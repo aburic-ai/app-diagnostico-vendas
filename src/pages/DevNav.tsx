@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Settings,
   Video,
+  Camera,
 } from 'lucide-react'
 
 import { PageWrapper } from '../components/ui'
@@ -69,6 +70,13 @@ const pages: PageLink[] = [
     label: 'Demo',
     description: 'Preview para captura de vídeo promocional',
     icon: <Video size={24} />,
+    status: 'done',
+  },
+  {
+    path: '/sandbox',
+    label: 'Sandbox',
+    description: 'Prints promocionais e form pós-compra',
+    icon: <Camera size={24} />,
     status: 'done',
   },
 ]

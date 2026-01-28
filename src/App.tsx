@@ -14,6 +14,7 @@ import { PosEvento } from './pages/PosEvento'
 import { DevNav } from './pages/DevNav'
 import { Admin } from './pages/Admin'
 import { Demo } from './pages/Demo'
+import { Sandbox } from './pages/Sandbox'
 import { AppLayout } from './components/ui'
 import './index.css'
 
@@ -26,6 +27,9 @@ function App() {
 
         {/* Demo tem layout próprio - otimizado para captura de vídeo */}
         <Route path="/demo" element={<Demo />} />
+
+        {/* Sandbox tem layout próprio - para prints e forms */}
+        <Route path="/sandbox" element={<Sandbox />} />
 
         {/* Todas as outras páginas usam AppLayout (mobile-first) */}
         <Route path="/*" element={

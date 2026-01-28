@@ -35,6 +35,7 @@ import {
   LockedOffer,
   AvatarButton,
   NotificationDrawer,
+  PageHeader,
 } from '../components/ui'
 import type { IMPACTData, ActionItem, Notification } from '../components/ui'
 import { theme } from '../styles/theme'
@@ -47,6 +48,21 @@ interface ProfileData {
   company: string
   role: string
   photoUrl: string | null
+}
+
+// Links da oferta (viriam do Admin/Backend)
+const OFFER_LINKS = {
+  posEventoLink: 'https://imersao.neuropersuasao.com.br/',
+  utmSource: 'appdiagn',
+  utmMedium: 'app',
+  utmCampaign: 'imersao2026',
+  utmContent: 'posevento',
+}
+
+// Helper para construir URL com UTM
+const buildOfferUrl = (baseUrl: string, utmContent?: string): string => {
+  const separator = baseUrl.includes('?') ? '&' : '?'
+  return `${baseUrl}${separator}utm_source=${OFFER_LINKS.utmSource}&utm_medium=${OFFER_LINKS.utmMedium}&utm_campaign=${OFFER_LINKS.utmCampaign}&utm_content=${utmContent || OFFER_LINKS.utmContent}`
 }
 
 export function PosEvento() {
@@ -252,17 +268,25 @@ export function PosEvento() {
           animate="visible"
           style={{ padding: '16px' }}
         >
-          {/* ==================== TOP BAR - Avatar + Notifications ==================== */}
+          {/* ==================== HEADER WITH AVATAR ==================== */}
           <motion.div
             variants={itemVariants}
             style={{
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: '12px',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
               marginBottom: '16px',
             }}
           >
+            <PageHeader
+              title="IMERSÃO ONLINE"
+              subtitle="DIAGNÓSTICO DE VENDAS"
+              marginBottom="0px"
+              centered={false}
+            />
+
+            {/* Avatar + Notifications */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {/* Notification Bell */}
             <motion.button
               whileTap={{ scale: 0.9 }}
@@ -311,6 +335,7 @@ export function PosEvento() {
               photoUrl={profile.photoUrl || undefined}
               onClick={() => setShowProfileModal(true)}
             />
+            </div>
           </motion.div>
 
           {/* ==================== HEADER STATUS ==================== */}
@@ -384,7 +409,7 @@ export function PosEvento() {
                 title="PROTOCOLO DE CORREÇÃO DISPONÍVEL"
                 message={`Seu diagnóstico aponta falha crítica em ${gargalo.etapa}. Ative o protocolo presencial.`}
                 actionLabel="ATIVAR"
-                onAction={() => console.log('Ativar oferta')}
+                onAction={() => window.open(buildOfferUrl(OFFER_LINKS.posEventoLink, 'alert'), '_blank')}
                 onClose={() => setShowAlert(false)}
               />
             </motion.div>
@@ -411,7 +436,7 @@ export function PosEvento() {
               title="IMERSÃO PRESENCIAL IMPACT"
               subtitle="Protocolo de Correção em 3 Dias"
               isUnlocked={true}
-              onClick={() => console.log('Reservar vaga')}
+              onClick={() => window.open(buildOfferUrl(OFFER_LINKS.posEventoLink, 'oferta'), '_blank')}
             />
           </motion.div>
 
