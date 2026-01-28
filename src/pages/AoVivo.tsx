@@ -210,6 +210,7 @@ export function AoVivo() {
               title="IMERSÃO ONLINE"
               subtitle="DIAGNÓSTICO DE VENDAS"
               marginBottom="0px"
+              centered={false}
             />
 
             {/* Avatar + Notifications */}

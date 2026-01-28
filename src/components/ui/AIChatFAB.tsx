@@ -30,7 +30,7 @@ export function AIChatFAB({
       onClick={isAvailable ? onClick : undefined}
       style={{
         position: 'fixed',
-        bottom: 'calc(80px + env(safe-area-inset-bottom, 24px))',
+        bottom: 'calc(110px + env(safe-area-inset-bottom, 24px))',
         right: '16px',
         width: '60px',
         height: '60px',
