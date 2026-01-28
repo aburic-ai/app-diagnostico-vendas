@@ -155,7 +155,7 @@ export function ActionPlan({
             style={{ overflow: 'hidden' }}
           >
             <div style={{ padding: '12px 16px 16px 16px' }}>
-              {/* Day progress bar - only shows up to current day */}
+              {/* Day progress bar - shows all 7 days, future ones grayed out */}
               <div
                 style={{
                   display: 'flex',
@@ -163,11 +163,12 @@ export function ActionPlan({
                   marginBottom: '16px',
                 }}
               >
-                {Array.from({ length: currentDay }).map((_, i) => {
+                {Array.from({ length: 7 }).map((_, i) => {
                   const dayNum = i + 1
                   const status = getActionStatus(dayNum)
-                  const dayAction = visibleActions.find(a => a.day === dayNum)
+                  const dayAction = actions.find(a => a.day === dayNum)
                   const isCompleted = dayAction?.completed
+                  const isFuture = dayNum > currentDay
 
                   return (
                     <div
@@ -176,11 +177,13 @@ export function ActionPlan({
                         flex: 1,
                         height: '6px',
                         borderRadius: '3px',
-                        background: isCompleted
+                        background: isFuture
+                          ? 'rgba(100, 116, 139, 0.15)'
+                          : isCompleted
                           ? theme.colors.accent.cyan.DEFAULT
                           : status === 'current'
                           ? `linear-gradient(90deg, ${theme.colors.gold.DEFAULT} 0%, ${theme.colors.gold.light} 100%)`
-                          : 'rgba(100, 116, 139, 0.2)',
+                          : 'rgba(100, 116, 139, 0.3)',
                         boxShadow: isCompleted
                           ? `0 0 8px ${theme.colors.accent.cyan.DEFAULT}`
                           : status === 'current'

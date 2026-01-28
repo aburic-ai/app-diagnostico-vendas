@@ -31,6 +31,7 @@ import {
   Calendar,
   Clock,
   Settings,
+  Bot,
 } from 'lucide-react'
 import { EVENT_MODULES, TOTAL_MODULES, getCurrentDay } from '../data/modules'
 import { NotificationToast } from '../components/ui'
@@ -44,6 +45,7 @@ interface EventState {
   status: EventStatus
   currentModule: number
   offerReleased: boolean
+  aiEnabled: boolean
   participantsOnline: number
   lunchReturnTime: string
 }
@@ -80,6 +82,7 @@ export function Admin() {
     status: 'offline',
     currentModule: 0,
     offerReleased: false,
+    aiEnabled: false,
     participantsOnline: 0,
     lunchReturnTime: '14:00',
   })
@@ -196,6 +199,10 @@ export function Admin() {
 
   const handleReleaseOffer = () => {
     setEventState(prev => ({ ...prev, offerReleased: !prev.offerReleased }))
+  }
+
+  const handleToggleAI = () => {
+    setEventState(prev => ({ ...prev, aiEnabled: !prev.aiEnabled }))
   }
 
   const handleSendNotification = () => {
@@ -911,6 +918,64 @@ export function Admin() {
             >
               {eventState.offerReleased ? <Lock size={16} /> : <Unlock size={16} />}
               {eventState.offerReleased ? 'BLOQUEAR' : 'LIBERAR OFERTA'}
+            </motion.button>
+          </div>
+        </div>
+
+        {/* ==================== ASSISTENTE IA ==================== */}
+        <div
+          style={{
+            padding: '20px',
+            background: eventState.aiEnabled
+              ? 'rgba(168, 85, 247, 0.1)'
+              : 'rgba(15, 17, 21, 0.8)',
+            border: `1px solid ${eventState.aiEnabled ? 'rgba(168, 85, 247, 0.4)' : 'rgba(100, 116, 139, 0.2)'}`,
+            borderRadius: '16px',
+            marginBottom: '20px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h2
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: theme.colors.text.primary,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  margin: '0 0 4px 0',
+                }}
+              >
+                Assistente IA
+              </h2>
+              <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: 0 }}>
+                {eventState.aiEnabled
+                  ? 'Habilitada para os participantes'
+                  : 'Desabilitada - participantes não podem usar'}
+              </p>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleToggleAI}
+              style={{
+                padding: '12px 20px',
+                background: eventState.aiEnabled
+                  ? 'rgba(239, 68, 68, 0.2)'
+                  : 'rgba(168, 85, 247, 0.2)',
+                border: `1px solid ${eventState.aiEnabled ? 'rgba(239, 68, 68, 0.5)' : 'rgba(168, 85, 247, 0.5)'}`,
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: eventState.aiEnabled ? '#EF4444' : '#A855F7',
+                fontSize: '13px',
+                fontWeight: 'bold',
+              }}
+            >
+              <Bot size={16} />
+              {eventState.aiEnabled ? 'DESABILITAR IA' : 'HABILITAR IA'}
             </motion.button>
           </div>
         </div>
