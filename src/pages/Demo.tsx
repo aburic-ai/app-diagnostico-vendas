@@ -46,19 +46,19 @@ interface TourStep {
 const TOUR_STEPS: TourStep[] = [
   // INTRO
   { id: 'intro', title: 'Bem-vindo ao Cockpit', description: 'Seu painel de diagnóstico de vendas', duration: 2000, phase: 'intro' },
-  // PRÉ-EVENTO
-  { id: 'phase-pre', title: 'PRÉ-EVENTO', description: 'Preparação antes do evento', duration: 2000, phase: 'pre' },
-  { id: 'aulas', title: 'Aulas Preparatórias', description: 'Conteúdo exclusivo + bônus', duration: 3000, phase: 'pre' },
-  // DURANTE O EVENTO
-  { id: 'phase-durante', title: 'DURANTE O EVENTO', description: 'Diagnóstico em tempo real', duration: 2000, phase: 'durante' },
+  // PRÉ-EVENTO - Timeline section
+  { id: 'pre-label', title: 'Pré-Evento', description: 'Preparação antes da imersão', duration: 1500, phase: 'pre' },
+  { id: 'aulas', title: 'Aulas Preparatórias', description: 'Conteúdo exclusivo + bônus', duration: 2500, phase: 'pre' },
+  // DURANTE O EVENTO - Timeline section
+  { id: 'durante-label', title: 'Durante o Evento', description: 'Diagnóstico em tempo real', duration: 1500, phase: 'durante' },
   { id: 'agenda', title: 'Agenda Ao Vivo', description: 'Acompanhe cada módulo', duration: 2500, phase: 'durante' },
-  { id: 'sliders', title: 'Diagnóstico IMPACT', description: 'Avalie cada etapa da sua jornada', duration: 4000, phase: 'durante' },
-  { id: 'radar', title: 'Visualização Radar', description: 'Veja seu diagnóstico completo', duration: 2500, phase: 'durante' },
-  { id: 'gargalo', title: 'Identificação de Gargalos', description: 'Descubra onde sua venda trava', duration: 3000, phase: 'durante' },
-  { id: 'ia', title: 'Assistente IA', description: 'Suporte inteligente ao vivo', duration: 2500, phase: 'durante' },
+  { id: 'radar', title: 'Visualização Radar', description: 'Veja seu diagnóstico se formando', duration: 3000, phase: 'durante' },
+  { id: 'sliders', title: 'Diagnóstico IMPACT', description: 'As barras oscilam em tempo real', duration: 3500, phase: 'durante' },
+  { id: 'gargalo', title: 'Identificação de Gargalos', description: 'Descubra onde sua venda trava', duration: 2500, phase: 'durante' },
+  { id: 'ia', title: 'Assistente IA', description: 'Suporte inteligente ao vivo', duration: 4000, phase: 'durante' },
   { id: 'avisos', title: 'Avisos em Tempo Real', description: 'Notificações da organização', duration: 2500, phase: 'durante' },
-  // PÓS-EVENTO
-  { id: 'phase-pos', title: 'PÓS-EVENTO', description: 'Consolidação e ação', duration: 2000, phase: 'pos' },
+  // PÓS-EVENTO - Timeline section
+  { id: 'pos-label', title: 'Pós-Evento', description: 'Consolidação e ação', duration: 1500, phase: 'pos' },
   { id: 'relatorio', title: 'Relatório Final', description: 'Consolidação do seu diagnóstico', duration: 3000, phase: 'pos' },
   { id: 'posevento', title: 'Plano de 7 Dias', description: 'Acompanhamento pós-evento', duration: 3000, phase: 'pos' },
   // END
@@ -93,20 +93,25 @@ export function Demo() {
   const [xp, setXp] = useState(0)
   const [showXpAnimation, setShowXpAnimation] = useState(false)
 
-  // Phase states
-  const [currentPhase, setCurrentPhase] = useState<'intro' | 'pre' | 'durante' | 'pos' | 'end'>('intro')
+  // Phase states (tracked but not displayed - timeline labels show phases instead)
+  const [, setCurrentPhase] = useState<'intro' | 'pre' | 'durante' | 'pos' | 'end'>('intro')
 
   // Visibility states
-  const [showPhaseTransition, setShowPhaseTransition] = useState(false)
+  const [showPreLabel, setShowPreLabel] = useState(false)
   const [showAulas, setShowAulas] = useState(false)
+  const [showDuranteLabel, setShowDuranteLabel] = useState(false)
   const [showAgenda, setShowAgenda] = useState(false)
   const [showSliders, setShowSliders] = useState(false)
   const [showRadar, setShowRadar] = useState(false)
   const [showGargalo, setShowGargalo] = useState(false)
   const [showIA, setShowIA] = useState(false)
   const [showAvisos, setShowAvisos] = useState(false)
+  const [showPosLabel, setShowPosLabel] = useState(false)
   const [showRelatorio, setShowRelatorio] = useState(false)
   const [showPosEvento, setShowPosEvento] = useState(false)
+
+  // IA Chat animation state
+  const [iaChatStep, setIaChatStep] = useState(0)
 
   // Highlights
   const [highlightFeature, setHighlightFeature] = useState<string | null>(null)
@@ -118,19 +123,23 @@ export function Demo() {
   const resetDemo = useCallback(() => {
     setSliderValues([0, 0, 0, 0, 0, 0])
     setXp(0)
+    xpRef.current = 0
     setCurrentPhase('intro')
-    setShowPhaseTransition(false)
+    setShowPreLabel(false)
     setShowAulas(false)
+    setShowDuranteLabel(false)
     setShowAgenda(false)
     setShowSliders(false)
     setShowRadar(false)
     setShowGargalo(false)
     setShowIA(false)
     setShowAvisos(false)
+    setShowPosLabel(false)
     setShowRelatorio(false)
     setShowPosEvento(false)
     setHighlightFeature(null)
     setActiveNotification(null)
+    setIaChatStep(0)
     setCurrentStep(0)
     setShowIntro(true)
   }, [])
@@ -200,33 +209,34 @@ export function Demo() {
         setShowIntro(false)
         setCurrentPhase('intro')
         break
-      case 'phase-pre':
+      case 'pre-label':
         setCurrentPhase('pre')
-        setShowPhaseTransition(true)
-        setTimeout(() => setShowPhaseTransition(false), 1500)
+        setShowPreLabel(true)
+        scrollToSection('section-pre-label')
         break
       case 'aulas':
         setShowAulas(true)
         scrollToSection('section-aulas')
         animateXp(50)
         break
-      case 'phase-durante':
+      case 'durante-label':
         setCurrentPhase('durante')
-        setShowPhaseTransition(true)
-        setTimeout(() => setShowPhaseTransition(false), 1500)
+        setShowDuranteLabel(true)
+        scrollToSection('section-durante-label')
         break
       case 'agenda':
         setShowAgenda(true)
         scrollToSection('section-agenda')
         break
+      case 'radar':
+        // Show radar first with initial values, then animate
+        setShowRadar(true)
+        scrollToSection('section-radar')
+        setTimeout(() => animateSliders(), 500)
+        break
       case 'sliders':
         setShowSliders(true)
         scrollToSection('section-sliders')
-        setTimeout(() => animateSliders(), 500)
-        break
-      case 'radar':
-        setShowRadar(true)
-        scrollToSection('section-radar')
         break
       case 'gargalo':
         setShowGargalo(true)
@@ -235,6 +245,11 @@ export function Demo() {
       case 'ia':
         setShowIA(true)
         scrollToSection('section-ia')
+        // Animate chat messages
+        setIaChatStep(1)
+        setTimeout(() => setIaChatStep(2), 1000)
+        setTimeout(() => setIaChatStep(3), 2000)
+        setTimeout(() => setIaChatStep(4), 3000)
         break
       case 'avisos':
         setShowAvisos(true)
@@ -243,10 +258,10 @@ export function Demo() {
         setTimeout(() => setActiveNotification(1), 800)
         setTimeout(() => setActiveNotification(2), 1600)
         break
-      case 'phase-pos':
+      case 'pos-label':
         setCurrentPhase('pos')
-        setShowPhaseTransition(true)
-        setTimeout(() => setShowPhaseTransition(false), 1500)
+        setShowPosLabel(true)
+        scrollToSection('section-pos-label')
         break
       case 'relatorio':
         setShowRelatorio(true)
@@ -367,55 +382,62 @@ export function Demo() {
           </motion.div>
         </div>
 
-        {/* Phase Indicator */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
-          {[
-            { id: 'pre', label: 'PRÉ', icon: Rocket, color: theme.colors.accent.cyan.DEFAULT },
-            { id: 'durante', label: 'AO VIVO', icon: Radio, color: theme.colors.accent.purple.light },
-            { id: 'pos', label: 'PÓS', icon: Target, color: theme.colors.gold.DEFAULT },
-          ].map((p) => (
+        {/* AO VIVO Badge - Cockpit indicator */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+          <motion.div
+            animate={{
+              boxShadow: ['0 0 10px rgba(239, 68, 68, 0.3)', '0 0 25px rgba(239, 68, 68, 0.6)', '0 0 10px rgba(239, 68, 68, 0.3)'],
+            }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 20px',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.5)',
+              borderRadius: '8px',
+            }}
+          >
             <motion.div
-              key={p.id}
-              animate={{
-                opacity: currentPhase === p.id || (p.id === 'pre' && currentPhase === 'intro') ? 1 : 0.4,
-                scale: currentPhase === p.id ? 1.05 : 1,
-              }}
+              animate={{ scale: [1, 1.3, 1], opacity: [1, 0.6, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 10px',
-                background: currentPhase === p.id ? `${p.color}25` : 'transparent',
-                border: `1px solid ${currentPhase === p.id ? p.color : 'rgba(100, 116, 139, 0.3)'}`,
-                borderRadius: '6px',
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: '#EF4444',
+                boxShadow: '0 0 10px #EF4444',
               }}
-            >
-              <p.icon size={12} color={currentPhase === p.id ? p.color : theme.colors.text.muted} />
-              <span style={{ fontSize: '9px', fontWeight: 'bold', color: currentPhase === p.id ? p.color : theme.colors.text.muted, textTransform: 'uppercase' }}>
-                {p.label}
-              </span>
-            </motion.div>
-          ))}
+            />
+            <Radio size={16} color="#EF4444" />
+            <span style={{
+              fontFamily: theme.typography.fontFamily.orbitron,
+              fontSize: '12px',
+              fontWeight: 'bold',
+              color: '#EF4444',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+            }}>
+              AO VIVO
+            </span>
+          </motion.div>
         </div>
 
         {/* Step Progress Bar */}
         <div style={{ display: 'flex', gap: '3px', justifyContent: 'center' }}>
-          {TOUR_STEPS.filter(s => !s.id.startsWith('phase-')).map((step) => {
+          {TOUR_STEPS.filter(s => !s.id.endsWith('-label')).map((step) => {
             const realIndex = TOUR_STEPS.findIndex(s => s.id === step.id)
-            const phaseColor = step.phase === 'pre' ? theme.colors.accent.cyan.DEFAULT
-              : step.phase === 'durante' ? theme.colors.accent.purple.light
-                : step.phase === 'pos' ? theme.colors.gold.DEFAULT
-                  : theme.colors.text.secondary
             return (
               <motion.div
                 key={step.id}
                 animate={{
                   background: realIndex < currentStep
-                    ? phaseColor
+                    ? theme.colors.accent.cyan.DEFAULT
                     : realIndex === currentStep && isTourRunning
-                      ? phaseColor
+                      ? theme.colors.accent.purple.light
                       : 'rgba(100, 116, 139, 0.3)',
-                  width: realIndex === currentStep && isTourRunning ? '20px' : '12px',
+                  width: realIndex === currentStep && isTourRunning ? '20px' : '10px',
                 }}
                 style={{
                   height: '4px',
@@ -475,6 +497,49 @@ export function Demo() {
           </h2>
         </motion.div>
 
+        {/* ==================== PRÉ-EVENTO LABEL ==================== */}
+        <AnimatePresence>
+          {showPreLabel && (
+            <motion.div
+              id="section-pre-label"
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '16px',
+                paddingLeft: '8px',
+              }}
+            >
+              <div style={{
+                width: '3px',
+                height: '40px',
+                background: `linear-gradient(180deg, ${theme.colors.accent.cyan.DEFAULT} 0%, transparent 100%)`,
+                borderRadius: '2px',
+              }} />
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Rocket size={18} color={theme.colors.accent.cyan.DEFAULT} />
+                  <span style={{
+                    fontFamily: theme.typography.fontFamily.orbitron,
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: theme.colors.accent.cyan.DEFAULT,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                  }}>
+                    PRÉ-EVENTO
+                  </span>
+                </div>
+                <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
+                  Preparação antes da imersão
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* ==================== AULAS BÔNUS ==================== */}
         <AnimatePresence>
           {showAulas && (
@@ -522,6 +587,49 @@ export function Demo() {
                     <span style={{ fontSize: '10px', color: theme.colors.text.primary, fontWeight: 'bold' }}>Aula {i}</span>
                   </motion.div>
                 ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ==================== DURANTE O EVENTO LABEL ==================== */}
+        <AnimatePresence>
+          {showDuranteLabel && (
+            <motion.div
+              id="section-durante-label"
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '16px',
+                paddingLeft: '8px',
+              }}
+            >
+              <div style={{
+                width: '3px',
+                height: '40px',
+                background: `linear-gradient(180deg, ${theme.colors.accent.purple.light} 0%, transparent 100%)`,
+                borderRadius: '2px',
+              }} />
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Radio size={18} color={theme.colors.accent.purple.light} />
+                  <span style={{
+                    fontFamily: theme.typography.fontFamily.orbitron,
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: theme.colors.accent.purple.light,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                  }}>
+                    DURANTE O EVENTO
+                  </span>
+                </div>
+                <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
+                  Diagnóstico em tempo real
+                </span>
               </div>
             </motion.div>
           )}
@@ -773,23 +881,90 @@ export function Demo() {
                 </div>
               </div>
 
-              {/* Chat Preview */}
-              <div style={{ padding: '12px', background: 'rgba(5, 5, 5, 0.5)', borderRadius: '10px', marginBottom: '12px' }}>
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                  style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}
-                >
-                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Sparkles size={14} color={theme.colors.accent.purple.light} />
-                  </div>
-                  <div style={{ flex: 1, padding: '10px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '8px' }}>
-                    <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: 0, lineHeight: 1.4 }}>
-                      Como posso ajudar você a melhorar sua conversão?
-                    </p>
-                  </div>
-                </motion.div>
+              {/* Chat Preview - Animated conversation */}
+              <div style={{ padding: '12px', background: 'rgba(5, 5, 5, 0.5)', borderRadius: '10px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {/* IA Message 1 */}
+                <AnimatePresence>
+                  {iaChatStep >= 1 && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      style={{ display: 'flex', gap: '8px' }}
+                    >
+                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Sparkles size={14} color={theme.colors.accent.purple.light} />
+                      </div>
+                      <div style={{ flex: 1, padding: '10px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '8px' }}>
+                        <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: 0, lineHeight: 1.4 }}>
+                          Seu gargalo está em Conversão. O que você usa para criar urgência?
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* User Message */}
+                <AnimatePresence>
+                  {iaChatStep >= 2 && (
+                    <motion.div
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}
+                    >
+                      <div style={{ padding: '10px', background: 'rgba(34, 211, 238, 0.15)', borderRadius: '8px', maxWidth: '80%' }}>
+                        <p style={{ fontSize: '12px', color: theme.colors.text.primary, margin: 0, lineHeight: 1.4 }}>
+                          Geralmente só falo que o desconto vai acabar
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* IA Message 2 */}
+                <AnimatePresence>
+                  {iaChatStep >= 3 && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      style={{ display: 'flex', gap: '8px' }}
+                    >
+                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Sparkles size={14} color={theme.colors.accent.purple.light} />
+                      </div>
+                      <div style={{ flex: 1, padding: '10px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '8px' }}>
+                        <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: 0, lineHeight: 1.4 }}>
+                          Essa é uma urgência externa. Você precisa criar urgência interna baseada na dor do cliente.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* IA Typing indicator */}
+                <AnimatePresence>
+                  {iaChatStep >= 4 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      style={{ display: 'flex', gap: '8px' }}
+                    >
+                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(168, 85, 247, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Sparkles size={14} color={theme.colors.accent.purple.light} />
+                      </div>
+                      <div style={{ padding: '10px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '8px' }}>
+                        <motion.div
+                          animate={{ opacity: [0.4, 1, 0.4] }}
+                          transition={{ duration: 1.2, repeat: Infinity }}
+                          style={{ display: 'flex', gap: '4px' }}
+                        >
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.colors.accent.purple.light }} />
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.colors.accent.purple.light }} />
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: theme.colors.accent.purple.light }} />
+                        </motion.div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -868,6 +1043,49 @@ export function Demo() {
                     <span style={{ fontSize: '12px', color: theme.colors.text.primary }}>{notif.text}</span>
                   </motion.div>
                 ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ==================== PÓS-EVENTO LABEL ==================== */}
+        <AnimatePresence>
+          {showPosLabel && (
+            <motion.div
+              id="section-pos-label"
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '16px',
+                paddingLeft: '8px',
+              }}
+            >
+              <div style={{
+                width: '3px',
+                height: '40px',
+                background: `linear-gradient(180deg, ${theme.colors.gold.DEFAULT} 0%, transparent 100%)`,
+                borderRadius: '2px',
+              }} />
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Target size={18} color={theme.colors.gold.DEFAULT} />
+                  <span style={{
+                    fontFamily: theme.typography.fontFamily.orbitron,
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: theme.colors.gold.DEFAULT,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                  }}>
+                    PÓS-EVENTO
+                  </span>
+                </div>
+                <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
+                  Consolidação e plano de ação
+                </span>
               </div>
             </motion.div>
           )}
@@ -1025,7 +1243,7 @@ export function Demo() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: '9px', color: theme.colors.text.muted, textTransform: 'uppercase' }}>DIA 3 - TAREFA</span>
-                  <p style={{ fontSize: '13px', fontWeight: 'bold', color: theme.colors.text.primary, margin: '2px 0 0 0' }}>Revisar proposta de valor</p>
+                  <p style={{ fontSize: '13px', fontWeight: 'bold', color: theme.colors.text.primary, margin: '2px 0 0 0' }}>Etapa I em estado crítico para gerar captação</p>
                 </div>
                 <ChevronRight size={18} color={theme.colors.gold.DEFAULT} />
               </motion.div>
@@ -1100,118 +1318,6 @@ export function Demo() {
           <RotateCcw size={20} color={theme.colors.text.secondary} />
         </motion.button>
       </div>
-
-      {/* ==================== PHASE TRANSITION OVERLAY ==================== */}
-      <AnimatePresence>
-        {showPhaseTransition && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(5, 5, 5, 0.95)',
-              backdropFilter: 'blur(10px)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 90,
-            }}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              style={{ textAlign: 'center' }}
-            >
-              {currentPhase === 'pre' && (
-                <>
-                  <motion.div
-                    animate={{ y: [0, -10, 0] }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                    style={{
-                      width: '80px',
-                      height: '80px',
-                      borderRadius: '24px',
-                      background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.3) 0%, rgba(6, 182, 212, 0.2) 100%)',
-                      border: '2px solid rgba(34, 211, 238, 0.5)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto 20px',
-                    }}
-                  >
-                    <Rocket size={36} color={theme.colors.accent.cyan.DEFAULT} />
-                  </motion.div>
-                  <h2 style={{ fontFamily: theme.typography.fontFamily.orbitron, fontSize: '24px', fontWeight: 'bold', color: theme.colors.accent.cyan.DEFAULT, margin: '0 0 8px 0', textTransform: 'uppercase' }}>
-                    PRÉ-EVENTO
-                  </h2>
-                  <p style={{ fontSize: '14px', color: theme.colors.text.secondary, margin: 0 }}>
-                    Preparação antes do evento
-                  </p>
-                </>
-              )}
-              {currentPhase === 'durante' && (
-                <>
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 0.8, repeat: Infinity }}
-                    style={{
-                      width: '80px',
-                      height: '80px',
-                      borderRadius: '24px',
-                      background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
-                      border: '2px solid rgba(168, 85, 247, 0.5)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto 20px',
-                      boxShadow: '0 0 30px rgba(168, 85, 247, 0.4)',
-                    }}
-                  >
-                    <Radio size={36} color={theme.colors.accent.purple.light} />
-                  </motion.div>
-                  <h2 style={{ fontFamily: theme.typography.fontFamily.orbitron, fontSize: '24px', fontWeight: 'bold', color: theme.colors.accent.purple.light, margin: '0 0 8px 0', textTransform: 'uppercase' }}>
-                    DURANTE O EVENTO
-                  </h2>
-                  <p style={{ fontSize: '14px', color: theme.colors.text.secondary, margin: 0 }}>
-                    Diagnóstico em tempo real
-                  </p>
-                </>
-              )}
-              {currentPhase === 'pos' && (
-                <>
-                  <motion.div
-                    animate={{ rotate: [0, 10, -10, 0] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                    style={{
-                      width: '80px',
-                      height: '80px',
-                      borderRadius: '24px',
-                      background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.3) 0%, rgba(217, 119, 6, 0.2) 100%)',
-                      border: '2px solid rgba(245, 158, 11, 0.5)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto 20px',
-                    }}
-                  >
-                    <Target size={36} color={theme.colors.gold.DEFAULT} />
-                  </motion.div>
-                  <h2 style={{ fontFamily: theme.typography.fontFamily.orbitron, fontSize: '24px', fontWeight: 'bold', color: theme.colors.gold.DEFAULT, margin: '0 0 8px 0', textTransform: 'uppercase' }}>
-                    PÓS-EVENTO
-                  </h2>
-                  <p style={{ fontSize: '14px', color: theme.colors.text.secondary, margin: 0 }}>
-                    Consolidação e plano de ação
-                  </p>
-                </>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ==================== INTRO OVERLAY ==================== */}
       <AnimatePresence>
