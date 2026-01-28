@@ -20,7 +20,7 @@ function App() {
     <BrowserRouter>
       <AppLayout>
         <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<Navigate to="/dev" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/pre-evento" element={<PreEvento />} />
           <Route path="/ao-vivo" element={<AoVivo />} />
