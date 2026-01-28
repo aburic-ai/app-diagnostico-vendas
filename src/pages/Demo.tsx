@@ -192,11 +192,10 @@ export function Demo() {
     }, 50)
   }, []) // No dependencies - uses refs
 
-  // Scroll to section
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId)
-    if (element && contentRef.current) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  // Scroll to top (for new content appearing at top)
+  const scrollToTop = () => {
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
@@ -212,39 +211,39 @@ export function Demo() {
       case 'pre-label':
         setCurrentPhase('pre')
         setShowPreLabel(true)
-        scrollToSection('section-pre-label')
+        scrollToTop()
         break
       case 'aulas':
         setShowAulas(true)
-        scrollToSection('section-aulas')
+        scrollToTop()
         animateXp(50)
         break
       case 'durante-label':
         setCurrentPhase('durante')
         setShowDuranteLabel(true)
-        scrollToSection('section-durante-label')
+        scrollToTop()
         break
       case 'agenda':
         setShowAgenda(true)
-        scrollToSection('section-agenda')
+        scrollToTop()
         break
       case 'radar':
         // Show radar first with initial values, then animate
         setShowRadar(true)
-        scrollToSection('section-radar')
+        scrollToTop()
         setTimeout(() => animateSliders(), 500)
         break
       case 'sliders':
         setShowSliders(true)
-        scrollToSection('section-sliders')
+        scrollToTop()
         break
       case 'gargalo':
         setShowGargalo(true)
-        scrollToSection('section-gargalo')
+        scrollToTop()
         break
       case 'ia':
         setShowIA(true)
-        scrollToSection('section-ia')
+        scrollToTop()
         // Animate chat messages
         setIaChatStep(1)
         setTimeout(() => setIaChatStep(2), 1000)
@@ -253,7 +252,7 @@ export function Demo() {
         break
       case 'avisos':
         setShowAvisos(true)
-        scrollToSection('section-avisos')
+        scrollToTop()
         setActiveNotification(0)
         setTimeout(() => setActiveNotification(1), 800)
         setTimeout(() => setActiveNotification(2), 1600)
@@ -261,16 +260,16 @@ export function Demo() {
       case 'pos-label':
         setCurrentPhase('pos')
         setShowPosLabel(true)
-        scrollToSection('section-pos-label')
+        scrollToTop()
         break
       case 'relatorio':
         setShowRelatorio(true)
-        scrollToSection('section-relatorio')
+        scrollToTop()
         animateXp(200)
         break
       case 'posevento':
         setShowPosEvento(true)
-        scrollToSection('section-posevento')
+        scrollToTop()
         break
       case 'end':
         setCurrentPhase('end')
@@ -521,13 +520,19 @@ export function Demo() {
           </p>
         </motion.div>
 
-        {/* ==================== PRÉ-EVENTO LABEL ==================== */}
+        {/* ==================== REVERSED TIMELINE CONTAINER ==================== */}
+        {/* New content appears at TOP, pushing older content down */}
+        <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
+
+          {/* ==================== PRÉ-EVENTO GROUP ==================== */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {/* PRÉ-EVENTO LABEL */}
         <AnimatePresence>
           {showPreLabel && (
             <motion.div
               id="section-pre-label"
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: -30 }}
+              animate={{ opacity: 1, y: 0 }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -569,7 +574,7 @@ export function Demo() {
           {showAulas && (
             <motion.div
               id="section-aulas"
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: -30 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
                 marginBottom: '20px',
@@ -615,43 +620,47 @@ export function Demo() {
             </motion.div>
           )}
         </AnimatePresence>
+          </div>
+          {/* END PRÉ-EVENTO GROUP */}
 
-        {/* ==================== DURANTE O EVENTO LABEL ==================== */}
-        <AnimatePresence>
-          {showDuranteLabel && (
-            <motion.div
-              id="section-durante-label"
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '16px',
-                paddingLeft: '8px',
-              }}
-            >
-              <div style={{
-                width: '3px',
-                height: '40px',
-                background: `linear-gradient(180deg, ${theme.colors.accent.purple.light} 0%, transparent 100%)`,
-                borderRadius: '2px',
-              }} />
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Radio size={18} color={theme.colors.accent.purple.light} />
-                  <span style={{
-                    fontFamily: theme.typography.fontFamily.orbitron,
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    color: theme.colors.accent.purple.light,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.1em',
-                  }}>
-                    DURANTE O EVENTO
-                  </span>
-                </div>
-                <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
+          {/* ==================== DURANTE O EVENTO GROUP ==================== */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {/* DURANTE O EVENTO LABEL */}
+            <AnimatePresence>
+              {showDuranteLabel && (
+                <motion.div
+                  id="section-durante-label"
+                  initial={{ opacity: 0, y: -30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: '16px',
+                    paddingLeft: '8px',
+                  }}
+                >
+                  <div style={{
+                    width: '3px',
+                    height: '40px',
+                    background: `linear-gradient(180deg, ${theme.colors.accent.purple.light} 0%, transparent 100%)`,
+                    borderRadius: '2px',
+                  }} />
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Radio size={18} color={theme.colors.accent.purple.light} />
+                      <span style={{
+                        fontFamily: theme.typography.fontFamily.orbitron,
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        color: theme.colors.accent.purple.light,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.1em',
+                      }}>
+                        DURANTE O EVENTO
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
                   Diagnóstico em tempo real
                 </span>
               </div>
@@ -664,7 +673,7 @@ export function Demo() {
           {showAgenda && (
             <motion.div
               id="section-agenda"
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: -30 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
                 marginBottom: '20px',
@@ -743,7 +752,7 @@ export function Demo() {
           {showSliders && (
             <motion.div
               id="section-sliders"
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: -30 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
                 marginBottom: '20px',
@@ -828,7 +837,7 @@ export function Demo() {
           {showRadar && (
             <motion.div
               id="section-radar"
-              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              initial={{ opacity: 0, y: -30, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               style={{
                 marginBottom: '20px',
@@ -849,7 +858,7 @@ export function Demo() {
           {showGargalo && (
             <motion.div
               id="section-gargalo"
-              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              initial={{ opacity: 0, y: -30, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               style={{
                 marginBottom: '20px',
@@ -884,7 +893,7 @@ export function Demo() {
           {showIA && (
             <motion.div
               id="section-ia"
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: -30 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
                 marginBottom: '20px',
@@ -1020,7 +1029,7 @@ export function Demo() {
           {showAvisos && (
             <motion.div
               id="section-avisos"
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: -30 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
                 marginBottom: '20px',
@@ -1070,57 +1079,61 @@ export function Demo() {
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
+            </AnimatePresence>
+          </div>
+          {/* END DURANTE O EVENTO GROUP */}
 
-        {/* ==================== PÓS-EVENTO LABEL ==================== */}
-        <AnimatePresence>
-          {showPosLabel && (
-            <motion.div
-              id="section-pos-label"
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '16px',
-                paddingLeft: '8px',
-              }}
-            >
-              <div style={{
-                width: '3px',
-                height: '40px',
-                background: `linear-gradient(180deg, ${theme.colors.gold.DEFAULT} 0%, transparent 100%)`,
-                borderRadius: '2px',
-              }} />
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Target size={18} color={theme.colors.gold.DEFAULT} />
-                  <span style={{
-                    fontFamily: theme.typography.fontFamily.orbitron,
-                    fontSize: '14px',
-                    fontWeight: 'bold',
-                    color: theme.colors.gold.DEFAULT,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.1em',
-                  }}>
-                    PÓS-EVENTO
-                  </span>
-                </div>
-                <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
-                  Consolidação e plano de ação
-                </span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          {/* ==================== PÓS-EVENTO GROUP ==================== */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {/* PÓS-EVENTO LABEL */}
+            <AnimatePresence>
+              {showPosLabel && (
+                <motion.div
+                  id="section-pos-label"
+                  initial={{ opacity: 0, y: -30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: '16px',
+                    paddingLeft: '8px',
+                  }}
+                >
+                  <div style={{
+                    width: '3px',
+                    height: '40px',
+                    background: `linear-gradient(180deg, ${theme.colors.gold.DEFAULT} 0%, transparent 100%)`,
+                    borderRadius: '2px',
+                  }} />
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Target size={18} color={theme.colors.gold.DEFAULT} />
+                      <span style={{
+                        fontFamily: theme.typography.fontFamily.orbitron,
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        color: theme.colors.gold.DEFAULT,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.1em',
+                      }}>
+                        PÓS-EVENTO
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
+                      Consolidação e plano de ação
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-        {/* ==================== RELATÓRIO FINAL ==================== */}
+            {/* RELATÓRIO FINAL */}
         <AnimatePresence>
           {showRelatorio && (
             <motion.div
               id="section-relatorio"
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: -30 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
                 marginBottom: '20px',
@@ -1198,7 +1211,7 @@ export function Demo() {
           {showPosEvento && (
             <motion.div
               id="section-posevento"
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: -30 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
                 marginBottom: '20px',
@@ -1273,7 +1286,12 @@ export function Demo() {
               </motion.div>
             </motion.div>
           )}
-        </AnimatePresence>
+            </AnimatePresence>
+          </div>
+          {/* END PÓS-EVENTO GROUP */}
+
+        </div>
+        {/* END REVERSED TIMELINE CONTAINER */}
       </div>
 
       {/* ==================== CONTROLS (BOTTOM) ==================== */}
