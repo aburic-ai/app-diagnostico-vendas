@@ -7,7 +7,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, Circle, Calendar, ChevronDown, ChevronUp, Clock } from 'lucide-react'
+import { Check, Circle, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
 import { theme } from '../../styles/theme'
 
 export interface ActionItem {
@@ -36,8 +36,11 @@ export function ActionPlan({
   defaultExpanded = true,
 }: ActionPlanProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
-  const completedCount = actions.filter(a => a.completed).length
-  const totalActions = actions.length
+
+  // Filter to only show actions up to and including current day
+  const visibleActions = actions.filter(a => a.day <= currentDay)
+  const completedCount = visibleActions.filter(a => a.completed).length
+  const totalActions = visibleActions.length
 
   const getActionStatus = (day: number) => {
     if (day < currentDay) return 'past'
@@ -152,7 +155,7 @@ export function ActionPlan({
             style={{ overflow: 'hidden' }}
           >
             <div style={{ padding: '12px 16px 16px 16px' }}>
-              {/* Day progress bar */}
+              {/* Day progress bar - only shows up to current day */}
               <div
                 style={{
                   display: 'flex',
@@ -160,10 +163,10 @@ export function ActionPlan({
                   marginBottom: '16px',
                 }}
               >
-                {Array.from({ length: 7 }).map((_, i) => {
+                {Array.from({ length: currentDay }).map((_, i) => {
                   const dayNum = i + 1
                   const status = getActionStatus(dayNum)
-                  const dayAction = actions.find(a => a.day === dayNum)
+                  const dayAction = visibleActions.find(a => a.day === dayNum)
                   const isCompleted = dayAction?.completed
 
                   return (
@@ -189,13 +192,10 @@ export function ActionPlan({
                 })}
               </div>
 
-              {/* Actions */}
+              {/* Actions - only shows visible (past + current) days */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {actions.map((action, index) => {
-                  const status = getActionStatus(action.day)
-                  const isActive = status === 'current'
-                  const isPast = status === 'past'
-                  const isFuture = status === 'future'
+                {visibleActions.map((action, index) => {
+                  const isActive = getActionStatus(action.day) === 'current'
 
                   return (
                     <motion.div
@@ -203,7 +203,7 @@ export function ActionPlan({
                       initial={{ x: -10, opacity: 0 }}
                       animate={{ x: 0, opacity: 1 }}
                       transition={{ delay: index * 0.05 }}
-                      onClick={() => (isActive || isPast) && onToggleAction(action.id)}
+                      onClick={() => onToggleAction(action.id)}
                       style={{
                         display: 'flex',
                         alignItems: 'flex-start',
@@ -220,8 +220,7 @@ export function ActionPlan({
                             : 'rgba(100, 116, 139, 0.15)'
                         }`,
                         borderRadius: '10px',
-                        cursor: isFuture ? 'default' : 'pointer',
-                        opacity: isFuture ? 0.5 : 1,
+                        cursor: 'pointer',
                       }}
                     >
                       {/* Checkbox */}
@@ -251,8 +250,6 @@ export function ActionPlan({
                       >
                         {action.completed ? (
                           <Check size={14} color="#000000" strokeWidth={3} />
-                        ) : isFuture ? (
-                          <Clock size={12} color={theme.colors.text.muted} />
                         ) : (
                           <Circle size={10} color={isActive ? theme.colors.gold.DEFAULT : theme.colors.text.muted} />
                         )}

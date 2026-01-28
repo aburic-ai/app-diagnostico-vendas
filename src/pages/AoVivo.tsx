@@ -2,10 +2,10 @@
  * Página Ao Vivo - Durante o Evento
  *
  * Core da experiência: diagnóstico em tempo real, gráfico radar,
- * alertas de gargalo, lista de módulos e oferta bloqueada.
+ * alertas de gargalo, módulos em scroll horizontal e oferta bloqueada.
  */
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Rocket,
@@ -19,6 +19,7 @@ import {
   Lock,
   Play,
   Bell,
+  Zap,
 } from 'lucide-react'
 
 import {
@@ -34,22 +35,33 @@ import {
   NotificationDrawer,
   AIChatFAB,
   SponsorBadge,
-  PresenceConfirmCard,
 } from '../components/ui'
 import type { IMPACTData, Notification } from '../components/ui'
 import { theme } from '../styles/theme'
-import { getModulesByDay, getModuleById } from '../data/modules'
+import { getModuleById, EVENT_MODULES } from '../data/modules'
 
 export function AoVivo() {
   const [activeNav, setActiveNav] = useState('aovivo')
   const [selectedDay, setSelectedDay] = useState<1 | 2>(1)
   const [showSliders, setShowSliders] = useState(true)
-  const [showModules, setShowModules] = useState(true)
   const [currentModule] = useState(5) // Módulo atual (simulado)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
-  const [showPresenceCard, setShowPresenceCard] = useState(true)
   const [isOfferUnlocked] = useState(false) // Libera no módulo 11
+  const [confirmedModules, setConfirmedModules] = useState<number[]>([0, 1, 2, 3, 4]) // Módulos já confirmados
+
+  // Ref for horizontal scroll
+  const modulesScrollRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to current module on mount
+  useEffect(() => {
+    if (modulesScrollRef.current) {
+      const currentModuleElement = modulesScrollRef.current.querySelector(`[data-module="${currentModule}"]`)
+      if (currentModuleElement) {
+        currentModuleElement.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+      }
+    }
+  }, [currentModule])
 
   // Notificações de exemplo
   const [notifications] = useState<Notification[]>([
@@ -153,8 +165,15 @@ export function AoVivo() {
   const currentModuleData = getModuleById(currentModule)
   const currentDay = currentModuleData?.day || 1
 
-  // Módulos do dia atual
-  const dayModules = getModulesByDay(currentDay)
+  // Handle presence confirmation
+  const handleConfirmPresence = (moduleId: number) => {
+    if (!confirmedModules.includes(moduleId)) {
+      setConfirmedModules(prev => [...prev, moduleId])
+    }
+  }
+
+  // Calculate total XP from confirmed modules
+  const totalXP = confirmedModules.length * 15
 
   return (
     <PageWrapper
@@ -250,106 +269,109 @@ export function AoVivo() {
             />
           </motion.div>
 
-          {/* ==================== PRESENCE CONFIRMATION ==================== */}
-          <AnimatePresence>
-            {showPresenceCard && (
-              <motion.div
-                variants={itemVariants}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                style={{ marginBottom: '16px' }}
-              >
-                <PresenceConfirmCard
-                  blockNumber={currentModule}
-                  blockName={currentModuleData?.title || ''}
-                  xpReward={15}
-                  timeLimit={120}
-                  onConfirm={() => setShowPresenceCard(false)}
-                  onExpire={() => setShowPresenceCard(false)}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* ==================== MODULES LIST ==================== */}
+          {/* ==================== HORIZONTAL MODULES SCROLL ==================== */}
           <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setShowModules(!showModules)}
+            {/* Section Header */}
+            <div
               style={{
-                width: '100%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '12px 16px',
-                background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.9) 0%, rgba(10, 12, 18, 0.95) 100%)',
-                border: '1px solid rgba(168, 85, 247, 0.3)',
-                borderRadius: showModules ? '12px 12px 0 0' : '12px',
-                cursor: 'pointer',
+                marginBottom: '12px',
               }}
             >
-              <span
-                style={{
-                  fontSize: '13px',
-                  fontWeight: theme.typography.fontWeight.bold,
-                  color: theme.colors.text.primary,
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                MÓDULOS DO DIA {currentDay}
-              </span>
-              {showModules ? (
-                <ChevronUp size={20} color={theme.colors.accent.purple.light} />
-              ) : (
-                <ChevronDown size={20} color={theme.colors.accent.purple.light} />
-              )}
-            </motion.button>
-
-            {showModules && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: theme.typography.fontWeight.bold,
+                    color: theme.colors.text.primary,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  MÓDULOS DIA {currentDay}
+                </span>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    color: theme.colors.text.muted,
+                  }}
+                >
+                  (deslize para ver todos)
+                </span>
+              </div>
               <div
                 style={{
-                  background: 'rgba(10, 12, 18, 0.5)',
-                  border: '1px solid rgba(168, 85, 247, 0.2)',
-                  borderTop: 'none',
-                  borderRadius: '0 0 12px 12px',
-                  padding: '12px',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  maxHeight: '300px',
-                  overflowY: 'auto',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  background: 'rgba(245, 158, 11, 0.1)',
+                  borderRadius: '6px',
                 }}
               >
-                {dayModules.map((mod) => {
-                  const isPast = mod.id < currentModule
-                  const isCurrent = mod.id === currentModule
-                  const isFuture = mod.id > currentModule
+                <Zap size={12} color={theme.colors.gold.DEFAULT} />
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: theme.colors.gold.DEFAULT,
+                  }}
+                >
+                  {totalXP} XP
+                </span>
+              </div>
+            </div>
 
-                  return (
-                    <motion.div
-                      key={mod.id}
-                      whileTap={isPast || isCurrent ? { scale: 0.98 } : {}}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '10px 12px',
-                        background: isCurrent
-                          ? 'rgba(168, 85, 247, 0.15)'
-                          : isPast
-                          ? 'rgba(34, 211, 238, 0.08)'
-                          : 'rgba(100, 116, 139, 0.05)',
-                        border: isCurrent
-                          ? '1px solid rgba(168, 85, 247, 0.4)'
-                          : '1px solid transparent',
-                        borderRadius: '10px',
-                        cursor: isPast || isCurrent ? 'pointer' : 'default',
-                        opacity: isFuture ? 0.5 : 1,
-                      }}
-                    >
-                      {/* Status Icon */}
+            {/* Horizontal Scroll Container */}
+            <div
+              ref={modulesScrollRef}
+              style={{
+                display: 'flex',
+                gap: '12px',
+                overflowX: 'auto',
+                paddingBottom: '8px',
+                scrollSnapType: 'x mandatory',
+                WebkitOverflowScrolling: 'touch',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
+            >
+              {EVENT_MODULES.filter(m => m.day === currentDay).map((mod) => {
+                const isPast = mod.id < currentModule
+                const isCurrent = mod.id === currentModule
+                const isFuture = mod.id > currentModule
+                const isConfirmed = confirmedModules.includes(mod.id)
+                const canConfirm = isCurrent && !isConfirmed
+
+                return (
+                  <motion.div
+                    key={mod.id}
+                    data-module={mod.id}
+                    whileTap={canConfirm ? { scale: 0.98 } : {}}
+                    style={{
+                      minWidth: isCurrent ? '200px' : '140px',
+                      flexShrink: 0,
+                      scrollSnapAlign: 'center',
+                      padding: '14px',
+                      background: isCurrent
+                        ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(124, 58, 237, 0.15) 100%)'
+                        : isPast
+                        ? 'rgba(34, 211, 238, 0.08)'
+                        : 'rgba(100, 116, 139, 0.05)',
+                      border: isCurrent
+                        ? '2px solid rgba(168, 85, 247, 0.5)'
+                        : isPast
+                        ? '1px solid rgba(34, 211, 238, 0.3)'
+                        : '1px solid rgba(100, 116, 139, 0.2)',
+                      borderRadius: '14px',
+                      opacity: isFuture ? 0.5 : 1,
+                      boxShadow: isCurrent ? '0 0 20px rgba(168, 85, 247, 0.3)' : 'none',
+                    }}
+                  >
+                    {/* Module Number + Status */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                       <div
                         style={{
                           width: '28px',
@@ -358,71 +380,38 @@ export function AoVivo() {
                           background: isPast
                             ? 'rgba(34, 211, 238, 0.2)'
                             : isCurrent
-                            ? 'rgba(168, 85, 247, 0.2)'
+                            ? 'rgba(168, 85, 247, 0.3)'
                             : 'rgba(100, 116, 139, 0.1)',
                           border: `1px solid ${
                             isPast
                               ? 'rgba(34, 211, 238, 0.4)'
                               : isCurrent
-                              ? 'rgba(168, 85, 247, 0.4)'
+                              ? 'rgba(168, 85, 247, 0.5)'
                               : 'rgba(100, 116, 139, 0.2)'
                           }`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          flexShrink: 0,
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          color: isPast
+                            ? theme.colors.accent.cyan.DEFAULT
+                            : isCurrent
+                            ? theme.colors.accent.purple.light
+                            : theme.colors.text.muted,
                         }}
                       >
                         {isPast ? (
-                          <Check size={14} color={theme.colors.accent.cyan.DEFAULT} />
+                          <Check size={14} />
                         ) : isCurrent ? (
-                          <Play size={12} color={theme.colors.accent.purple.light} fill={theme.colors.accent.purple.light} />
+                          <Play size={12} fill={theme.colors.accent.purple.light} />
                         ) : (
-                          <Lock size={12} color={theme.colors.text.muted} />
+                          <Lock size={12} />
                         )}
                       </div>
 
-                      {/* Module Info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span
-                            style={{
-                              fontSize: '10px',
-                              color: theme.colors.text.muted,
-                              fontFamily: theme.typography.fontFamily.orbitron,
-                            }}
-                          >
-                            {mod.id}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              fontWeight: theme.typography.fontWeight.semibold,
-                              color: isCurrent
-                                ? theme.colors.accent.purple.light
-                                : isPast
-                                ? theme.colors.text.primary
-                                : theme.colors.text.muted,
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            {mod.title}
-                          </span>
-                        </div>
-                        <p
-                          style={{
-                            fontSize: '10px',
-                            color: theme.colors.text.secondary,
-                            margin: '2px 0 0 0',
-                            opacity: isFuture ? 0.6 : 1,
-                          }}
-                        >
-                          {mod.subtitle}
-                        </p>
-                      </div>
-
-                      {/* XP Badge (for past modules) */}
-                      {isPast && (
+                      {/* XP Badge */}
+                      {(isPast || isCurrent) && isConfirmed && (
                         <span
                           style={{
                             fontSize: '9px',
@@ -436,7 +425,7 @@ export function AoVivo() {
                         </span>
                       )}
 
-                      {/* Live indicator */}
+                      {/* Live indicator for current */}
                       {isCurrent && (
                         <motion.div
                           animate={{ opacity: [1, 0.5, 1] }}
@@ -450,11 +439,104 @@ export function AoVivo() {
                           }}
                         />
                       )}
-                    </motion.div>
-                  )
-                })}
-              </div>
-            )}
+                    </div>
+
+                    {/* Module Title */}
+                    <p
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: theme.typography.fontWeight.bold,
+                        color: isCurrent
+                          ? theme.colors.accent.purple.light
+                          : isPast
+                          ? theme.colors.text.primary
+                          : theme.colors.text.muted,
+                        textTransform: 'uppercase',
+                        margin: '0 0 4px 0',
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {mod.title}
+                    </p>
+
+                    {/* Subtitle - only for current */}
+                    {isCurrent && (
+                      <p
+                        style={{
+                          fontSize: '9px',
+                          color: theme.colors.text.secondary,
+                          margin: '0 0 10px 0',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {mod.subtitle}
+                      </p>
+                    )}
+
+                    {/* Confirm Button - only for current module that hasn't been confirmed */}
+                    {canConfirm && (
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleConfirmPresence(mod.id)}
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
+                          border: '1px solid rgba(168, 85, 247, 0.5)',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          color: theme.colors.accent.purple.light,
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        <Zap size={12} />
+                        CONFIRMAR +15 XP
+                      </motion.button>
+                    )}
+
+                    {/* Confirmed indicator */}
+                    {isCurrent && isConfirmed && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '8px',
+                          background: 'rgba(34, 211, 238, 0.1)',
+                          borderRadius: '8px',
+                        }}
+                      >
+                        <Check size={14} color={theme.colors.accent.cyan.DEFAULT} />
+                        <span
+                          style={{
+                            fontSize: '10px',
+                            color: theme.colors.accent.cyan.DEFAULT,
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          PRESENÇA CONFIRMADA
+                        </span>
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+
+            {/* Hide scrollbar */}
+            <style>{`
+              div::-webkit-scrollbar {
+                display: none;
+              }
+            `}</style>
           </motion.div>
 
           {/* ==================== DAY SELECTOR ==================== */}
@@ -813,8 +895,6 @@ export function AoVivo() {
               zIndex: 1000,
             }}
           >
-            {/* Import AIChatInterface dynamically to avoid circular deps */}
-            {/* For now, simple placeholder - full interface in separate page */}
             <div
               style={{
                 height: '100%',

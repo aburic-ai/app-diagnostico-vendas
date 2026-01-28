@@ -218,18 +218,18 @@ export function ScenarioProjection({
                 flex: 1,
               }}
             >
-              {/* Day badge */}
+              {/* Day badge - solid dark background to block the timeline */}
               <div
                 style={{
                   width: '40px',
                   height: '40px',
                   borderRadius: '50%',
-                  background: severityConfig[point.severity].bg,
+                  background: `radial-gradient(circle, #0a0808 0%, #0f0a0a 70%), ${severityConfig[point.severity].bg}`,
                   border: `2px solid ${severityConfig[point.severity].color}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: `0 0 15px ${severityConfig[point.severity].color}50`,
+                  boxShadow: `0 0 15px ${severityConfig[point.severity].color}50, inset 0 0 20px ${severityConfig[point.severity].bg}`,
                   position: 'relative',
                   zIndex: 2,
                 }}
