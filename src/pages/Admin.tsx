@@ -1002,6 +1002,113 @@ export function Admin() {
           </div>
         </div>
 
+        {/* ==================== SOLICITAR NPS ==================== */}
+        <div
+          style={{
+            padding: '20px',
+            background: 'rgba(15, 17, 21, 0.8)',
+            border: '1px solid rgba(168, 85, 247, 0.2)',
+            borderRadius: '16px',
+            marginBottom: '20px',
+          }}
+        >
+          <div style={{ marginBottom: '16px' }}>
+            <h2
+              style={{
+                fontSize: '14px',
+                fontWeight: 'bold',
+                color: theme.colors.text.primary,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                margin: '0 0 4px 0',
+              }}
+            >
+              Solicitar NPS
+            </h2>
+            <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: 0 }}>
+              Envia formulário de NPS para os participantes (+XP)
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                const notification: Notification = {
+                  id: Date.now().toString(),
+                  type: 'nps',
+                  title: 'Avalie o Dia 1',
+                  message: 'Conta pra gente como foi sua experiência no primeiro dia! (+25 XP)',
+                  actionLabel: 'Avaliar agora',
+                  timestamp: new Date(),
+                  read: false,
+                }
+                setSentNotifications(prev => [notification, ...prev])
+                setPreviewNotification(notification)
+                setTimeout(() => setPreviewNotification(null), 5000)
+              }}
+              style={{
+                flex: 1,
+                padding: '14px 16px',
+                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                border: '1px solid rgba(168, 85, 247, 0.4)',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Star size={20} color={theme.colors.accent.purple.light} />
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: theme.colors.accent.purple.light }}>
+                NPS DIA 1
+              </span>
+              <span style={{ fontSize: '10px', color: theme.colors.text.muted }}>
+                +25 XP
+              </span>
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                const notification: Notification = {
+                  id: Date.now().toString(),
+                  type: 'nps',
+                  title: 'Avalie a Imersão',
+                  message: 'Como foi sua experiência na Imersão Diagnóstico de Vendas? (+50 XP)',
+                  actionLabel: 'Avaliar agora',
+                  timestamp: new Date(),
+                  read: false,
+                }
+                setSentNotifications(prev => [notification, ...prev])
+                setPreviewNotification(notification)
+                setTimeout(() => setPreviewNotification(null), 5000)
+              }}
+              style={{
+                flex: 1,
+                padding: '14px 16px',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(234, 179, 8, 0.1) 100%)',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Star size={20} color={theme.colors.gold.DEFAULT} />
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: theme.colors.gold.DEFAULT }}>
+                NPS EVENTO
+              </span>
+              <span style={{ fontSize: '10px', color: theme.colors.text.muted }}>
+                +50 XP
+              </span>
+            </motion.button>
+          </div>
+        </div>
+
         {/* ==================== ENVIO DE AVISOS ==================== */}
         <div
           style={{
