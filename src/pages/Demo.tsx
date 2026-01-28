@@ -525,7 +525,7 @@ export function Demo() {
         <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
 
           {/* ==================== PRÉ-EVENTO GROUP ==================== */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
             {/* PRÉ-EVENTO LABEL */}
         <AnimatePresence>
           {showPreLabel && (
@@ -624,7 +624,7 @@ export function Demo() {
           {/* END PRÉ-EVENTO GROUP */}
 
           {/* ==================== DURANTE O EVENTO GROUP ==================== */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
             {/* DURANTE O EVENTO LABEL */}
             <AnimatePresence>
               {showDuranteLabel && (
@@ -1084,7 +1084,7 @@ export function Demo() {
           {/* END DURANTE O EVENTO GROUP */}
 
           {/* ==================== PÓS-EVENTO GROUP ==================== */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
             {/* PÓS-EVENTO LABEL */}
             <AnimatePresence>
               {showPosLabel && (
