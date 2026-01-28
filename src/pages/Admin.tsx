@@ -1336,9 +1336,37 @@ export function Admin() {
                 ) : (
                   <span style={{ fontSize: '9px', color: theme.colors.text.muted }}>OFFLINE</span>
                 )}
-                <span style={{ fontSize: '9px', color: theme.colors.text.muted }}>
-                  MÓDULO {eventState.currentModule}/{TOTAL_MODULES - 1}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '9px', color: theme.colors.text.muted }}>
+                    MÓDULO {eventState.currentModule}/{TOTAL_MODULES - 1}
+                  </span>
+                  {/* Notification bell with badge */}
+                  <div style={{ position: 'relative' }}>
+                    <Bell size={14} color={theme.colors.text.secondary} />
+                    {sentNotifications.length > 0 && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '-4px',
+                          right: '-4px',
+                          width: '12px',
+                          height: '12px',
+                          borderRadius: '50%',
+                          background: '#EF4444',
+                          border: '1px solid #050505',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '7px',
+                          fontWeight: 'bold',
+                          color: '#fff',
+                        }}
+                      >
+                        {sentNotifications.length > 9 ? '9+' : sentNotifications.length}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
