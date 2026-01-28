@@ -13,6 +13,7 @@ import { AoVivo } from './pages/AoVivo'
 import { PosEvento } from './pages/PosEvento'
 import { DevNav } from './pages/DevNav'
 import { Admin } from './pages/Admin'
+import { Demo } from './pages/Demo'
 import { AppLayout } from './components/ui'
 import './index.css'
 
@@ -22,6 +23,9 @@ function App() {
       <Routes>
         {/* Admin tem layout próprio - desktop only com split view */}
         <Route path="/admin" element={<Admin />} />
+
+        {/* Demo tem layout próprio - otimizado para captura de vídeo */}
+        <Route path="/demo" element={<Demo />} />
 
         {/* Todas as outras páginas usam AppLayout (mobile-first) */}
         <Route path="/*" element={

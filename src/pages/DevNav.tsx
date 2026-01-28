@@ -14,6 +14,7 @@ import {
   Target,
   ExternalLink,
   Settings,
+  Video,
 } from 'lucide-react'
 
 import { PageWrapper } from '../components/ui'
@@ -61,6 +62,13 @@ const pages: PageLink[] = [
     label: 'Admin',
     description: 'Painel de controle do evento (desktop only)',
     icon: <Settings size={24} />,
+    status: 'done',
+  },
+  {
+    path: '/demo',
+    label: 'Demo',
+    description: 'Preview para captura de vídeo promocional',
+    icon: <Video size={24} />,
     status: 'done',
   },
 ]
