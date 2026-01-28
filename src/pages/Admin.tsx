@@ -113,6 +113,28 @@ export function Admin() {
 
   // Preview notification
   const [previewNotification, setPreviewNotification] = useState<Notification | null>(null)
+  const [lunchMinutesRemaining, setLunchMinutesRemaining] = useState<number>(0)
+
+  // Calculate minutes remaining until lunch return
+  const calculateLunchMinutes = () => {
+    const [hours, minutes] = eventState.lunchReturnTime.split(':').map(Number)
+    const now = new Date()
+    const returnTime = new Date()
+    returnTime.setHours(hours, minutes, 0, 0)
+    const diffMs = returnTime.getTime() - now.getTime()
+    return Math.max(0, Math.ceil(diffMs / 60000))
+  }
+
+  // Update lunch countdown every minute
+  useEffect(() => {
+    if (eventState.status === 'lunch') {
+      setLunchMinutesRemaining(calculateLunchMinutes())
+      const interval = setInterval(() => {
+        setLunchMinutesRemaining(calculateLunchMinutes())
+      }, 60000)
+      return () => clearInterval(interval)
+    }
+  }, [eventState.status, eventState.lunchReturnTime])
 
   // Simulated online count
   useEffect(() => {
@@ -1308,7 +1330,7 @@ export function Admin() {
                     {eventState.status === 'lunch' && <Coffee size={12} color="#F59E0B" />}
                     {eventState.status === 'paused' && <Pause size={12} color="#F59E0B" />}
                     <span style={{ fontSize: '9px', fontWeight: 'bold', color: eventState.status === 'live' ? '#FF4444' : '#F59E0B' }}>
-                      {eventState.status === 'live' ? 'AO VIVO' : eventState.status === 'lunch' ? `ALMOÇO - Volta ${eventState.lunchReturnTime}` : 'PAUSADO'}
+                      {eventState.status === 'live' ? 'AO VIVO' : eventState.status === 'lunch' ? `ALMOÇO - Volta ${eventState.lunchReturnTime} (${lunchMinutesRemaining} min)` : 'PAUSADO'}
                     </span>
                   </div>
                 ) : (
@@ -1350,7 +1372,7 @@ export function Admin() {
                     {eventState.status === 'lunch' ? 'HORA DO ALMOÇO' : currentModule?.title}
                   </p>
                   <p style={{ fontSize: '9px', color: theme.colors.text.secondary, margin: '2px 0 0 0' }}>
-                    {eventState.status === 'lunch' ? `Retorno às ${eventState.lunchReturnTime}` : currentModule?.subtitle}
+                    {eventState.status === 'lunch' ? `Retorno às ${eventState.lunchReturnTime} (em ${lunchMinutesRemaining} minutos)` : currentModule?.subtitle}
                   </p>
                 </div>
               </div>
