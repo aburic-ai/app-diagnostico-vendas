@@ -5,7 +5,7 @@
  * alertas de gargalo, módulos em scroll horizontal e oferta bloqueada.
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Rocket,
@@ -15,9 +15,10 @@ import {
   Brain,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Check,
   Lock,
-  Play,
   Bell,
   Zap,
 } from 'lucide-react'
@@ -43,24 +44,12 @@ export function AoVivo() {
   const [activeNav, setActiveNav] = useState('aovivo')
   const [selectedDay, setSelectedDay] = useState<1 | 2>(1)
   const [showSliders, setShowSliders] = useState(true)
-  const [currentModule] = useState(5) // Módulo atual (simulado)
+  const [currentModule] = useState(5) // Módulo atual (simulado - vem do admin)
+  const [viewingModule, setViewingModule] = useState(5) // Módulo que o usuário está vendo
   const [showNotifications, setShowNotifications] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
   const [isOfferUnlocked] = useState(false) // Libera no módulo 11
   const [confirmedModules, setConfirmedModules] = useState<number[]>([0, 1, 2, 3, 4]) // Módulos já confirmados
-
-  // Ref for horizontal scroll
-  const modulesScrollRef = useRef<HTMLDivElement>(null)
-
-  // Auto-scroll to current module on mount
-  useEffect(() => {
-    if (modulesScrollRef.current) {
-      const currentModuleElement = modulesScrollRef.current.querySelector(`[data-module="${currentModule}"]`)
-      if (currentModuleElement) {
-        currentModuleElement.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
-      }
-    }
-  }, [currentModule])
 
   // Notificações de exemplo
   const [notifications] = useState<Notification[]>([
@@ -164,12 +153,42 @@ export function AoVivo() {
   const currentModuleData = getModuleById(currentModule)
   const currentDay = currentModuleData?.day || 1
 
+  // Get viewing module data (for navigation)
+  const viewingModuleData = getModuleById(viewingModule)
+  const viewingDay = viewingModuleData?.day || 1
+  const isViewingCurrent = viewingModule === currentModule
+  const isViewingConfirmed = confirmedModules.includes(viewingModule)
+  const canConfirmViewing = isViewingCurrent && !isViewingConfirmed
+
   // Handle presence confirmation
   const handleConfirmPresence = (moduleId: number) => {
     if (!confirmedModules.includes(moduleId)) {
       setConfirmedModules(prev => [...prev, moduleId])
     }
   }
+
+  // Navigate modules
+  const handlePrevModule = () => {
+    const dayModules = EVENT_MODULES.filter(m => m.day === viewingDay)
+    const currentIndex = dayModules.findIndex(m => m.id === viewingModule)
+    if (currentIndex > 0) {
+      setViewingModule(dayModules[currentIndex - 1].id)
+    }
+  }
+
+  const handleNextModule = () => {
+    const dayModules = EVENT_MODULES.filter(m => m.day === viewingDay)
+    const currentIndex = dayModules.findIndex(m => m.id === viewingModule)
+    if (currentIndex < dayModules.length - 1) {
+      setViewingModule(dayModules[currentIndex + 1].id)
+    }
+  }
+
+  // Check if can navigate
+  const dayModules = EVENT_MODULES.filter(m => m.day === viewingDay)
+  const viewingIndex = dayModules.findIndex(m => m.id === viewingModule)
+  const canGoPrev = viewingIndex > 0
+  const canGoNext = viewingIndex < dayModules.length - 1
 
   // Calculate total XP from confirmed modules
   const totalXP = confirmedModules.length * 15
@@ -285,13 +304,8 @@ export function AoVivo() {
               }}
             />
 
-            {/* Header Section */}
-            <div
-              style={{
-                padding: '14px 16px',
-                borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
-              }}
-            >
+            {/* Content Section */}
+            <div style={{ padding: '14px 16px' }}>
               {/* Top Row - Badges */}
               <div
                 style={{
@@ -386,297 +400,185 @@ export function AoVivo() {
                 </div>
               </div>
 
-              {/* Current Module Info */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
+              {/* Module Info with Navigation */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Previous Arrow */}
+                <motion.button
+                  whileTap={canGoPrev ? { scale: 0.9 } : {}}
+                  onClick={handlePrevModule}
+                  disabled={!canGoPrev}
                   style={{
-                    width: '44px',
-                    height: '44px',
+                    width: '36px',
+                    height: '36px',
                     borderRadius: '10px',
-                    background: 'linear-gradient(135deg, rgba(255, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%)',
-                    border: '1px solid rgba(255, 68, 68, 0.4)',
+                    background: canGoPrev ? 'rgba(100, 116, 139, 0.2)' : 'rgba(100, 116, 139, 0.05)',
+                    border: `1px solid ${canGoPrev ? 'rgba(100, 116, 139, 0.3)' : 'rgba(100, 116, 139, 0.1)'}`,
+                    cursor: canGoPrev ? 'pointer' : 'not-allowed',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
+                    opacity: canGoPrev ? 1 : 0.3,
                   }}
                 >
-                  <Radio size={22} color="#FF4444" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                  <ChevronLeft size={20} color={theme.colors.text.secondary} />
+                </motion.button>
+
+                {/* Module Content */}
+                <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
                   <p
                     style={{
                       fontSize: '10px',
-                      color: theme.colors.text.muted,
+                      color: isViewingCurrent ? '#FF4444' : theme.colors.text.muted,
                       margin: '0 0 2px 0',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
                     }}
                   >
-                    MÓDULO {currentModule} DE {EVENT_MODULES.length - 1}
+                    {isViewingCurrent ? '● AO VIVO AGORA' : `MÓDULO ${viewingModule} DE ${EVENT_MODULES.length - 1}`}
                   </p>
                   <h3
                     style={{
                       fontFamily: theme.typography.fontFamily.orbitron,
-                      fontSize: '13px',
+                      fontSize: '14px',
                       fontWeight: theme.typography.fontWeight.bold,
-                      color: theme.colors.text.primary,
+                      color: isViewingCurrent ? theme.colors.text.primary : theme.colors.text.secondary,
                       textTransform: 'uppercase',
                       letterSpacing: '0.03em',
                       margin: 0,
                       lineHeight: 1.3,
                     }}
                   >
-                    {currentModuleData?.title || `MÓDULO ${currentModule}`}
+                    {viewingModuleData?.title || `MÓDULO ${viewingModule}`}
                   </h3>
-                  {currentModuleData?.subtitle && (
+                  {viewingModuleData?.subtitle && (
                     <p
                       style={{
-                        fontSize: '10px',
+                        fontSize: '11px',
                         color: theme.colors.text.secondary,
-                        margin: '3px 0 0 0',
+                        margin: '4px 0 0 0',
                         lineHeight: 1.4,
                       }}
                     >
-                      {currentModuleData.subtitle}
+                      {viewingModuleData.subtitle}
                     </p>
                   )}
                 </div>
-              </div>
-            </div>
 
-            {/* Modules Horizontal Scroll */}
-            <div style={{ padding: '12px 0 14px 0' }}>
-              {/* Scroll hint */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '0 16px',
-                  marginBottom: '10px',
-                }}
-              >
-                <span
+                {/* Next Arrow */}
+                <motion.button
+                  whileTap={canGoNext ? { scale: 0.9 } : {}}
+                  onClick={handleNextModule}
+                  disabled={!canGoNext}
                   style={{
-                    fontSize: '10px',
-                    color: theme.colors.text.muted,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: canGoNext ? 'rgba(100, 116, 139, 0.2)' : 'rgba(100, 116, 139, 0.05)',
+                    border: `1px solid ${canGoNext ? 'rgba(100, 116, 139, 0.3)' : 'rgba(100, 116, 139, 0.1)'}`,
+                    cursor: canGoNext ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    opacity: canGoNext ? 1 : 0.3,
                   }}
                 >
-                  MÓDULOS DO DIA
-                </span>
-                <span
-                  style={{
-                    fontSize: '9px',
-                    color: theme.colors.text.muted,
-                  }}
-                >
-                  deslize →
-                </span>
+                  <ChevronRight size={20} color={theme.colors.text.secondary} />
+                </motion.button>
               </div>
 
-              {/* Horizontal Scroll Container */}
-              <div
-                ref={modulesScrollRef}
-                style={{
-                  display: 'flex',
-                  gap: '10px',
-                  overflowX: 'auto',
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  paddingBottom: '4px',
-                  scrollSnapType: 'x mandatory',
-                  WebkitOverflowScrolling: 'touch',
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none',
-                }}
-              >
-                {EVENT_MODULES.filter(m => m.day === currentDay).map((mod) => {
-                  const isPast = mod.id < currentModule
-                  const isCurrent = mod.id === currentModule
-                  const isFuture = mod.id > currentModule
-                  const isConfirmed = confirmedModules.includes(mod.id)
-                  const canConfirm = isCurrent && !isConfirmed
-
-                  return (
-                    <motion.div
-                      key={mod.id}
-                      data-module={mod.id}
-                      whileTap={canConfirm ? { scale: 0.98 } : {}}
+              {/* Confirm Presence Button */}
+              {isViewingCurrent && (
+                <div style={{ marginTop: '14px' }}>
+                  {canConfirmViewing ? (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleConfirmPresence(viewingModule)}
                       style={{
-                        minWidth: isCurrent ? '180px' : '120px',
-                        flexShrink: 0,
-                        scrollSnapAlign: 'center',
-                        padding: '12px',
-                        background: isCurrent
-                          ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(124, 58, 237, 0.15) 100%)'
-                          : isPast
-                          ? 'rgba(34, 211, 238, 0.08)'
-                          : 'rgba(100, 116, 139, 0.05)',
-                        border: isCurrent
-                          ? '2px solid rgba(168, 85, 247, 0.5)'
-                          : isPast
-                          ? '1px solid rgba(34, 211, 238, 0.3)'
-                          : '1px solid rgba(100, 116, 139, 0.2)',
-                        borderRadius: '12px',
-                        opacity: isFuture ? 0.5 : 1,
-                        boxShadow: isCurrent ? '0 0 15px rgba(168, 85, 247, 0.3)' : 'none',
+                        width: '100%',
+                        padding: '14px',
+                        background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
+                        border: '1px solid rgba(168, 85, 247, 0.5)',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        color: theme.colors.accent.purple.light,
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
                       }}
                     >
-                      {/* Module Number + Status */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <div
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '6px',
-                            background: isPast
-                              ? 'rgba(34, 211, 238, 0.2)'
-                              : isCurrent
-                              ? 'rgba(168, 85, 247, 0.3)'
-                              : 'rgba(100, 116, 139, 0.1)',
-                            border: `1px solid ${
-                              isPast
-                                ? 'rgba(34, 211, 238, 0.4)'
-                                : isCurrent
-                                ? 'rgba(168, 85, 247, 0.5)'
-                                : 'rgba(100, 116, 139, 0.2)'
-                            }`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '10px',
-                            fontWeight: 'bold',
-                            color: isPast
-                              ? theme.colors.accent.cyan.DEFAULT
-                              : isCurrent
-                              ? theme.colors.accent.purple.light
-                              : theme.colors.text.muted,
-                          }}
-                        >
-                          {isPast ? (
-                            <Check size={12} />
-                          ) : isCurrent ? (
-                            <Play size={10} fill={theme.colors.accent.purple.light} />
-                          ) : (
-                            <Lock size={10} />
-                          )}
-                        </div>
-
-                        {/* XP Badge or Live indicator */}
-                        {(isPast || isCurrent) && isConfirmed ? (
-                          <span
-                            style={{
-                              fontSize: '8px',
-                              color: theme.colors.accent.cyan.DEFAULT,
-                              padding: '2px 5px',
-                              background: 'rgba(34, 211, 238, 0.1)',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            +15 XP
-                          </span>
-                        ) : isCurrent ? (
-                          <motion.div
-                            animate={{ opacity: [1, 0.5, 1] }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
-                            style={{
-                              width: '6px',
-                              height: '6px',
-                              borderRadius: '50%',
-                              background: '#FF4444',
-                              boxShadow: '0 0 8px #FF4444',
-                            }}
-                          />
-                        ) : null}
-                      </div>
-
-                      {/* Module Title */}
-                      <p
+                      <Zap size={16} />
+                      ESTOU ASSISTINDO +15 XP
+                    </motion.button>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '12px',
+                        background: 'rgba(34, 211, 238, 0.1)',
+                        border: '1px solid rgba(34, 211, 238, 0.3)',
+                        borderRadius: '10px',
+                      }}
+                    >
+                      <Check size={16} color={theme.colors.accent.cyan.DEFAULT} />
+                      <span
                         style={{
-                          fontSize: '9px',
-                          fontWeight: theme.typography.fontWeight.bold,
-                          color: isCurrent
-                            ? theme.colors.accent.purple.light
-                            : isPast
-                            ? theme.colors.text.primary
-                            : theme.colors.text.muted,
+                          fontSize: '12px',
+                          color: theme.colors.accent.cyan.DEFAULT,
+                          fontWeight: 'bold',
                           textTransform: 'uppercase',
-                          margin: 0,
-                          lineHeight: 1.3,
                         }}
                       >
-                        {mod.title}
-                      </p>
+                        PRESENÇA CONFIRMADA
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
 
-                      {/* Confirm Button - only for current module that hasn't been confirmed */}
-                      {canConfirm && (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => handleConfirmPresence(mod.id)}
-                          style={{
-                            width: '100%',
-                            marginTop: '8px',
-                            padding: '8px',
-                            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
-                            border: '1px solid rgba(168, 85, 247, 0.5)',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            color: theme.colors.accent.purple.light,
-                            fontSize: '9px',
-                            fontWeight: 'bold',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          <Zap size={10} />
-                          +15 XP
-                        </motion.button>
-                      )}
-
-                      {/* Confirmed indicator */}
-                      {isCurrent && isConfirmed && (
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            marginTop: '8px',
-                            padding: '6px',
-                            background: 'rgba(34, 211, 238, 0.1)',
-                            borderRadius: '6px',
-                          }}
-                        >
-                          <Check size={10} color={theme.colors.accent.cyan.DEFAULT} />
-                          <span
-                            style={{
-                              fontSize: '8px',
-                              color: theme.colors.accent.cyan.DEFAULT,
-                              fontWeight: 'bold',
-                            }}
-                          >
-                            CONFIRMADO
-                          </span>
-                        </div>
-                      )}
-                    </motion.div>
-                  )
-                })}
-              </div>
-
-              {/* Hide scrollbar */}
-              <style>{`
-                div::-webkit-scrollbar {
-                  display: none;
-                }
-              `}</style>
+              {/* Not current module indicator */}
+              {!isViewingCurrent && (
+                <div style={{ marginTop: '14px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '12px',
+                      background: viewingModule < currentModule ? 'rgba(34, 211, 238, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+                      border: `1px solid ${viewingModule < currentModule ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.2)'}`,
+                      borderRadius: '10px',
+                    }}
+                  >
+                    {viewingModule < currentModule ? (
+                      <>
+                        <Check size={16} color={theme.colors.accent.cyan.DEFAULT} />
+                        <span style={{ fontSize: '11px', color: theme.colors.accent.cyan.DEFAULT, fontWeight: 'bold' }}>
+                          MÓDULO CONCLUÍDO
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={16} color={theme.colors.text.muted} />
+                        <span style={{ fontSize: '11px', color: theme.colors.text.muted, fontWeight: 'bold' }}>
+                          EM BREVE
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
 
