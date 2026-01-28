@@ -3,6 +3,7 @@
  *
  * Usa React Router para navegação entre páginas.
  * Usa AppLayout para garantir layout consistente em todas as páginas.
+ * Admin tem layout próprio (desktop-only) e fica fora do AppLayout.
  */
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
@@ -12,23 +13,32 @@ import { AoVivo } from './pages/AoVivo'
 import { PosEvento } from './pages/PosEvento'
 import { Sandbox } from './pages/Sandbox'
 import { DevNav } from './pages/DevNav'
+import { Admin } from './pages/Admin'
 import { AppLayout } from './components/ui'
 import './index.css'
 
 function App() {
   return (
     <BrowserRouter>
-      <AppLayout>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dev" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/pre-evento" element={<PreEvento />} />
-          <Route path="/ao-vivo" element={<AoVivo />} />
-          <Route path="/pos-evento" element={<PosEvento />} />
-          <Route path="/sandbox" element={<Sandbox />} />
-          <Route path="/dev" element={<DevNav />} />
-        </Routes>
-      </AppLayout>
+      <Routes>
+        {/* Admin tem layout próprio - desktop only com split view */}
+        <Route path="/admin" element={<Admin />} />
+
+        {/* Todas as outras páginas usam AppLayout (mobile-first) */}
+        <Route path="/*" element={
+          <AppLayout>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dev" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/pre-evento" element={<PreEvento />} />
+              <Route path="/ao-vivo" element={<AoVivo />} />
+              <Route path="/pos-evento" element={<PosEvento />} />
+              <Route path="/sandbox" element={<Sandbox />} />
+              <Route path="/dev" element={<DevNav />} />
+            </Routes>
+          </AppLayout>
+        } />
+      </Routes>
     </BrowserRouter>
   )
 }

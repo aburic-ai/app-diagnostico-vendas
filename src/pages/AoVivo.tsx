@@ -2,11 +2,11 @@
  * Página Ao Vivo - Durante o Evento
  *
  * Core da experiência: diagnóstico em tempo real, gráfico radar,
- * alertas de gargalo e oferta bloqueada.
+ * alertas de gargalo, lista de módulos e oferta bloqueada.
  */
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Rocket,
   Radio,
@@ -15,6 +15,10 @@ import {
   Brain,
   ChevronDown,
   ChevronUp,
+  Check,
+  Lock,
+  Play,
+  Bell,
 } from 'lucide-react'
 
 import {
@@ -26,26 +30,48 @@ import {
   DiagnosticSlider,
   GargaloAlert,
   LockedOffer,
+  AvatarButton,
+  NotificationDrawer,
+  AIChatFAB,
+  SponsorBadge,
+  PresenceConfirmCard,
 } from '../components/ui'
-import type { IMPACTData } from '../components/ui'
+import type { IMPACTData, Notification } from '../components/ui'
 import { theme } from '../styles/theme'
-
-// Blocos do evento
-const BLOCOS = [
-  { num: 1, title: 'A Jornada Psicológica', subtitle: 'Como o cliente pensa antes de comprar' },
-  { num: 2, title: 'Inspiração', subtitle: 'O primeiro gatilho da venda' },
-  { num: 3, title: 'Motivação', subtitle: 'Transformando interesse em desejo' },
-  { num: 4, title: 'Preparação', subtitle: 'Construindo a decisão na mente' },
-  { num: 5, title: 'Apresentação', subtitle: 'O momento da oferta' },
-  { num: 6, title: 'Conversão', subtitle: 'Da decisão à ação' },
-  { num: 7, title: 'Transformação', subtitle: 'Pós-venda e fidelização' },
-]
+import { getModulesByDay, getModuleById } from '../data/modules'
 
 export function AoVivo() {
   const [activeNav, setActiveNav] = useState('aovivo')
   const [selectedDay, setSelectedDay] = useState<1 | 2>(1)
   const [showSliders, setShowSliders] = useState(true)
-  const [currentBlock] = useState(3)
+  const [showModules, setShowModules] = useState(true)
+  const [currentModule] = useState(5) // Módulo atual (simulado)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [showAIChat, setShowAIChat] = useState(false)
+  const [showPresenceCard, setShowPresenceCard] = useState(true)
+  const [isOfferUnlocked] = useState(false) // Libera no módulo 11
+
+  // Notificações de exemplo
+  const [notifications] = useState<Notification[]>([
+    {
+      id: '1',
+      type: 'info',
+      title: 'Intervalo de 15 minutos',
+      message: 'Aproveite para preencher seu diagnóstico',
+      timestamp: new Date(Date.now() - 1000 * 60 * 30),
+      read: true,
+    },
+    {
+      id: '2',
+      type: 'alert',
+      title: 'Voltamos ao vivo!',
+      message: 'Módulo 5 começando agora',
+      timestamp: new Date(Date.now() - 1000 * 60 * 5),
+      read: false,
+    },
+  ])
+
+  const unreadCount = notifications.filter(n => !n.read).length
 
   // Dados do diagnóstico
   const [day1Data, setDay1Data] = useState<IMPACTData>({
@@ -92,6 +118,14 @@ export function AoVivo() {
     transformacao: { etapa: 'Transformação', letra: 'T' },
   }
 
+  // Contexto do usuário para o chat
+  const userContext = {
+    name: 'João Silva',
+    businessType: 'Consultoria B2B',
+    gargalo: { etapa: gargaloMap[gargalo[0]].etapa, valor: gargalo[1] },
+    diagnostico: currentData,
+  }
+
   const navItems = [
     { id: 'preparacao', label: 'Preparação', icon: <Rocket size={20} />, status: 'Liberado' },
     { id: 'aovivo', label: 'Ao Vivo', icon: <Radio size={20} />, badge: 'LIVE', status: 'Liberado' },
@@ -115,7 +149,12 @@ export function AoVivo() {
     setCurrentData(prev => ({ ...prev, [key]: value }))
   }
 
-  const currentBlockData = BLOCOS[currentBlock - 1]
+  // Get current day from module
+  const currentModuleData = getModuleById(currentModule)
+  const currentDay = currentModuleData?.day || 1
+
+  // Módulos do dia atual
+  const dayModules = getModulesByDay(currentDay)
 
   return (
     <PageWrapper
@@ -138,24 +177,284 @@ export function AoVivo() {
           animate="visible"
           style={{ padding: '16px' }}
         >
-          {/* ==================== HEADER ==================== */}
-          <motion.div variants={itemVariants}>
+          {/* ==================== HEADER WITH AVATAR ==================== */}
+          <motion.div
+            variants={itemVariants}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              marginBottom: '16px',
+            }}
+          >
             <PageHeader
               title="IMERSÃO ONLINE"
               subtitle="DIAGNÓSTICO DE VENDAS"
-              marginBottom="16px"
+              marginBottom="0px"
             />
+
+            {/* Avatar + Notifications */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setShowNotifications(true)}
+                style={{
+                  position: 'relative',
+                  background: 'rgba(100, 116, 139, 0.2)',
+                  border: '1px solid rgba(100, 116, 139, 0.3)',
+                  borderRadius: '10px',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Bell size={20} color={theme.colors.text.secondary} />
+                {unreadCount > 0 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      right: '-4px',
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      background: '#EF4444',
+                      border: '2px solid #050505',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '9px',
+                      fontWeight: 'bold',
+                      color: '#fff',
+                    }}
+                  >
+                    {unreadCount}
+                  </div>
+                )}
+              </motion.button>
+              <AvatarButton
+                name="João Silva"
+                onClick={() => {/* TODO: navigate to profile */}}
+              />
+            </div>
           </motion.div>
 
           {/* ==================== LIVE TICKER ==================== */}
-          <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
+          <motion.div variants={itemVariants} style={{ marginBottom: '16px' }}>
             <LiveTicker
-              currentBlock={currentBlock}
-              blockTitle={currentBlockData.title}
-              blockSubtitle={currentBlockData.subtitle}
-              totalBlocks={7}
-              isLive={true}
+              currentModule={currentModule}
+              status="live"
+              currentDay={currentDay}
             />
+          </motion.div>
+
+          {/* ==================== PRESENCE CONFIRMATION ==================== */}
+          <AnimatePresence>
+            {showPresenceCard && (
+              <motion.div
+                variants={itemVariants}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                style={{ marginBottom: '16px' }}
+              >
+                <PresenceConfirmCard
+                  blockNumber={currentModule}
+                  blockName={currentModuleData?.title || ''}
+                  xpReward={15}
+                  timeLimit={120}
+                  onConfirm={() => setShowPresenceCard(false)}
+                  onExpire={() => setShowPresenceCard(false)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ==================== MODULES LIST ==================== */}
+          <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowModules(!showModules)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.9) 0%, rgba(10, 12, 18, 0.95) 100%)',
+                border: '1px solid rgba(168, 85, 247, 0.3)',
+                borderRadius: showModules ? '12px 12px 0 0' : '12px',
+                cursor: 'pointer',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '13px',
+                  fontWeight: theme.typography.fontWeight.bold,
+                  color: theme.colors.text.primary,
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                MÓDULOS DO DIA {currentDay}
+              </span>
+              {showModules ? (
+                <ChevronUp size={20} color={theme.colors.accent.purple.light} />
+              ) : (
+                <ChevronDown size={20} color={theme.colors.accent.purple.light} />
+              )}
+            </motion.button>
+
+            {showModules && (
+              <div
+                style={{
+                  background: 'rgba(10, 12, 18, 0.5)',
+                  border: '1px solid rgba(168, 85, 247, 0.2)',
+                  borderTop: 'none',
+                  borderRadius: '0 0 12px 12px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                }}
+              >
+                {dayModules.map((mod) => {
+                  const isPast = mod.id < currentModule
+                  const isCurrent = mod.id === currentModule
+                  const isFuture = mod.id > currentModule
+
+                  return (
+                    <motion.div
+                      key={mod.id}
+                      whileTap={isPast || isCurrent ? { scale: 0.98 } : {}}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '10px 12px',
+                        background: isCurrent
+                          ? 'rgba(168, 85, 247, 0.15)'
+                          : isPast
+                          ? 'rgba(34, 211, 238, 0.08)'
+                          : 'rgba(100, 116, 139, 0.05)',
+                        border: isCurrent
+                          ? '1px solid rgba(168, 85, 247, 0.4)'
+                          : '1px solid transparent',
+                        borderRadius: '10px',
+                        cursor: isPast || isCurrent ? 'pointer' : 'default',
+                        opacity: isFuture ? 0.5 : 1,
+                      }}
+                    >
+                      {/* Status Icon */}
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          background: isPast
+                            ? 'rgba(34, 211, 238, 0.2)'
+                            : isCurrent
+                            ? 'rgba(168, 85, 247, 0.2)'
+                            : 'rgba(100, 116, 139, 0.1)',
+                          border: `1px solid ${
+                            isPast
+                              ? 'rgba(34, 211, 238, 0.4)'
+                              : isCurrent
+                              ? 'rgba(168, 85, 247, 0.4)'
+                              : 'rgba(100, 116, 139, 0.2)'
+                          }`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {isPast ? (
+                          <Check size={14} color={theme.colors.accent.cyan.DEFAULT} />
+                        ) : isCurrent ? (
+                          <Play size={12} color={theme.colors.accent.purple.light} fill={theme.colors.accent.purple.light} />
+                        ) : (
+                          <Lock size={12} color={theme.colors.text.muted} />
+                        )}
+                      </div>
+
+                      {/* Module Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              color: theme.colors.text.muted,
+                              fontFamily: theme.typography.fontFamily.orbitron,
+                            }}
+                          >
+                            {mod.id}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: theme.typography.fontWeight.semibold,
+                              color: isCurrent
+                                ? theme.colors.accent.purple.light
+                                : isPast
+                                ? theme.colors.text.primary
+                                : theme.colors.text.muted,
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            {mod.title}
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            fontSize: '10px',
+                            color: theme.colors.text.secondary,
+                            margin: '2px 0 0 0',
+                            opacity: isFuture ? 0.6 : 1,
+                          }}
+                        >
+                          {mod.subtitle}
+                        </p>
+                      </div>
+
+                      {/* XP Badge (for past modules) */}
+                      {isPast && (
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            color: theme.colors.accent.cyan.DEFAULT,
+                            padding: '2px 6px',
+                            background: 'rgba(34, 211, 238, 0.1)',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          +15 XP
+                        </span>
+                      )}
+
+                      {/* Live indicator */}
+                      {isCurrent && (
+                        <motion.div
+                          animate={{ opacity: [1, 0.5, 1] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: '#FF4444',
+                            boxShadow: '0 0 10px #FF4444',
+                          }}
+                        />
+                      )}
+                    </motion.div>
+                  )
+                })}
+              </div>
+            )}
           </motion.div>
 
           {/* ==================== DAY SELECTOR ==================== */}
@@ -409,13 +708,14 @@ export function AoVivo() {
                   color: theme.colors.text.secondary,
                 }}
               >
-                Exercícios do bloco
+                Exercícios do módulo
               </span>
             </motion.button>
 
             {/* IA Simulator Button */}
             <motion.button
               whileTap={{ scale: 0.95 }}
+              onClick={() => setShowAIChat(true)}
               style={{
                 padding: '16px',
                 background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(124, 58, 237, 0.1) 100%)',
@@ -465,17 +765,161 @@ export function AoVivo() {
           </motion.div>
 
           {/* ==================== LOCKED OFFER ==================== */}
-          <motion.div variants={itemVariants}>
+          <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
             <LockedOffer
               title="PROTOCOLO IMPACT"
               subtitle="Imersão Presencial de 3 Dias"
-              isUnlocked={false}
-              unlockTime="16:30"
+              isUnlocked={isOfferUnlocked}
+              unlockTime="15:00"
               lockedMessage="Essa etapa exige algo que não acontece sozinho."
+            />
+          </motion.div>
+
+          {/* ==================== SPONSOR BADGE ==================== */}
+          <motion.div variants={itemVariants}>
+            <SponsorBadge
+              isLinkActive={isOfferUnlocked}
+              onLinkClick={() => {/* TODO: navigate to offer */}}
             />
           </motion.div>
         </motion.div>
       </div>
+
+      {/* ==================== FLOATING AI CHAT BUTTON ==================== */}
+      <AIChatFAB
+        onClick={() => setShowAIChat(true)}
+        isAvailable={true}
+      />
+
+      {/* ==================== NOTIFICATION DRAWER ==================== */}
+      <NotificationDrawer
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        notifications={notifications}
+        onMarkAllRead={() => console.log('Mark all as read')}
+      />
+
+      {/* ==================== AI CHAT MODAL ==================== */}
+      <AnimatePresence>
+        {showAIChat && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: theme.colors.background.dark,
+              zIndex: 1000,
+            }}
+          >
+            {/* Import AIChatInterface dynamically to avoid circular deps */}
+            {/* For now, simple placeholder - full interface in separate page */}
+            <div
+              style={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              {/* Header */}
+              <div
+                style={{
+                  padding: '16px 20px',
+                  borderBottom: '1px solid rgba(168, 85, 247, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Brain size={24} color={theme.colors.accent.purple.light} />
+                  <h3
+                    style={{
+                      fontFamily: theme.typography.fontFamily.orbitron,
+                      fontSize: '14px',
+                      fontWeight: theme.typography.fontWeight.bold,
+                      color: theme.colors.accent.purple.light,
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase',
+                      margin: 0,
+                    }}
+                  >
+                    SIMULADOR DE VENDAS IA
+                  </h3>
+                </div>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setShowAIChat(false)}
+                  style={{
+                    background: 'rgba(100, 116, 139, 0.2)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 16px',
+                    color: theme.colors.text.secondary,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Fechar
+                </motion.button>
+              </div>
+
+              {/* Context Card */}
+              <div
+                style={{
+                  margin: '16px',
+                  padding: '12px 16px',
+                  background: 'rgba(168, 85, 247, 0.1)',
+                  border: '1px solid rgba(168, 85, 247, 0.3)',
+                  borderRadius: '12px',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '10px',
+                    color: theme.colors.accent.purple.light,
+                    textTransform: 'uppercase',
+                    fontWeight: theme.typography.fontWeight.bold,
+                    letterSpacing: '0.05em',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Contexto do seu diagnóstico
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '11px',
+                    color: theme.colors.text.secondary,
+                  }}
+                >
+                  <span>Negócio: {userContext.businessType}</span>
+                  <span style={{ color: '#EF4444' }}>
+                    Gargalo: {userContext.gargalo.etapa} ({userContext.gargalo.valor}/10)
+                  </span>
+                </div>
+              </div>
+
+              {/* Placeholder content */}
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '20px',
+                }}
+              >
+                <p style={{ color: theme.colors.text.muted, textAlign: 'center' }}>
+                  Chat com IA será implementado com integração OpenAI
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ==================== BOTTOM NAVIGATION ==================== */}
       <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />

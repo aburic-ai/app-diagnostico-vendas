@@ -14,6 +14,7 @@ import {
   Target,
   FlaskConical,
   ExternalLink,
+  Settings,
 } from 'lucide-react'
 
 import { PageWrapper } from '../components/ui'
@@ -62,6 +63,13 @@ const pages: PageLink[] = [
     description: 'Página de testes e protótipos',
     icon: <FlaskConical size={24} />,
     status: 'wip',
+  },
+  {
+    path: '/admin',
+    label: 'Admin',
+    description: 'Painel de controle do evento (desktop only)',
+    icon: <Settings size={24} />,
+    status: 'done',
   },
 ]
 
