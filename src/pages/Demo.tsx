@@ -487,7 +487,7 @@ export function Demo() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          style={{ textAlign: 'center', marginBottom: '24px' }}
+          style={{ textAlign: 'center', marginBottom: '16px' }}
         >
           <h1 style={{ fontFamily: theme.typography.fontFamily.body, fontSize: '10px', fontWeight: theme.typography.fontWeight.medium, color: theme.colors.text.secondary, letterSpacing: '0.25em', textTransform: 'uppercase', margin: 0 }}>
             IMERSÃO ONLINE
@@ -495,6 +495,30 @@ export function Demo() {
           <h2 style={{ fontFamily: theme.typography.fontFamily.orbitron, fontSize: '20px', fontWeight: theme.typography.fontWeight.bold, color: theme.colors.accent.cyan.DEFAULT, letterSpacing: '0.08em', textTransform: 'uppercase', textShadow: '0 0 20px rgba(34, 211, 238, 0.6)', margin: '4px 0 0 0' }}>
             DIAGNÓSTICO DE VENDAS
           </h2>
+        </motion.div>
+
+        {/* Intro Message */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          style={{
+            textAlign: 'center',
+            marginBottom: '24px',
+            padding: '16px',
+            background: 'rgba(34, 211, 238, 0.08)',
+            border: '1px solid rgba(34, 211, 238, 0.2)',
+            borderRadius: '12px',
+          }}
+        >
+          <p style={{
+            fontSize: '13px',
+            color: theme.colors.text.secondary,
+            lineHeight: 1.6,
+            margin: 0,
+          }}>
+            Você terá um <span style={{ color: theme.colors.accent.cyan.DEFAULT, fontWeight: 'bold' }}>cockpit</span> ao longo do evento inteiro, para te acompanhar e diagnosticar seu processo de vendas
+          </p>
         </motion.div>
 
         {/* ==================== PRÉ-EVENTO LABEL ==================== */}
