@@ -7,7 +7,8 @@
  * - Estilo glassmorphism
  */
 
-import { useState, InputHTMLAttributes, ReactNode } from 'react'
+import { useState } from 'react'
+import type { InputHTMLAttributes, ReactNode } from 'react'
 import { theme } from '../../styles/theme'
 
 interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'style'> {

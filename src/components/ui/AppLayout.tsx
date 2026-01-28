@@ -6,7 +6,7 @@
  * - Desktop: container centralizado simulando celular
  */
 
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { theme } from '../../styles/theme'
 
 interface AppLayoutProps {

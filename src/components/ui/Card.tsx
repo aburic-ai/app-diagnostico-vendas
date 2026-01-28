@@ -2,7 +2,7 @@
  * Card - Container com estilo glassmorphism
  */
 
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { theme } from '../../styles/theme'
 

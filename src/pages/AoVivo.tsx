@@ -45,7 +45,7 @@ export function AoVivo() {
   const [activeNav, setActiveNav] = useState('aovivo')
   const [selectedDay, setSelectedDay] = useState<1 | 2>(1)
   const [showSliders, setShowSliders] = useState(true)
-  const [currentBlock, setCurrentBlock] = useState(3)
+  const [currentBlock] = useState(3)
 
   // Dados do diagnóstico
   const [day1Data, setDay1Data] = useState<IMPACTData>({

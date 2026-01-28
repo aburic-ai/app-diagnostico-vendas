@@ -5,7 +5,7 @@
  * (completed, current, purchase, locked)
  */
 
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { Check, Lock, ShoppingCart, ChevronRight } from 'lucide-react'
 import { theme } from '../../styles/theme'

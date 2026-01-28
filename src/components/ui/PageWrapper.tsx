@@ -8,7 +8,7 @@
  * - Container de conteúdo
  */
 
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { AnimatedBackground } from '../AnimatedBackground'
 import { theme } from '../../styles/theme'
 

@@ -7,19 +7,26 @@
  * - ghost: Transparente
  */
 
-import { useState, ButtonHTMLAttributes, ReactNode } from 'react'
+import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { theme } from '../../styles/theme'
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost'
 
-interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style'> {
+interface ButtonProps {
   children: ReactNode
   variant?: ButtonVariant
   /** Ativa o efeito de beam no hover */
   withBeam?: boolean
   /** Full width */
   fullWidth?: boolean
+  /** Desabilitar botão */
+  disabled?: boolean
+  /** Callback ao clicar */
+  onClick?: () => void
+  /** Tipo do botão */
+  type?: 'button' | 'submit' | 'reset'
 }
 
 export function Button({
@@ -28,7 +35,8 @@ export function Button({
   withBeam = true,
   fullWidth = true,
   disabled,
-  ...props
+  onClick,
+  type = 'button',
 }: ButtonProps) {
   const [isHovered, setIsHovered] = useState(false)
 
@@ -77,6 +85,7 @@ export function Button({
 
   return (
     <motion.button
+      type={type}
       style={baseStyle}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -84,7 +93,7 @@ export function Button({
       onTouchEnd={() => setTimeout(() => setIsHovered(false), 500)}
       whileTap={theme.animations.variants.scale.tap}
       disabled={disabled}
-      {...props}
+      onClick={onClick}
     >
       {/* Beam animation para variant primary */}
       {variant === 'primary' && withBeam && (

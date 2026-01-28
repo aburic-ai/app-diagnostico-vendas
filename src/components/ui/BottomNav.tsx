@@ -5,7 +5,7 @@
  * Números/cadeados ficam acima dos ícones para clareza.
  */
 
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { Lock, ChevronRight } from 'lucide-react'
 import { theme } from '../../styles/theme'
