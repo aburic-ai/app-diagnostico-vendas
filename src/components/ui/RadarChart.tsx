@@ -92,14 +92,28 @@ export function RadarChart({
   const activeData1 = data1 || defaultData
   const activeData2 = data2 || defaultData
 
+  // Color based on selected day
+  const isCyan = selectedDay === 1 || selectedDay === 'both'
+  const accentColor = isCyan ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light
+  const borderColor = isCyan ? 'rgba(34, 211, 238, 0.3)' : 'rgba(168, 85, 247, 0.3)'
+  const glowColor = isCyan ? 'rgba(34, 211, 238, 0.1)' : 'rgba(168, 85, 247, 0.1)'
+
+  // Day label
+  const getDayLabel = () => {
+    if (selectedDay === 1) return 'DIA 1 - ETAPAS DA JORNADA'
+    if (selectedDay === 2) return 'DIA 2 - PROFUNDIDADE'
+    return 'VISÃO GERAL'
+  }
+
   return (
     <div
       style={{
         background: 'linear-gradient(135deg, rgba(10, 12, 18, 0.95) 0%, rgba(5, 8, 15, 0.98) 100%)',
-        border: '1px solid rgba(34, 211, 238, 0.3)',
+        border: `1px solid ${borderColor}`,
         borderRadius: '16px',
         padding: '20px',
-        boxShadow: '0 0 30px rgba(34, 211, 238, 0.1)',
+        boxShadow: `0 0 30px ${glowColor}`,
+        transition: 'all 0.3s ease',
       }}
     >
       {/* Title */}
@@ -109,11 +123,11 @@ export function RadarChart({
             fontFamily: theme.typography.fontFamily.orbitron,
             fontSize: '14px',
             fontWeight: theme.typography.fontWeight.bold,
-            color: theme.colors.accent.cyan.DEFAULT,
+            color: accentColor,
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
             margin: 0,
-            textShadow: '0 0 20px rgba(34, 211, 238, 0.5)',
+            textShadow: `0 0 20px ${isCyan ? 'rgba(34, 211, 238, 0.5)' : 'rgba(168, 85, 247, 0.5)'}`,
           }}
         >
           DIAGNÓSTICO I.M.P.A.C.T.
@@ -121,11 +135,13 @@ export function RadarChart({
         <p
           style={{
             fontSize: '11px',
-            color: theme.colors.text.secondary,
+            color: accentColor,
             margin: '4px 0 0 0',
+            fontWeight: theme.typography.fontWeight.semibold,
+            letterSpacing: '0.05em',
           }}
         >
-          Jornada Psicológica de Venda
+          {getDayLabel()}
         </p>
       </div>
 
@@ -217,7 +233,7 @@ export function RadarChart({
                 cy={point.y}
                 r="14"
                 fill="rgba(10, 12, 18, 0.9)"
-                stroke={theme.colors.accent.cyan.DEFAULT}
+                stroke={accentColor}
                 strokeWidth="1"
               />
               {/* Letter */}
@@ -225,7 +241,7 @@ export function RadarChart({
                 x={point.x}
                 y={point.y + 4}
                 textAnchor="middle"
-                fill={theme.colors.accent.cyan.DEFAULT}
+                fill={accentColor}
                 fontSize="12"
                 fontWeight="bold"
                 fontFamily={theme.typography.fontFamily.orbitron}
@@ -241,8 +257,8 @@ export function RadarChart({
           cx={centerX}
           cy={centerY}
           r="4"
-          fill={theme.colors.accent.cyan.DEFAULT}
-          style={{ filter: 'drop-shadow(0 0 8px rgba(34, 211, 238, 0.8))' }}
+          fill={accentColor}
+          style={{ filter: `drop-shadow(0 0 8px ${isCyan ? 'rgba(34, 211, 238, 0.8)' : 'rgba(168, 85, 247, 0.8)'})` }}
         />
       </svg>
 

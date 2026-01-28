@@ -174,6 +174,7 @@ export function ScenarioProjection({
             height: '3px',
             background: 'rgba(100, 116, 139, 0.2)',
             borderRadius: '2px',
+            zIndex: 0,
           }}
         />
 
@@ -191,6 +192,7 @@ export function ScenarioProjection({
             background: 'linear-gradient(90deg, #F59E0B 0%, #EF4444 50%, #DC2626 100%)',
             borderRadius: '2px',
             boxShadow: '0 0 10px rgba(239, 68, 68, 0.5)',
+            zIndex: 1,
           }}
         />
 
@@ -228,6 +230,8 @@ export function ScenarioProjection({
                   alignItems: 'center',
                   justifyContent: 'center',
                   boxShadow: `0 0 15px ${severityConfig[point.severity].color}50`,
+                  position: 'relative',
+                  zIndex: 2,
                 }}
               >
                 <span

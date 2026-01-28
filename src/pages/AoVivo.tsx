@@ -76,7 +76,13 @@ export function AoVivo() {
     return sorted[0]
   }
 
+  // Verificar se há dados preenchidos (não todos zeros)
+  const hasFilledData = (data: IMPACTData) => {
+    return Object.values(data).some(value => value > 0)
+  }
+
   const gargalo = findGargalo(currentData)
+  const showGargalo = hasFilledData(currentData) && gargalo[1] <= 5
   const gargaloMap: Record<keyof IMPACTData, { etapa: string; letra: string }> = {
     inspiracao: { etapa: 'Inspiração', letra: 'I' },
     motivacao: { etapa: 'Motivação', letra: 'M' },
@@ -223,7 +229,7 @@ export function AoVivo() {
             <RadarChart
               data1={day1Data}
               data2={day2Data.inspiracao > 0 ? day2Data : undefined}
-              selectedDay={day2Data.inspiracao > 0 ? 'both' : 1}
+              selectedDay={selectedDay}
               size={280}
             />
           </motion.div>
@@ -334,7 +340,7 @@ export function AoVivo() {
           </motion.div>
 
           {/* ==================== GARGALO ALERT ==================== */}
-          {gargalo[1] <= 5 && (
+          {showGargalo && (
             <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
               <GargaloAlert
                 etapa={gargaloMap[gargalo[0]].etapa}
