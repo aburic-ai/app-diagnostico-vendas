@@ -21,9 +21,16 @@ import {
   ShoppingCart,
   Info,
   X,
+  Bell,
+  User,
+  Camera,
+  Mail,
+  Building2,
+  Phone,
 } from 'lucide-react'
 
-import { PageWrapper, Countdown, BottomNav } from '../components/ui'
+import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } from '../components/ui'
+import type { Notification } from '../components/ui'
 import { theme } from '../styles/theme'
 
 interface JourneyStep {
@@ -37,9 +44,57 @@ interface JourneyStep {
   isPurchase?: boolean
 }
 
+// Dados do perfil
+interface ProfileData {
+  name: string
+  email: string
+  phone: string
+  company: string
+  role: string
+  photoUrl: string | null
+}
+
 export function PreEvento() {
   const [activeNav, setActiveNav] = useState('preparacao')
   const [showSchedule, setShowSchedule] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [showProfileModal, setShowProfileModal] = useState(false)
+
+  // Profile state
+  const [profile, setProfile] = useState<ProfileData>({
+    name: 'João Silva',
+    email: 'joao.silva@email.com',
+    phone: '',
+    company: '',
+    role: '',
+    photoUrl: null,
+  })
+
+  // Calculate profile completion
+  const profileFields = [profile.name, profile.email, profile.phone, profile.company, profile.role, profile.photoUrl]
+  const completedFields = profileFields.filter(f => f && f.trim() !== '').length
+  const profileProgress = Math.round((completedFields / profileFields.length) * 100)
+  const isProfileComplete = profileProgress === 100
+
+  // Notificações de exemplo
+  const [notifications] = useState<Notification[]>([
+    {
+      id: '1',
+      type: 'info',
+      title: 'Bem-vindo à Imersão!',
+      message: 'Complete seu perfil e as aulas preparatórias para ganhar XP.',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60),
+      read: false,
+    },
+    {
+      id: '2',
+      type: 'info',
+      title: 'Aulas Bônus Disponíveis',
+      message: 'Assista as aulas preparatórias para chegar pronto no evento.',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+      read: true,
+    },
+  ])
 
   // Data do evento: 28/02/2026 às 9h30
   const eventDate = new Date('2026-02-28T09:30:00')
@@ -50,7 +105,8 @@ export function PreEvento() {
     { id: 'posevento', label: 'Pós Evento', icon: <Target size={20} />, status: 'Libera 16/03' },
   ]
 
-  const [steps, setSteps] = useState<JourneyStep[]>([
+  // Steps depend on profile completion
+  const getSteps = (): JourneyStep[] => [
     {
       id: 'imersao',
       title: 'Imersão Diagnóstico de Vendas',
@@ -64,9 +120,17 @@ export function PreEvento() {
       title: 'Protocolo de Iniciação',
       subtitle: 'Calibre seus dados para o seu sistema ser personalizado para o seu negócio',
       icon: <Network size={28} />,
-      status: 'current',
-      progress: 60,
+      status: 'completed', // Protocolo agora é só concluído ou não, sem %
       xp: 100,
+    },
+    {
+      id: 'perfil',
+      title: 'Complete seu Perfil',
+      subtitle: 'Adicione sua foto e informações para personalizar sua experiência',
+      icon: <User size={28} />,
+      status: isProfileComplete ? 'completed' : 'current',
+      progress: isProfileComplete ? undefined : profileProgress,
+      xp: 75,
     },
     {
       id: 'dossie',
@@ -95,7 +159,14 @@ export function PreEvento() {
       progress: 0,
       xp: 50,
     },
-  ])
+  ]
+
+  const [steps, setSteps] = useState<JourneyStep[]>(getSteps())
+
+  // Update steps when profile changes
+  const updateStepsWithProfile = () => {
+    setSteps(getSteps())
+  }
 
   const totalXP = steps
     .filter(s => s.status === 'completed')
@@ -108,6 +179,30 @@ export function PreEvento() {
       newSteps[stepIndex] = { ...newSteps[stepIndex], status: 'completed', progress: 100 }
       return newSteps
     })
+  }
+
+  const handleStepClick = (stepId: string, status: JourneyStep['status']) => {
+    if (stepId === 'perfil') {
+      setShowProfileModal(true)
+    } else if (status === 'current') {
+      handleComplete(stepId)
+    }
+  }
+
+  // Handle photo upload simulation
+  const handlePhotoUpload = () => {
+    // Simula upload de foto
+    setProfile(prev => ({
+      ...prev,
+      photoUrl: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(prev.name) + '&background=22d3ee&color=050505&size=200',
+    }))
+    setTimeout(updateStepsWithProfile, 100)
+  }
+
+  // Handle profile field change
+  const handleProfileChange = (field: keyof ProfileData, value: string) => {
+    setProfile(prev => ({ ...prev, [field]: value }))
+    setTimeout(updateStepsWithProfile, 100)
   }
 
   const getStatusColor = (status: JourneyStep['status']) => {
@@ -177,6 +272,92 @@ export function PreEvento() {
         >
           {/* ==================== HEADER ==================== */}
           <motion.div variants={headerVariants} style={{ marginBottom: '20px' }}>
+            {/* Top Bar - Avatar + Notifications */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '16px',
+              }}
+            >
+              {/* XP Badge */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  borderRadius: '8px',
+                }}
+              >
+                <Zap size={14} color={theme.colors.gold.DEFAULT} />
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    color: theme.colors.gold.DEFAULT,
+                  }}
+                >
+                  {totalXP} XP
+                </span>
+              </div>
+
+              {/* Right side - Notifications + Avatar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* Notification Bell */}
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setShowNotifications(true)}
+                  style={{
+                    position: 'relative',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
+                    background: 'rgba(100, 116, 139, 0.15)',
+                    border: '1px solid rgba(100, 116, 139, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Bell size={18} color={theme.colors.text.secondary} />
+                  {notifications.filter(n => !n.read).length > 0 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '-4px',
+                        right: '-4px',
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: '#EF4444',
+                        border: '2px solid #050505',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                        color: '#fff',
+                      }}
+                    >
+                      {notifications.filter(n => !n.read).length}
+                    </div>
+                  )}
+                </motion.button>
+
+                {/* Avatar */}
+                <AvatarButton
+                  name={profile.name}
+                  photoUrl={profile.photoUrl || undefined}
+                  onClick={() => setShowProfileModal(true)}
+                />
+              </div>
+            </div>
+
             {/* Logo/Título - Invertido */}
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               {/* Título menor em branco */}
@@ -449,7 +630,7 @@ export function PreEvento() {
                   <motion.div
                     whileHover={step.status !== 'locked' ? { scale: 1.02 } : {}}
                     whileTap={step.status !== 'locked' ? { scale: 0.98 } : {}}
-                    onClick={() => step.status === 'current' && handleComplete(step.id)}
+                    onClick={() => handleStepClick(step.id, step.status)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -759,6 +940,388 @@ export function PreEvento() {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* ==================== PROFILE MODAL ==================== */}
+      {showProfileModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={() => setShowProfileModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '400px',
+              maxHeight: '85vh',
+              background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.98) 0%, rgba(10, 12, 18, 0.99) 100%)',
+              border: '1px solid rgba(168, 85, 247, 0.4)',
+              borderRadius: '20px',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '20px',
+                borderBottom: '1px solid rgba(100, 116, 139, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '12px',
+                    background: 'rgba(168, 85, 247, 0.2)',
+                    border: '1px solid rgba(168, 85, 247, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <User size={20} color={theme.colors.accent.purple.light} />
+                </div>
+                <div>
+                  <h3
+                    style={{
+                      fontFamily: theme.typography.fontFamily.orbitron,
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      color: theme.colors.accent.purple.light,
+                      margin: 0,
+                    }}
+                  >
+                    MEU PERFIL
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <Zap size={12} color={theme.colors.gold.DEFAULT} />
+                    <span style={{ fontSize: '10px', color: theme.colors.gold.DEFAULT, fontWeight: 'bold' }}>
+                      +75 XP ao completar
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setShowProfileModal(false)}
+                style={{
+                  background: 'rgba(100, 116, 139, 0.2)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={18} color={theme.colors.text.muted} />
+              </motion.button>
+            </div>
+
+            {/* Content */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '20px',
+              }}
+            >
+              {/* Progress */}
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
+                    Progresso do perfil
+                  </span>
+                  <span style={{ fontSize: '11px', color: theme.colors.accent.purple.light, fontWeight: 'bold' }}>
+                    {profileProgress}%
+                  </span>
+                </div>
+                <div
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    background: 'rgba(30, 35, 45, 0.8)',
+                    borderRadius: '3px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${profileProgress}%` }}
+                    style={{
+                      height: '100%',
+                      background: profileProgress === 100
+                        ? theme.colors.accent.cyan.DEFAULT
+                        : `linear-gradient(90deg, ${theme.colors.accent.purple.DEFAULT} 0%, ${theme.colors.accent.purple.light} 100%)`,
+                      borderRadius: '3px',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Photo Upload */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handlePhotoUpload}
+                  style={{
+                    position: 'relative',
+                    width: '100px',
+                    height: '100px',
+                    borderRadius: '50%',
+                    background: profile.photoUrl
+                      ? `url(${profile.photoUrl}) center/cover`
+                      : 'rgba(168, 85, 247, 0.15)',
+                    border: `3px solid ${profile.photoUrl ? theme.colors.accent.cyan.DEFAULT : 'rgba(168, 85, 247, 0.4)'}`,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {!profile.photoUrl && (
+                    <Camera size={32} color={theme.colors.accent.purple.light} />
+                  )}
+                  {/* Overlay on hover */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: 0,
+                      transition: 'opacity 0.2s',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = '0')}
+                  >
+                    <Camera size={24} color="#fff" />
+                  </div>
+                </motion.button>
+              </div>
+              <p style={{ fontSize: '11px', color: theme.colors.text.muted, textAlign: 'center', marginBottom: '4px' }}>
+                {profile.photoUrl ? 'Clique para alterar a foto' : 'Clique para adicionar uma foto'}
+              </p>
+              <p style={{ fontSize: '9px', color: theme.colors.text.muted, textAlign: 'center', marginBottom: '20px', fontStyle: 'italic' }}>
+                Não aparecerá para outros participantes
+              </p>
+
+              {/* Form Fields */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Name */}
+                <div>
+                  <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <User size={12} />
+                    Nome completo
+                    {profile.name && <Check size={12} color={theme.colors.accent.cyan.DEFAULT} />}
+                  </label>
+                  <input
+                    type="text"
+                    value={profile.name}
+                    onChange={(e) => handleProfileChange('name', e.target.value)}
+                    placeholder="Seu nome"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      background: 'rgba(10, 12, 18, 0.8)',
+                      border: `1px solid ${profile.name ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
+                      borderRadius: '10px',
+                      color: theme.colors.text.primary,
+                      fontSize: '14px',
+                      outline: 'none',
+                    }}
+                  />
+                  <span style={{ fontSize: '9px', color: theme.colors.text.muted, marginTop: '4px', display: 'block', fontStyle: 'italic' }}>
+                    Visível para outros participantes
+                  </span>
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <Mail size={12} />
+                    E-mail
+                    {profile.email && <Check size={12} color={theme.colors.accent.cyan.DEFAULT} />}
+                  </label>
+                  <input
+                    type="email"
+                    value={profile.email}
+                    onChange={(e) => handleProfileChange('email', e.target.value)}
+                    placeholder="seu@email.com"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      background: 'rgba(10, 12, 18, 0.8)',
+                      border: `1px solid ${profile.email ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
+                      borderRadius: '10px',
+                      color: theme.colors.text.primary,
+                      fontSize: '14px',
+                      outline: 'none',
+                    }}
+                  />
+                  <span style={{ fontSize: '9px', color: theme.colors.text.muted, marginTop: '4px', display: 'block', fontStyle: 'italic' }}>
+                    Não aparecerá para outros participantes
+                  </span>
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <Phone size={12} />
+                    Telefone
+                    {profile.phone && <Check size={12} color={theme.colors.accent.cyan.DEFAULT} />}
+                  </label>
+                  <input
+                    type="tel"
+                    value={profile.phone}
+                    onChange={(e) => handleProfileChange('phone', e.target.value)}
+                    placeholder="(11) 99999-9999"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      background: 'rgba(10, 12, 18, 0.8)',
+                      border: `1px solid ${profile.phone ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
+                      borderRadius: '10px',
+                      color: theme.colors.text.primary,
+                      fontSize: '14px',
+                      outline: 'none',
+                    }}
+                  />
+                  <span style={{ fontSize: '9px', color: theme.colors.text.muted, marginTop: '4px', display: 'block', fontStyle: 'italic' }}>
+                    Não aparecerá para outros participantes
+                  </span>
+                </div>
+
+                {/* Company */}
+                <div>
+                  <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <Building2 size={12} />
+                    Empresa
+                    {profile.company && <Check size={12} color={theme.colors.accent.cyan.DEFAULT} />}
+                  </label>
+                  <input
+                    type="text"
+                    value={profile.company}
+                    onChange={(e) => handleProfileChange('company', e.target.value)}
+                    placeholder="Nome da empresa"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      background: 'rgba(10, 12, 18, 0.8)',
+                      border: `1px solid ${profile.company ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
+                      borderRadius: '10px',
+                      color: theme.colors.text.primary,
+                      fontSize: '14px',
+                      outline: 'none',
+                    }}
+                  />
+                  <span style={{ fontSize: '9px', color: theme.colors.text.muted, marginTop: '4px', display: 'block', fontStyle: 'italic' }}>
+                    Não aparecerá para outros participantes
+                  </span>
+                </div>
+
+                {/* Role */}
+                <div>
+                  <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <User size={12} />
+                    Cargo / Função
+                    {profile.role && <Check size={12} color={theme.colors.accent.cyan.DEFAULT} />}
+                  </label>
+                  <input
+                    type="text"
+                    value={profile.role}
+                    onChange={(e) => handleProfileChange('role', e.target.value)}
+                    placeholder="Seu cargo"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      background: 'rgba(10, 12, 18, 0.8)',
+                      border: `1px solid ${profile.role ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
+                      borderRadius: '10px',
+                      color: theme.colors.text.primary,
+                      fontSize: '14px',
+                      outline: 'none',
+                    }}
+                  />
+                  <span style={{ fontSize: '9px', color: theme.colors.text.muted, marginTop: '4px', display: 'block', fontStyle: 'italic' }}>
+                    Não aparecerá para outros participantes
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderTop: '1px solid rgba(100, 116, 139, 0.2)',
+              }}
+            >
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowProfileModal(false)}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: isProfileComplete
+                    ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.3) 0%, rgba(6, 182, 212, 0.2) 100%)'
+                    : 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
+                  border: `1px solid ${isProfileComplete ? 'rgba(34, 211, 238, 0.5)' : 'rgba(168, 85, 247, 0.5)'}`,
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  color: isProfileComplete ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light,
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {isProfileComplete ? (
+                  <>
+                    <Check size={18} />
+                    PERFIL COMPLETO
+                  </>
+                ) : (
+                  'SALVAR ALTERAÇÕES'
+                )}
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* ==================== NOTIFICATION DRAWER ==================== */}
+      <NotificationDrawer
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        notifications={notifications}
+        onMarkAllRead={() => {}}
+      />
 
       {/* ==================== BOTTOM NAVIGATION ==================== */}
       <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />

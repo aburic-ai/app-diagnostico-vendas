@@ -12,7 +12,6 @@ import {
   Rocket,
   Radio,
   Target,
-  FlaskConical,
   ExternalLink,
   Settings,
 } from 'lucide-react'
@@ -56,13 +55,6 @@ const pages: PageLink[] = [
     description: 'Consolidação e plano de ação pós-evento',
     icon: <Target size={24} />,
     status: 'done',
-  },
-  {
-    path: '/sandbox',
-    label: 'Sandbox',
-    description: 'Página de testes e protótipos',
-    icon: <FlaskConical size={24} />,
-    status: 'wip',
   },
   {
     path: '/admin',

@@ -32,6 +32,10 @@ import {
   Clock,
   Settings,
   Bot,
+  Search,
+  UserCheck,
+  UserX,
+  Activity,
 } from 'lucide-react'
 import { EVENT_MODULES, TOTAL_MODULES, getCurrentDay } from '../data/modules'
 import { NotificationToast } from '../components/ui'
@@ -50,6 +54,40 @@ interface EventState {
   lunchReturnTime: string
 }
 
+// Participante online
+interface OnlineParticipant {
+  id: string
+  name: string
+  email: string
+  xp: number
+  currentModule: number
+  lastActivity: Date
+  status: 'active' | 'idle'
+}
+
+// Mock de participantes online
+const generateMockParticipants = (count: number): OnlineParticipant[] => {
+  const firstNames = ['João', 'Maria', 'Pedro', 'Ana', 'Carlos', 'Juliana', 'Rafael', 'Fernanda', 'Lucas', 'Beatriz', 'André', 'Camila', 'Bruno', 'Larissa', 'Diego', 'Patricia', 'Gustavo', 'Amanda', 'Rodrigo', 'Carolina']
+  const lastNames = ['Silva', 'Santos', 'Oliveira', 'Souza', 'Costa', 'Ferreira', 'Almeida', 'Pereira', 'Lima', 'Gomes', 'Ribeiro', 'Martins', 'Carvalho', 'Rodrigues', 'Nascimento', 'Araújo', 'Barbosa', 'Moreira', 'Mendes', 'Pinto']
+
+  return Array.from({ length: count }, (_, i) => {
+    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)]
+    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)]
+    const name = `${firstName} ${lastName}`
+    const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@email.com`
+
+    return {
+      id: `user-${i}`,
+      name,
+      email,
+      xp: Math.floor(Math.random() * 200) + 10,
+      currentModule: Math.floor(Math.random() * 10),
+      lastActivity: new Date(Date.now() - Math.floor(Math.random() * 300000)),
+      status: (Math.random() > 0.2 ? 'active' : 'idle') as 'active' | 'idle',
+    }
+  }).sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())
+}
+
 // Dados do evento (editáveis)
 interface EventData {
   edition: string
@@ -59,6 +97,13 @@ interface EventData {
   day2Time: string
 }
 
+// Liberação das abas do app
+interface TabRelease {
+  preparacao: { enabled: boolean; date: string; time: string }
+  aoVivo: { enabled: boolean; date: string; time: string }
+  posEvento: { enabled: boolean; date: string; time: string }
+}
+
 // Tipos de aviso
 const notificationTypes: { type: NotificationType; label: string; icon: typeof Bell; color: string }[] = [
   { type: 'info', label: 'Info', icon: Bell, color: '#22D3EE' },
@@ -66,6 +111,16 @@ const notificationTypes: { type: NotificationType; label: string; icon: typeof B
   { type: 'offer', label: 'Oferta', icon: Gift, color: '#F59E0B' },
   { type: 'nps', label: 'NPS', icon: Star, color: '#A855F7' },
 ]
+
+// Helper to format time ago
+const formatTimeAgo = (date: Date): string => {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seconds < 60) return 'agora'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}min`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}h`
+}
 
 // Templates de avisos
 const notificationTemplates = [
@@ -97,6 +152,13 @@ export function Admin() {
   })
   const [showEventSettings, setShowEventSettings] = useState(false)
 
+  // Tab Release (liberação das abas)
+  const [tabRelease, setTabRelease] = useState<TabRelease>({
+    preparacao: { enabled: true, date: '2026-02-01', time: '00:00' },
+    aoVivo: { enabled: false, date: '2026-02-28', time: '09:30' },
+    posEvento: { enabled: false, date: '2026-03-01', time: '18:00' },
+  })
+
   // Confirmation Dialog
   const [confirmDialog, setConfirmDialog] = useState<{
     show: boolean
@@ -114,6 +176,11 @@ export function Admin() {
   // Preview notification
   const [previewNotification, setPreviewNotification] = useState<Notification | null>(null)
   const [lunchMinutesRemaining, setLunchMinutesRemaining] = useState<number>(0)
+
+  // Participants modal
+  const [showParticipants, setShowParticipants] = useState(false)
+  const [participants, setParticipants] = useState<OnlineParticipant[]>([])
+  const [participantSearch, setParticipantSearch] = useState('')
 
   // Calculate minutes remaining until lunch return
   const calculateLunchMinutes = () => {
@@ -139,15 +206,36 @@ export function Admin() {
   // Simulated online count
   useEffect(() => {
     if (eventState.status === 'live') {
+      // Generate initial participants
+      setParticipants(generateMockParticipants(eventState.participantsOnline || 50))
+
       const interval = setInterval(() => {
-        setEventState(prev => ({
-          ...prev,
-          participantsOnline: Math.min(700, prev.participantsOnline + Math.floor(Math.random() * 10)),
-        }))
+        setEventState(prev => {
+          const newCount = Math.min(700, prev.participantsOnline + Math.floor(Math.random() * 10))
+          return {
+            ...prev,
+            participantsOnline: newCount,
+          }
+        })
       }, 2000)
       return () => clearInterval(interval)
+    } else {
+      setParticipants([])
     }
   }, [eventState.status])
+
+  // Update participants list when count changes
+  useEffect(() => {
+    if (eventState.status === 'live' && eventState.participantsOnline > 0) {
+      setParticipants(generateMockParticipants(eventState.participantsOnline))
+    }
+  }, [eventState.participantsOnline, eventState.status])
+
+  // Filter participants by search
+  const filteredParticipants = participants.filter(p =>
+    p.name.toLowerCase().includes(participantSearch.toLowerCase()) ||
+    p.email.toLowerCase().includes(participantSearch.toLowerCase())
+  )
 
   const currentModule = EVENT_MODULES[eventState.currentModule]
   const currentDay = getCurrentDay(eventState.currentModule)
@@ -481,6 +569,287 @@ export function Admin() {
                     />
                   </div>
                 </div>
+
+                {/* Tab Release Settings */}
+                <div style={{ marginTop: '24px' }}>
+                  <h2
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      color: theme.colors.text.primary,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      margin: '0 0 16px 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <Unlock size={16} />
+                    Liberação das Abas
+                  </h2>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Preparação */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 16px',
+                        background: tabRelease.preparacao.enabled ? 'rgba(34, 211, 238, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+                        border: `1px solid ${tabRelease.preparacao.enabled ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.2)'}`,
+                        borderRadius: '10px',
+                      }}
+                    >
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => setTabRelease(prev => ({
+                          ...prev,
+                          preparacao: { ...prev.preparacao, enabled: !prev.preparacao.enabled }
+                        }))}
+                        style={{
+                          width: '36px',
+                          height: '20px',
+                          borderRadius: '10px',
+                          background: tabRelease.preparacao.enabled
+                            ? theme.colors.accent.cyan.DEFAULT
+                            : 'rgba(100, 116, 139, 0.3)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <motion.div
+                          animate={{ x: tabRelease.preparacao.enabled ? 18 : 2 }}
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            background: '#fff',
+                            position: 'absolute',
+                            top: '2px',
+                          }}
+                        />
+                      </motion.button>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: theme.colors.text.primary, minWidth: '100px' }}>
+                        Preparação
+                      </span>
+                      <input
+                        type="date"
+                        value={tabRelease.preparacao.date}
+                        onChange={(e) => setTabRelease(prev => ({
+                          ...prev,
+                          preparacao: { ...prev.preparacao, date: e.target.value }
+                        }))}
+                        style={{
+                          padding: '8px 10px',
+                          background: 'rgba(10, 12, 18, 0.8)',
+                          border: '1px solid rgba(100, 116, 139, 0.3)',
+                          borderRadius: '6px',
+                          color: theme.colors.text.primary,
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                      <input
+                        type="time"
+                        value={tabRelease.preparacao.time}
+                        onChange={(e) => setTabRelease(prev => ({
+                          ...prev,
+                          preparacao: { ...prev.preparacao, time: e.target.value }
+                        }))}
+                        style={{
+                          padding: '8px 10px',
+                          background: 'rgba(10, 12, 18, 0.8)',
+                          border: '1px solid rgba(100, 116, 139, 0.3)',
+                          borderRadius: '6px',
+                          color: theme.colors.text.primary,
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                      <span style={{ fontSize: '11px', color: tabRelease.preparacao.enabled ? theme.colors.accent.cyan.DEFAULT : theme.colors.text.muted, marginLeft: 'auto' }}>
+                        {tabRelease.preparacao.enabled ? '✓ Liberado' : 'Bloqueado'}
+                      </span>
+                    </div>
+
+                    {/* Ao Vivo */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 16px',
+                        background: tabRelease.aoVivo.enabled ? 'rgba(239, 68, 68, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+                        border: `1px solid ${tabRelease.aoVivo.enabled ? 'rgba(239, 68, 68, 0.3)' : 'rgba(100, 116, 139, 0.2)'}`,
+                        borderRadius: '10px',
+                      }}
+                    >
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => setTabRelease(prev => ({
+                          ...prev,
+                          aoVivo: { ...prev.aoVivo, enabled: !prev.aoVivo.enabled }
+                        }))}
+                        style={{
+                          width: '36px',
+                          height: '20px',
+                          borderRadius: '10px',
+                          background: tabRelease.aoVivo.enabled
+                            ? '#EF4444'
+                            : 'rgba(100, 116, 139, 0.3)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <motion.div
+                          animate={{ x: tabRelease.aoVivo.enabled ? 18 : 2 }}
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            background: '#fff',
+                            position: 'absolute',
+                            top: '2px',
+                          }}
+                        />
+                      </motion.button>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: theme.colors.text.primary, minWidth: '100px' }}>
+                        Ao Vivo
+                      </span>
+                      <input
+                        type="date"
+                        value={tabRelease.aoVivo.date}
+                        onChange={(e) => setTabRelease(prev => ({
+                          ...prev,
+                          aoVivo: { ...prev.aoVivo, date: e.target.value }
+                        }))}
+                        style={{
+                          padding: '8px 10px',
+                          background: 'rgba(10, 12, 18, 0.8)',
+                          border: '1px solid rgba(100, 116, 139, 0.3)',
+                          borderRadius: '6px',
+                          color: theme.colors.text.primary,
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                      <input
+                        type="time"
+                        value={tabRelease.aoVivo.time}
+                        onChange={(e) => setTabRelease(prev => ({
+                          ...prev,
+                          aoVivo: { ...prev.aoVivo, time: e.target.value }
+                        }))}
+                        style={{
+                          padding: '8px 10px',
+                          background: 'rgba(10, 12, 18, 0.8)',
+                          border: '1px solid rgba(100, 116, 139, 0.3)',
+                          borderRadius: '6px',
+                          color: theme.colors.text.primary,
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                      <span style={{ fontSize: '11px', color: tabRelease.aoVivo.enabled ? '#EF4444' : theme.colors.text.muted, marginLeft: 'auto' }}>
+                        {tabRelease.aoVivo.enabled ? '✓ Liberado' : 'Bloqueado'}
+                      </span>
+                    </div>
+
+                    {/* Pós Evento */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 16px',
+                        background: tabRelease.posEvento.enabled ? 'rgba(168, 85, 247, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+                        border: `1px solid ${tabRelease.posEvento.enabled ? 'rgba(168, 85, 247, 0.3)' : 'rgba(100, 116, 139, 0.2)'}`,
+                        borderRadius: '10px',
+                      }}
+                    >
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => setTabRelease(prev => ({
+                          ...prev,
+                          posEvento: { ...prev.posEvento, enabled: !prev.posEvento.enabled }
+                        }))}
+                        style={{
+                          width: '36px',
+                          height: '20px',
+                          borderRadius: '10px',
+                          background: tabRelease.posEvento.enabled
+                            ? theme.colors.accent.purple.light
+                            : 'rgba(100, 116, 139, 0.3)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <motion.div
+                          animate={{ x: tabRelease.posEvento.enabled ? 18 : 2 }}
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            background: '#fff',
+                            position: 'absolute',
+                            top: '2px',
+                          }}
+                        />
+                      </motion.button>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: theme.colors.text.primary, minWidth: '100px' }}>
+                        Pós Evento
+                      </span>
+                      <input
+                        type="date"
+                        value={tabRelease.posEvento.date}
+                        onChange={(e) => setTabRelease(prev => ({
+                          ...prev,
+                          posEvento: { ...prev.posEvento, date: e.target.value }
+                        }))}
+                        style={{
+                          padding: '8px 10px',
+                          background: 'rgba(10, 12, 18, 0.8)',
+                          border: '1px solid rgba(100, 116, 139, 0.3)',
+                          borderRadius: '6px',
+                          color: theme.colors.text.primary,
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                      <input
+                        type="time"
+                        value={tabRelease.posEvento.time}
+                        onChange={(e) => setTabRelease(prev => ({
+                          ...prev,
+                          posEvento: { ...prev.posEvento, time: e.target.value }
+                        }))}
+                        style={{
+                          padding: '8px 10px',
+                          background: 'rgba(10, 12, 18, 0.8)',
+                          border: '1px solid rgba(100, 116, 139, 0.3)',
+                          borderRadius: '6px',
+                          color: theme.colors.text.primary,
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                      <span style={{ fontSize: '11px', color: tabRelease.posEvento.enabled ? theme.colors.accent.purple.light : theme.colors.text.muted, marginLeft: 'auto' }}>
+                        {tabRelease.posEvento.enabled ? '✓ Liberado' : 'Bloqueado'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '11px', color: theme.colors.text.muted, marginTop: '12px' }}>
+                    As abas serão liberadas automaticamente na data/hora configurada, ou você pode liberar manualmente usando o toggle.
+                  </p>
+                </div>
               </div>
             </motion.div>
           )}
@@ -534,8 +903,11 @@ export function Admin() {
             </div>
           </div>
 
-          {/* Online Count */}
-          <div
+          {/* Online Count - Clickable */}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowParticipants(true)}
             style={{
               flex: 1,
               padding: '16px',
@@ -545,6 +917,8 @@ export function Admin() {
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
+              cursor: 'pointer',
+              textAlign: 'left',
             }}
           >
             <Users size={24} color={theme.colors.accent.cyan.DEFAULT} />
@@ -563,7 +937,8 @@ export function Admin() {
                 {eventState.participantsOnline} / 1000
               </p>
             </div>
-          </div>
+            <Search size={16} color={theme.colors.accent.cyan.DEFAULT} style={{ marginLeft: 'auto', opacity: 0.6 }} />
+          </motion.button>
 
           {/* Current Day */}
           <div
@@ -1728,6 +2103,347 @@ export function Admin() {
                 >
                   CONFIRMAR
                 </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ==================== PARTICIPANTS MODAL ==================== */}
+      <AnimatePresence>
+        {showParticipants && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+            }}
+            onClick={() => setShowParticipants(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.98) 0%, rgba(10, 12, 18, 0.98) 100%)',
+                border: '1px solid rgba(34, 211, 238, 0.4)',
+                borderRadius: '20px',
+                padding: '24px',
+                width: '600px',
+                maxHeight: '80vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '12px',
+                      background: 'rgba(34, 211, 238, 0.2)',
+                      border: '1px solid rgba(34, 211, 238, 0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Users size={22} color={theme.colors.accent.cyan.DEFAULT} />
+                  </div>
+                  <div>
+                    <h3
+                      style={{
+                        fontFamily: theme.typography.fontFamily.orbitron,
+                        fontSize: '16px',
+                        fontWeight: 'bold',
+                        color: theme.colors.accent.cyan.DEFAULT,
+                        margin: 0,
+                      }}
+                    >
+                      PARTICIPANTES ONLINE
+                    </h3>
+                    <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '2px 0 0 0' }}>
+                      {filteredParticipants.length} de {eventState.participantsOnline} exibidos
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowParticipants(false)}
+                  style={{
+                    background: 'rgba(100, 116, 139, 0.2)',
+                    border: '1px solid rgba(100, 116, 139, 0.3)',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    padding: '10px',
+                  }}
+                >
+                  <X size={20} color={theme.colors.text.muted} />
+                </button>
+              </div>
+
+              {/* Stats Row */}
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: 'rgba(34, 197, 94, 0.1)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <UserCheck size={18} color="#22C55E" />
+                  <div>
+                    <p style={{ fontSize: '10px', color: theme.colors.text.muted, margin: 0 }}>ATIVOS</p>
+                    <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#22C55E', margin: 0 }}>
+                      {filteredParticipants.filter(p => p.status === 'active').length}
+                    </p>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <UserX size={18} color="#F59E0B" />
+                  <div>
+                    <p style={{ fontSize: '10px', color: theme.colors.text.muted, margin: 0 }}>INATIVOS</p>
+                    <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#F59E0B', margin: 0 }}>
+                      {filteredParticipants.filter(p => p.status === 'idle').length}
+                    </p>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: 'rgba(168, 85, 247, 0.1)',
+                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <Activity size={18} color={theme.colors.accent.purple.light} />
+                  <div>
+                    <p style={{ fontSize: '10px', color: theme.colors.text.muted, margin: 0 }}>XP MÉDIO</p>
+                    <p style={{ fontSize: '14px', fontWeight: 'bold', color: theme.colors.accent.purple.light, margin: 0 }}>
+                      {filteredParticipants.length > 0
+                        ? Math.round(filteredParticipants.reduce((acc, p) => acc + p.xp, 0) / filteredParticipants.length)
+                        : 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search */}
+              <div style={{ position: 'relative', marginBottom: '16px' }}>
+                <Search
+                  size={18}
+                  color={theme.colors.text.muted}
+                  style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }}
+                />
+                <input
+                  type="text"
+                  value={participantSearch}
+                  onChange={(e) => setParticipantSearch(e.target.value)}
+                  placeholder="Buscar por nome ou email..."
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px 12px 44px',
+                    background: 'rgba(10, 12, 18, 0.8)',
+                    border: '1px solid rgba(100, 116, 139, 0.3)',
+                    borderRadius: '10px',
+                    color: theme.colors.text.primary,
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Participants List */}
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                {filteredParticipants.length === 0 ? (
+                  <div
+                    style={{
+                      padding: '40px',
+                      textAlign: 'center',
+                      color: theme.colors.text.muted,
+                    }}
+                  >
+                    {eventState.status === 'offline'
+                      ? 'Nenhum participante online. Inicie a transmissão.'
+                      : 'Nenhum participante encontrado.'}
+                  </div>
+                ) : (
+                  filteredParticipants.slice(0, 50).map((participant) => (
+                    <motion.div
+                      key={participant.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px 14px',
+                        background: 'rgba(10, 12, 18, 0.5)',
+                        border: `1px solid ${participant.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(100, 116, 139, 0.15)'}`,
+                        borderRadius: '10px',
+                      }}
+                    >
+                      {/* Avatar */}
+                      <div
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '10px',
+                          background: participant.status === 'active'
+                            ? 'rgba(34, 197, 94, 0.2)'
+                            : 'rgba(100, 116, 139, 0.2)',
+                          border: `1px solid ${participant.status === 'active' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(100, 116, 139, 0.3)'}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          position: 'relative',
+                        }}
+                      >
+                        <span style={{ fontSize: '14px', fontWeight: 'bold', color: theme.colors.text.primary }}>
+                          {participant.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </span>
+                        {/* Online indicator */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '-2px',
+                            right: '-2px',
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            background: participant.status === 'active' ? '#22C55E' : '#F59E0B',
+                            border: '2px solid #0a0a0f',
+                          }}
+                        />
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <p
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: 'bold',
+                              color: theme.colors.text.primary,
+                              margin: 0,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {participant.name}
+                          </p>
+                          <span
+                            style={{
+                              fontSize: '9px',
+                              padding: '2px 6px',
+                              background: participant.status === 'active' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                              color: participant.status === 'active' ? '#22C55E' : '#F59E0B',
+                              borderRadius: '4px',
+                              textTransform: 'uppercase',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {participant.status === 'active' ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            fontSize: '11px',
+                            color: theme.colors.text.muted,
+                            margin: '2px 0 0 0',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {participant.email}
+                        </p>
+                      </div>
+
+                      {/* XP */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '6px 10px',
+                          background: 'rgba(245, 158, 11, 0.15)',
+                          borderRadius: '6px',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Zap size={12} color={theme.colors.gold.DEFAULT} />
+                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: theme.colors.gold.DEFAULT }}>
+                          {participant.xp}
+                        </span>
+                      </div>
+
+                      {/* Module */}
+                      <div
+                        style={{
+                          padding: '6px 10px',
+                          background: 'rgba(168, 85, 247, 0.15)',
+                          borderRadius: '6px',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span style={{ fontSize: '11px', color: theme.colors.accent.purple.light }}>
+                          M{participant.currentModule}
+                        </span>
+                      </div>
+
+                      {/* Last Activity */}
+                      <span style={{ fontSize: '10px', color: theme.colors.text.muted, flexShrink: 0 }}>
+                        {formatTimeAgo(participant.lastActivity)}
+                      </span>
+                    </motion.div>
+                  ))
+                )}
+                {filteredParticipants.length > 50 && (
+                  <p style={{ fontSize: '11px', color: theme.colors.text.muted, textAlign: 'center', padding: '10px' }}>
+                    Mostrando 50 de {filteredParticipants.length} participantes
+                  </p>
+                )}
               </div>
             </motion.div>
           </motion.div>

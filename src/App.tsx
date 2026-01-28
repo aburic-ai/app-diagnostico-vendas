@@ -11,7 +11,6 @@ import { Login } from './pages/Login'
 import { PreEvento } from './pages/PreEvento'
 import { AoVivo } from './pages/AoVivo'
 import { PosEvento } from './pages/PosEvento'
-import { Sandbox } from './pages/Sandbox'
 import { DevNav } from './pages/DevNav'
 import { Admin } from './pages/Admin'
 import { AppLayout } from './components/ui'
@@ -33,7 +32,6 @@ function App() {
               <Route path="/pre-evento" element={<PreEvento />} />
               <Route path="/ao-vivo" element={<AoVivo />} />
               <Route path="/pos-evento" element={<PosEvento />} />
-              <Route path="/sandbox" element={<Sandbox />} />
               <Route path="/dev" element={<DevNav />} />
             </Routes>
           </AppLayout>
