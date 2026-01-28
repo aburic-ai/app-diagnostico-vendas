@@ -26,7 +26,6 @@ import {
   PageWrapper,
   BottomNav,
   PageHeader,
-  LiveTicker,
   RadarChart,
   DiagnosticSlider,
   GargaloAlert,
@@ -261,283 +260,424 @@ export function AoVivo() {
             </div>
           </motion.div>
 
-          {/* ==================== LIVE TICKER ==================== */}
-          <motion.div variants={itemVariants} style={{ marginBottom: '16px' }}>
-            <LiveTicker
-              currentModule={currentModule}
-              status="live"
-              currentDay={currentDay}
-            />
-          </motion.div>
-
-          {/* ==================== HORIZONTAL MODULES SCROLL ==================== */}
-          <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
-            {/* Section Header */}
+          {/* ==================== UNIFIED LIVE + MODULES BOX ==================== */}
+          <motion.div
+            variants={itemVariants}
+            style={{
+              marginBottom: '20px',
+              background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.95) 0%, rgba(10, 12, 18, 0.98) 100%)',
+              border: '1px solid rgba(255, 68, 68, 0.4)',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            {/* Top glow effect */}
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '12px',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '2px',
+                background: 'linear-gradient(90deg, transparent 0%, #FF4444 50%, transparent 100%)',
+                boxShadow: '0 0 20px #FF444480',
+              }}
+            />
+
+            {/* Header Section */}
+            <div
+              style={{
+                padding: '14px 16px',
+                borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: theme.typography.fontWeight.bold,
-                    color: theme.colors.text.primary,
-                    letterSpacing: '0.05em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  MÓDULOS DIA {currentDay}
-                </span>
-                <span
-                  style={{
-                    fontSize: '10px',
-                    color: theme.colors.text.muted,
-                  }}
-                >
-                  (deslize para ver todos)
-                </span>
-              </div>
+              {/* Top Row - Badges */}
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 8px',
-                  background: 'rgba(245, 158, 11, 0.1)',
-                  borderRadius: '6px',
+                  justifyContent: 'space-between',
+                  marginBottom: '12px',
                 }}
               >
-                <Zap size={12} color={theme.colors.gold.DEFAULT} />
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    color: theme.colors.gold.DEFAULT,
-                  }}
-                >
-                  {totalXP} XP
-                </span>
-              </div>
-            </div>
-
-            {/* Horizontal Scroll Container */}
-            <div
-              ref={modulesScrollRef}
-              style={{
-                display: 'flex',
-                gap: '12px',
-                overflowX: 'auto',
-                paddingBottom: '8px',
-                scrollSnapType: 'x mandatory',
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none',
-              }}
-            >
-              {EVENT_MODULES.filter(m => m.day === currentDay).map((mod) => {
-                const isPast = mod.id < currentModule
-                const isCurrent = mod.id === currentModule
-                const isFuture = mod.id > currentModule
-                const isConfirmed = confirmedModules.includes(mod.id)
-                const canConfirm = isCurrent && !isConfirmed
-
-                return (
-                  <motion.div
-                    key={mod.id}
-                    data-module={mod.id}
-                    whileTap={canConfirm ? { scale: 0.98 } : {}}
+                {/* Left side - Live badge + Day */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* AO VIVO Badge */}
+                  <div
                     style={{
-                      minWidth: isCurrent ? '200px' : '140px',
-                      flexShrink: 0,
-                      scrollSnapAlign: 'center',
-                      padding: '14px',
-                      background: isCurrent
-                        ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(124, 58, 237, 0.15) 100%)'
-                        : isPast
-                        ? 'rgba(34, 211, 238, 0.08)'
-                        : 'rgba(100, 116, 139, 0.05)',
-                      border: isCurrent
-                        ? '2px solid rgba(168, 85, 247, 0.5)'
-                        : isPast
-                        ? '1px solid rgba(34, 211, 238, 0.3)'
-                        : '1px solid rgba(100, 116, 139, 0.2)',
-                      borderRadius: '14px',
-                      opacity: isFuture ? 0.5 : 1,
-                      boxShadow: isCurrent ? '0 0 20px rgba(168, 85, 247, 0.3)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 10px',
+                      background: 'rgba(255, 68, 68, 0.15)',
+                      border: '1px solid rgba(255, 68, 68, 0.4)',
+                      borderRadius: '6px',
                     }}
                   >
-                    {/* Module Number + Status */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <div
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '8px',
-                          background: isPast
-                            ? 'rgba(34, 211, 238, 0.2)'
-                            : isCurrent
-                            ? 'rgba(168, 85, 247, 0.3)'
-                            : 'rgba(100, 116, 139, 0.1)',
-                          border: `1px solid ${
-                            isPast
-                              ? 'rgba(34, 211, 238, 0.4)'
-                              : isCurrent
-                              ? 'rgba(168, 85, 247, 0.5)'
-                              : 'rgba(100, 116, 139, 0.2)'
-                          }`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          color: isPast
-                            ? theme.colors.accent.cyan.DEFAULT
-                            : isCurrent
-                            ? theme.colors.accent.purple.light
-                            : theme.colors.text.muted,
-                        }}
-                      >
-                        {isPast ? (
-                          <Check size={14} />
-                        ) : isCurrent ? (
-                          <Play size={12} fill={theme.colors.accent.purple.light} />
-                        ) : (
-                          <Lock size={12} />
-                        )}
-                      </div>
-
-                      {/* XP Badge */}
-                      {(isPast || isCurrent) && isConfirmed && (
-                        <span
-                          style={{
-                            fontSize: '9px',
-                            color: theme.colors.accent.cyan.DEFAULT,
-                            padding: '2px 6px',
-                            background: 'rgba(34, 211, 238, 0.1)',
-                            borderRadius: '4px',
-                          }}
-                        >
-                          +15 XP
-                        </span>
-                      )}
-
-                      {/* Live indicator for current */}
-                      {isCurrent && (
-                        <motion.div
-                          animate={{ opacity: [1, 0.5, 1] }}
-                          transition={{ duration: 1.5, repeat: Infinity }}
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            background: '#FF4444',
-                            boxShadow: '0 0 10px #FF4444',
-                          }}
-                        />
-                      )}
-                    </div>
-
-                    {/* Module Title */}
-                    <p
+                    <motion.div
+                      animate={{
+                        scale: [1, 1.3, 1],
+                        opacity: [1, 0.5, 1],
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                        ease: 'easeInOut',
+                      }}
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: '#FF4444',
+                        boxShadow: '0 0 10px #FF4444',
+                      }}
+                    />
+                    <span
                       style={{
                         fontSize: '10px',
                         fontWeight: theme.typography.fontWeight.bold,
-                        color: isCurrent
-                          ? theme.colors.accent.purple.light
-                          : isPast
-                          ? theme.colors.text.primary
-                          : theme.colors.text.muted,
+                        color: '#FF4444',
+                        letterSpacing: '0.1em',
                         textTransform: 'uppercase',
-                        margin: '0 0 4px 0',
-                        lineHeight: 1.3,
                       }}
                     >
-                      {mod.title}
-                    </p>
+                      AO VIVO
+                    </span>
+                  </div>
 
-                    {/* Subtitle - only for current */}
-                    {isCurrent && (
+                  {/* Day Badge */}
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      color: theme.colors.accent.cyan.DEFAULT,
+                      fontWeight: theme.typography.fontWeight.semibold,
+                      padding: '4px 8px',
+                      background: 'rgba(34, 211, 238, 0.1)',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    DIA {currentDay}
+                  </span>
+                </div>
+
+                {/* Right side - XP Counter */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    borderRadius: '6px',
+                  }}
+                >
+                  <Zap size={12} color={theme.colors.gold.DEFAULT} />
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      color: theme.colors.gold.DEFAULT,
+                    }}
+                  >
+                    {totalXP} XP
+                  </span>
+                </div>
+              </div>
+
+              {/* Current Module Info */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, rgba(255, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%)',
+                    border: '1px solid rgba(255, 68, 68, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Radio size={22} color="#FF4444" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p
+                    style={{
+                      fontSize: '10px',
+                      color: theme.colors.text.muted,
+                      margin: '0 0 2px 0',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    MÓDULO {currentModule} DE {EVENT_MODULES.length - 1}
+                  </p>
+                  <h3
+                    style={{
+                      fontFamily: theme.typography.fontFamily.orbitron,
+                      fontSize: '13px',
+                      fontWeight: theme.typography.fontWeight.bold,
+                      color: theme.colors.text.primary,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.03em',
+                      margin: 0,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {currentModuleData?.title || `MÓDULO ${currentModule}`}
+                  </h3>
+                  {currentModuleData?.subtitle && (
+                    <p
+                      style={{
+                        fontSize: '10px',
+                        color: theme.colors.text.secondary,
+                        margin: '3px 0 0 0',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {currentModuleData.subtitle}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modules Horizontal Scroll */}
+            <div style={{ padding: '12px 0 14px 0' }}>
+              {/* Scroll hint */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0 16px',
+                  marginBottom: '10px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '10px',
+                    color: theme.colors.text.muted,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                >
+                  MÓDULOS DO DIA
+                </span>
+                <span
+                  style={{
+                    fontSize: '9px',
+                    color: theme.colors.text.muted,
+                  }}
+                >
+                  deslize →
+                </span>
+              </div>
+
+              {/* Horizontal Scroll Container */}
+              <div
+                ref={modulesScrollRef}
+                style={{
+                  display: 'flex',
+                  gap: '10px',
+                  overflowX: 'auto',
+                  paddingLeft: '16px',
+                  paddingRight: '16px',
+                  paddingBottom: '4px',
+                  scrollSnapType: 'x mandatory',
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                }}
+              >
+                {EVENT_MODULES.filter(m => m.day === currentDay).map((mod) => {
+                  const isPast = mod.id < currentModule
+                  const isCurrent = mod.id === currentModule
+                  const isFuture = mod.id > currentModule
+                  const isConfirmed = confirmedModules.includes(mod.id)
+                  const canConfirm = isCurrent && !isConfirmed
+
+                  return (
+                    <motion.div
+                      key={mod.id}
+                      data-module={mod.id}
+                      whileTap={canConfirm ? { scale: 0.98 } : {}}
+                      style={{
+                        minWidth: isCurrent ? '180px' : '120px',
+                        flexShrink: 0,
+                        scrollSnapAlign: 'center',
+                        padding: '12px',
+                        background: isCurrent
+                          ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(124, 58, 237, 0.15) 100%)'
+                          : isPast
+                          ? 'rgba(34, 211, 238, 0.08)'
+                          : 'rgba(100, 116, 139, 0.05)',
+                        border: isCurrent
+                          ? '2px solid rgba(168, 85, 247, 0.5)'
+                          : isPast
+                          ? '1px solid rgba(34, 211, 238, 0.3)'
+                          : '1px solid rgba(100, 116, 139, 0.2)',
+                        borderRadius: '12px',
+                        opacity: isFuture ? 0.5 : 1,
+                        boxShadow: isCurrent ? '0 0 15px rgba(168, 85, 247, 0.3)' : 'none',
+                      }}
+                    >
+                      {/* Module Number + Status */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <div
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '6px',
+                            background: isPast
+                              ? 'rgba(34, 211, 238, 0.2)'
+                              : isCurrent
+                              ? 'rgba(168, 85, 247, 0.3)'
+                              : 'rgba(100, 116, 139, 0.1)',
+                            border: `1px solid ${
+                              isPast
+                                ? 'rgba(34, 211, 238, 0.4)'
+                                : isCurrent
+                                ? 'rgba(168, 85, 247, 0.5)'
+                                : 'rgba(100, 116, 139, 0.2)'
+                            }`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            fontWeight: 'bold',
+                            color: isPast
+                              ? theme.colors.accent.cyan.DEFAULT
+                              : isCurrent
+                              ? theme.colors.accent.purple.light
+                              : theme.colors.text.muted,
+                          }}
+                        >
+                          {isPast ? (
+                            <Check size={12} />
+                          ) : isCurrent ? (
+                            <Play size={10} fill={theme.colors.accent.purple.light} />
+                          ) : (
+                            <Lock size={10} />
+                          )}
+                        </div>
+
+                        {/* XP Badge or Live indicator */}
+                        {(isPast || isCurrent) && isConfirmed ? (
+                          <span
+                            style={{
+                              fontSize: '8px',
+                              color: theme.colors.accent.cyan.DEFAULT,
+                              padding: '2px 5px',
+                              background: 'rgba(34, 211, 238, 0.1)',
+                              borderRadius: '4px',
+                            }}
+                          >
+                            +15 XP
+                          </span>
+                        ) : isCurrent ? (
+                          <motion.div
+                            animate={{ opacity: [1, 0.5, 1] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                            style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              background: '#FF4444',
+                              boxShadow: '0 0 8px #FF4444',
+                            }}
+                          />
+                        ) : null}
+                      </div>
+
+                      {/* Module Title */}
                       <p
                         style={{
                           fontSize: '9px',
-                          color: theme.colors.text.secondary,
-                          margin: '0 0 10px 0',
+                          fontWeight: theme.typography.fontWeight.bold,
+                          color: isCurrent
+                            ? theme.colors.accent.purple.light
+                            : isPast
+                            ? theme.colors.text.primary
+                            : theme.colors.text.muted,
+                          textTransform: 'uppercase',
+                          margin: 0,
                           lineHeight: 1.3,
                         }}
                       >
-                        {mod.subtitle}
+                        {mod.title}
                       </p>
-                    )}
 
-                    {/* Confirm Button - only for current module that hasn't been confirmed */}
-                    {canConfirm && (
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => handleConfirmPresence(mod.id)}
-                        style={{
-                          width: '100%',
-                          padding: '10px',
-                          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
-                          border: '1px solid rgba(168, 85, 247, 0.5)',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          color: theme.colors.accent.purple.light,
-                          fontSize: '10px',
-                          fontWeight: 'bold',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        <Zap size={12} />
-                        CONFIRMAR +15 XP
-                      </motion.button>
-                    )}
-
-                    {/* Confirmed indicator */}
-                    {isCurrent && isConfirmed && (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          padding: '8px',
-                          background: 'rgba(34, 211, 238, 0.1)',
-                          borderRadius: '8px',
-                        }}
-                      >
-                        <Check size={14} color={theme.colors.accent.cyan.DEFAULT} />
-                        <span
+                      {/* Confirm Button - only for current module that hasn't been confirmed */}
+                      {canConfirm && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleConfirmPresence(mod.id)}
                           style={{
-                            fontSize: '10px',
-                            color: theme.colors.accent.cyan.DEFAULT,
+                            width: '100%',
+                            marginTop: '8px',
+                            padding: '8px',
+                            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
+                            border: '1px solid rgba(168, 85, 247, 0.5)',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            color: theme.colors.accent.purple.light,
+                            fontSize: '9px',
                             fontWeight: 'bold',
+                            textTransform: 'uppercase',
                           }}
                         >
-                          PRESENÇA CONFIRMADA
-                        </span>
-                      </div>
-                    )}
-                  </motion.div>
-                )
-              })}
-            </div>
+                          <Zap size={10} />
+                          +15 XP
+                        </motion.button>
+                      )}
 
-            {/* Hide scrollbar */}
-            <style>{`
-              div::-webkit-scrollbar {
-                display: none;
-              }
-            `}</style>
+                      {/* Confirmed indicator */}
+                      {isCurrent && isConfirmed && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px',
+                            marginTop: '8px',
+                            padding: '6px',
+                            background: 'rgba(34, 211, 238, 0.1)',
+                            borderRadius: '6px',
+                          }}
+                        >
+                          <Check size={10} color={theme.colors.accent.cyan.DEFAULT} />
+                          <span
+                            style={{
+                              fontSize: '8px',
+                              color: theme.colors.accent.cyan.DEFAULT,
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            CONFIRMADO
+                          </span>
+                        </div>
+                      )}
+                    </motion.div>
+                  )
+                })}
+              </div>
+
+              {/* Hide scrollbar */}
+              <style>{`
+                div::-webkit-scrollbar {
+                  display: none;
+                }
+              `}</style>
+            </div>
           </motion.div>
 
           {/* ==================== DAY SELECTOR ==================== */}

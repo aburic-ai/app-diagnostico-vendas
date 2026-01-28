@@ -24,6 +24,8 @@ interface NPSFormProps {
   onSubmit: (score: number, feedback: string, type: NPSType) => void
   /** XP concedido */
   xpReward?: number
+  /** Se é obrigatório (não pode fechar sem responder) */
+  mandatory?: boolean
 }
 
 const npsConfig: Record<NPSType, { title: string; question: string; xp: number }> = {
@@ -45,6 +47,7 @@ export function NPSForm({
   onClose,
   onSubmit,
   xpReward,
+  mandatory = true,
 }: NPSFormProps) {
   const [selectedScore, setSelectedScore] = useState<number | null>(null)
   const [feedback, setFeedback] = useState('')
@@ -89,13 +92,14 @@ export function NPSForm({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={mandatory ? undefined : onClose}
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0, 0, 0, 0.8)',
+              background: 'rgba(0, 0, 0, 0.9)',
               zIndex: theme.zIndex.modal - 1,
-              backdropFilter: 'blur(8px)',
+              backdropFilter: 'blur(12px)',
+              cursor: mandatory ? 'default' : 'pointer',
             }}
           />
 
@@ -159,22 +163,24 @@ export function NPSForm({
                       </div>
                     </div>
                   </div>
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={onClose}
-                    style={{
-                      background: 'rgba(100, 116, 139, 0.2)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '8px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <X size={18} color={theme.colors.text.muted} />
-                  </motion.button>
+                  {!mandatory && (
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={onClose}
+                      style={{
+                        background: 'rgba(100, 116, 139, 0.2)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <X size={18} color={theme.colors.text.muted} />
+                    </motion.button>
+                  )}
                 </div>
 
                 {/* Question */}

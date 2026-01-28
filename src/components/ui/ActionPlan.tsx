@@ -155,7 +155,7 @@ export function ActionPlan({
             style={{ overflow: 'hidden' }}
           >
             <div style={{ padding: '12px 16px 16px 16px' }}>
-              {/* Day progress bar - shows all 7 days, future ones grayed out */}
+              {/* Day progress bar - shows all 7 days with labels */}
               <div
                 style={{
                   display: 'flex',
@@ -175,22 +175,48 @@ export function ActionPlan({
                       key={i}
                       style={{
                         flex: 1,
-                        height: '6px',
-                        borderRadius: '3px',
-                        background: isFuture
-                          ? 'rgba(100, 116, 139, 0.15)'
-                          : isCompleted
-                          ? theme.colors.accent.cyan.DEFAULT
-                          : status === 'current'
-                          ? `linear-gradient(90deg, ${theme.colors.gold.DEFAULT} 0%, ${theme.colors.gold.light} 100%)`
-                          : 'rgba(100, 116, 139, 0.3)',
-                        boxShadow: isCompleted
-                          ? `0 0 8px ${theme.colors.accent.cyan.DEFAULT}`
-                          : status === 'current'
-                          ? `0 0 8px ${theme.colors.gold.DEFAULT}`
-                          : 'none',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px',
                       }}
-                    />
+                    >
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '6px',
+                          borderRadius: '3px',
+                          background: isFuture
+                            ? 'rgba(100, 116, 139, 0.15)'
+                            : isCompleted
+                            ? theme.colors.accent.cyan.DEFAULT
+                            : status === 'current'
+                            ? `linear-gradient(90deg, ${theme.colors.gold.DEFAULT} 0%, ${theme.colors.gold.light} 100%)`
+                            : 'rgba(100, 116, 139, 0.3)',
+                          boxShadow: isCompleted
+                            ? `0 0 8px ${theme.colors.accent.cyan.DEFAULT}`
+                            : status === 'current'
+                            ? `0 0 8px ${theme.colors.gold.DEFAULT}`
+                            : 'none',
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: '7px',
+                          fontWeight: 'bold',
+                          color: isFuture
+                            ? 'rgba(100, 116, 139, 0.4)'
+                            : isCompleted
+                            ? theme.colors.accent.cyan.DEFAULT
+                            : status === 'current'
+                            ? theme.colors.gold.DEFAULT
+                            : theme.colors.text.muted,
+                          letterSpacing: '0.02em',
+                        }}
+                      >
+                        DIA {dayNum}
+                      </span>
+                    </div>
                   )
                 })}
               </div>
