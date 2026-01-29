@@ -146,7 +146,11 @@ export function Button({
       <span style={{
         position: 'relative',
         zIndex: 10,
-        textShadow: variant === 'primary' ? '0 2px 10px rgba(0,0,0,0.3)' : 'none'
+        textShadow: variant === 'primary' ? '0 2px 10px rgba(0,0,0,0.3)' : 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
       }}>
         {children}
       </span>

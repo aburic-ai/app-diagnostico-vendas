@@ -16,6 +16,7 @@ import {
   Settings,
   Video,
   Camera,
+  Gift,
 } from 'lucide-react'
 
 import { PageWrapper } from '../components/ui'
@@ -77,6 +78,13 @@ const pages: PageLink[] = [
     label: 'Sandbox',
     description: 'Prints promocionais e form pós-compra',
     icon: <Camera size={24} />,
+    status: 'done',
+  },
+  {
+    path: '/obrigado?transaction=DEMO123',
+    label: 'Thank You',
+    description: 'Página pós-compra com pesquisa e criação de senha',
+    icon: <Gift size={24} />,
     status: 'done',
   },
 ]

@@ -15,6 +15,7 @@ import { DevNav } from './pages/DevNav'
 import { Admin } from './pages/Admin'
 import { Demo } from './pages/Demo'
 import { Sandbox } from './pages/Sandbox'
+import { ThankYou } from './pages/ThankYou'
 import { AppLayout } from './components/ui'
 import './index.css'
 
@@ -30,6 +31,9 @@ function App() {
 
         {/* Sandbox tem layout próprio - para prints e forms */}
         <Route path="/sandbox" element={<Sandbox />} />
+
+        {/* ThankYou page - pós-compra Hotmart */}
+        <Route path="/obrigado" element={<ThankYou />} />
 
         {/* Todas as outras páginas usam AppLayout (mobile-first) */}
         <Route path="/*" element={
