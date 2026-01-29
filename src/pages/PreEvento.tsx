@@ -27,6 +27,9 @@ import {
   Mail,
   Building2,
   Phone,
+  ArrowLeft,
+  Download,
+  Clock,
 } from 'lucide-react'
 
 import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } from '../components/ui'
@@ -54,11 +57,54 @@ interface ProfileData {
   photoUrl: string | null
 }
 
+// Dados das aulas
+interface LessonData {
+  id: number
+  title: string
+  description: string
+  duration: string
+  videoUrl?: string
+  pdfUrl?: string
+  watched: boolean
+}
+
+const LESSONS: LessonData[] = [
+  {
+    id: 1,
+    title: 'Introdução ao Diagnóstico',
+    description: 'Entenda o que é a Imersão Diagnóstico de Vendas e como ela vai transformar sua visão sobre o processo de vendas.',
+    duration: '12:34',
+    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    pdfUrl: '/pdfs/aula-1.pdf',
+    watched: false,
+  },
+  {
+    id: 2,
+    title: 'O Método IMPACT',
+    description: 'Conheça as 6 etapas da jornada psicológica de compra e como cada uma afeta a decisão do seu cliente.',
+    duration: '18:45',
+    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    pdfUrl: '/pdfs/aula-2.pdf',
+    watched: false,
+  },
+  {
+    id: 3,
+    title: 'Preparação para o Evento',
+    description: 'Como aproveitar ao máximo os dois dias de imersão e extrair insights práticos para o seu negócio.',
+    duration: '09:22',
+    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+    pdfUrl: '/pdfs/aula-3.pdf',
+    watched: false,
+  },
+]
+
 export function PreEvento() {
   const [activeNav, setActiveNav] = useState('preparacao')
   const [showSchedule, setShowSchedule] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
+  const [selectedLesson, setSelectedLesson] = useState<LessonData | null>(null)
+  const [lessons, setLessons] = useState<LessonData[]>(LESSONS)
 
   // Profile state
   const [profile, setProfile] = useState<ProfileData>({
@@ -205,6 +251,13 @@ export function PreEvento() {
     setTimeout(updateStepsWithProfile, 100)
   }
 
+  // Mark lesson as watched
+  const handleMarkLessonWatched = (lessonId: number) => {
+    setLessons(prev => prev.map(l =>
+      l.id === lessonId ? { ...l, watched: true } : l
+    ))
+  }
+
   const getStatusColor = (status: JourneyStep['status']) => {
     switch (status) {
       case 'completed':
@@ -268,17 +321,17 @@ export function PreEvento() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          style={{ padding: '20px 16px' }}
+          style={{ padding: '24px 16px' }}
         >
           {/* ==================== HEADER ==================== */}
-          <motion.div variants={headerVariants} style={{ marginBottom: '20px' }}>
+          <motion.div variants={headerVariants} style={{ marginBottom: '28px' }}>
             {/* Top Bar - Avatar + Notifications */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: '16px',
+                marginBottom: '24px',
               }}
             >
               {/* XP Badge */}
@@ -359,7 +412,7 @@ export function PreEvento() {
             </div>
 
             {/* Logo/Título - Invertido */}
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '28px' }}>
               {/* Título menor em branco */}
               <h1
                 style={{
@@ -885,14 +938,17 @@ export function PreEvento() {
                 gap: '10px',
               }}
             >
-              {[1, 2, 3].map((num) => (
+              {lessons.map((lesson) => (
                 <motion.div
-                  key={num}
+                  key={lesson.id}
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
+                  onClick={() => setSelectedLesson(lesson)}
                   style={{
-                    background: 'linear-gradient(135deg, rgba(10, 15, 20, 0.8) 0%, rgba(5, 10, 18, 0.9) 100%)',
-                    border: '1px solid rgba(34, 211, 238, 0.35)',
+                    background: lesson.watched
+                      ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%)'
+                      : 'linear-gradient(135deg, rgba(10, 15, 20, 0.8) 0%, rgba(5, 10, 18, 0.9) 100%)',
+                    border: `1px solid ${lesson.watched ? 'rgba(34, 211, 238, 0.5)' : 'rgba(34, 211, 238, 0.35)'}`,
                     borderRadius: '8px',
                     padding: '14px 8px 10px 8px',
                     display: 'flex',
@@ -900,9 +956,32 @@ export function PreEvento() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 0 15px rgba(34, 211, 238, 0.05)',
+                    boxShadow: lesson.watched
+                      ? '0 0 20px rgba(34, 211, 238, 0.2)'
+                      : '0 0 15px rgba(34, 211, 238, 0.05)',
+                    position: 'relative',
                   }}
                 >
+                  {/* Watched badge */}
+                  {lesson.watched && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '6px',
+                        right: '6px',
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: theme.colors.accent.cyan.DEFAULT,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Check size={10} color="#050505" strokeWidth={3} />
+                    </div>
+                  )}
+
                   {/* Aula Icon Image */}
                   <div
                     style={{
@@ -914,11 +993,13 @@ export function PreEvento() {
                   >
                     <img
                       src="/aula+pdf.png"
-                      alt={`Aula ${num}`}
+                      alt={`Aula ${lesson.id}`}
                       style={{
                         width: '70px',
                         height: 'auto',
-                        filter: 'drop-shadow(0 0 10px rgba(245, 158, 11, 0.4))',
+                        filter: lesson.watched
+                          ? 'drop-shadow(0 0 10px rgba(34, 211, 238, 0.5))'
+                          : 'drop-shadow(0 0 10px rgba(245, 158, 11, 0.4))',
                       }}
                     />
                   </div>
@@ -928,11 +1009,11 @@ export function PreEvento() {
                     style={{
                       fontSize: '11px',
                       fontWeight: theme.typography.fontWeight.semibold,
-                      color: theme.colors.text.primary,
+                      color: lesson.watched ? theme.colors.accent.cyan.DEFAULT : theme.colors.text.primary,
                       letterSpacing: '0.03em',
                     }}
                   >
-                    Aula {num}
+                    Aula {lesson.id}
                   </span>
                 </motion.div>
               ))}
@@ -1312,6 +1393,318 @@ export function PreEvento() {
               </motion.button>
             </div>
           </motion.div>
+        </motion.div>
+      )}
+
+      {/* ==================== LESSON MODAL ==================== */}
+      {selectedLesson && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: theme.colors.background.dark,
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid rgba(34, 211, 238, 0.2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}
+          >
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setSelectedLesson(null)}
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                background: 'rgba(100, 116, 139, 0.2)',
+                border: '1px solid rgba(100, 116, 139, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <ArrowLeft size={20} color={theme.colors.text.secondary} />
+            </motion.button>
+            <div style={{ flex: 1 }}>
+              <span
+                style={{
+                  fontSize: '10px',
+                  color: theme.colors.accent.cyan.DEFAULT,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                }}
+              >
+                AULA {selectedLesson.id}
+              </span>
+              <h2
+                style={{
+                  fontFamily: theme.typography.fontFamily.orbitron,
+                  fontSize: '14px',
+                  fontWeight: theme.typography.fontWeight.bold,
+                  color: theme.colors.text.primary,
+                  margin: 0,
+                }}
+              >
+                {selectedLesson.title}
+              </h2>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '6px 10px',
+                background: 'rgba(100, 116, 139, 0.15)',
+                borderRadius: '8px',
+              }}
+            >
+              <Clock size={12} color={theme.colors.text.secondary} />
+              <span style={{ fontSize: '11px', color: theme.colors.text.secondary }}>
+                {selectedLesson.duration}
+              </span>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '20px',
+            }}
+          >
+            {/* Video Player */}
+            <div
+              style={{
+                width: '100%',
+                aspectRatio: '16/9',
+                background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.95) 0%, rgba(10, 12, 18, 0.98) 100%)',
+                border: '1px solid rgba(34, 211, 238, 0.3)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+              }}
+            >
+              {/* Video placeholder - in production this would be an actual video player */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <div
+                  style={{
+                    width: '70px',
+                    height: '70px',
+                    borderRadius: '50%',
+                    background: 'rgba(34, 211, 238, 0.15)',
+                    border: '2px solid rgba(34, 211, 238, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Play size={32} color={theme.colors.accent.cyan.DEFAULT} fill={theme.colors.accent.cyan.DEFAULT} />
+                </div>
+                <span style={{ fontSize: '12px', color: theme.colors.text.secondary }}>
+                  Clique para assistir
+                </span>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div
+              style={{
+                padding: '16px',
+                background: 'rgba(10, 12, 18, 0.6)',
+                border: '1px solid rgba(100, 116, 139, 0.2)',
+                borderRadius: '12px',
+                marginBottom: '16px',
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: '12px',
+                  fontWeight: theme.typography.fontWeight.bold,
+                  color: theme.colors.text.primary,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  marginBottom: '8px',
+                }}
+              >
+                Sobre esta aula
+              </h3>
+              <p
+                style={{
+                  fontSize: '13px',
+                  color: theme.colors.text.secondary,
+                  lineHeight: 1.6,
+                  margin: 0,
+                }}
+              >
+                {selectedLesson.description}
+              </p>
+            </div>
+
+            {/* PDF Download */}
+            {selectedLesson.pdfUrl && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(234, 179, 8, 0.1) 100%)',
+                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '16px',
+                }}
+              >
+                <div
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '10px',
+                    background: 'rgba(245, 158, 11, 0.2)',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <FileText size={22} color={theme.colors.gold.DEFAULT} />
+                </div>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <span
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: theme.typography.fontWeight.bold,
+                      color: theme.colors.gold.DEFAULT,
+                      display: 'block',
+                    }}
+                  >
+                    Material em PDF
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      color: theme.colors.text.secondary,
+                    }}
+                  >
+                    Baixe o material complementar
+                  </span>
+                </div>
+                <Download size={20} color={theme.colors.gold.DEFAULT} />
+              </motion.button>
+            )}
+          </div>
+
+          {/* Footer - Mark as watched */}
+          <div
+            style={{
+              padding: '16px 20px',
+              paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+              borderTop: '1px solid rgba(100, 116, 139, 0.2)',
+            }}
+          >
+            {selectedLesson.watched ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '16px',
+                  background: 'rgba(34, 211, 238, 0.1)',
+                  border: '1px solid rgba(34, 211, 238, 0.3)',
+                  borderRadius: '12px',
+                }}
+              >
+                <Check size={20} color={theme.colors.accent.cyan.DEFAULT} />
+                <span
+                  style={{
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: theme.colors.accent.cyan.DEFAULT,
+                  }}
+                >
+                  AULA CONCLUÍDA
+                </span>
+              </div>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  handleMarkLessonWatched(selectedLesson.id)
+                  setSelectedLesson({ ...selectedLesson, watched: true })
+                }}
+                style={{
+                  width: '100%',
+                  padding: '16px',
+                  background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.3) 0%, rgba(6, 182, 212, 0.2) 100%)',
+                  border: '1px solid rgba(34, 211, 238, 0.5)',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                }}
+              >
+                <Check size={20} color={theme.colors.accent.cyan.DEFAULT} />
+                <span
+                  style={{
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: theme.colors.accent.cyan.DEFAULT,
+                  }}
+                >
+                  MARCAR COMO ASSISTIDA
+                </span>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    marginLeft: '8px',
+                    padding: '4px 8px',
+                    background: 'rgba(245, 158, 11, 0.2)',
+                    borderRadius: '6px',
+                  }}
+                >
+                  <Zap size={12} color={theme.colors.gold.DEFAULT} />
+                  <span style={{ fontSize: '11px', color: theme.colors.gold.DEFAULT, fontWeight: 'bold' }}>
+                    +15 XP
+                  </span>
+                </div>
+              </motion.button>
+            )}
+          </div>
         </motion.div>
       )}
 

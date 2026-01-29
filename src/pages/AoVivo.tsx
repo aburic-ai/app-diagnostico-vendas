@@ -21,6 +21,10 @@ import {
   Lock,
   Bell,
   Zap,
+  X,
+  Star,
+  Crown,
+  Ticket,
 } from 'lucide-react'
 
 import {
@@ -40,6 +44,22 @@ import type { IMPACTData, Notification } from '../components/ui'
 import { theme } from '../styles/theme'
 import { getModuleById, EVENT_MODULES } from '../data/modules'
 
+// Links da oferta (viriam do Admin/Backend)
+const OFFER_LINKS = {
+  ingresso1Percent: 'https://pay.hotmart.com/K91662125A?off=66czkxps',
+  ingressoExecutivo: 'https://pay.hotmart.com/K91662125A?off=y1frgqvy',
+  utmSource: 'appdiagn',
+  utmMedium: 'app',
+  utmCampaign: 'imersao2026',
+  utmContent: 'aovivo',
+}
+
+// Helper para construir URL com UTM
+const buildOfferUrl = (baseUrl: string, utmContent?: string): string => {
+  const separator = baseUrl.includes('?') ? '&' : '?'
+  return `${baseUrl}${separator}utm_source=${OFFER_LINKS.utmSource}&utm_medium=${OFFER_LINKS.utmMedium}&utm_campaign=${OFFER_LINKS.utmCampaign}&utm_content=${utmContent || OFFER_LINKS.utmContent}`
+}
+
 export function AoVivo() {
   const [activeNav, setActiveNav] = useState('aovivo')
   const [selectedDay, setSelectedDay] = useState<1 | 2>(1)
@@ -48,6 +68,7 @@ export function AoVivo() {
   const [viewingModule, setViewingModule] = useState(5) // Módulo que o usuário está vendo
   const [showNotifications, setShowNotifications] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
+  const [showOfferModal, setShowOfferModal] = useState(false)
   const [isOfferUnlocked] = useState(false) // Libera no módulo 11
   const [confirmedModules, setConfirmedModules] = useState<number[]>([0, 1, 2, 3, 4]) // Módulos já confirmados
 
@@ -897,6 +918,7 @@ export function AoVivo() {
               isUnlocked={isOfferUnlocked}
               unlockTime="15:00"
               lockedMessage="Essa etapa exige algo que não acontece sozinho."
+              onClick={isOfferUnlocked ? () => setShowOfferModal(true) : undefined}
             />
           </motion.div>
 
@@ -904,7 +926,7 @@ export function AoVivo() {
           <motion.div variants={itemVariants}>
             <SponsorBadge
               isLinkActive={isOfferUnlocked}
-              onLinkClick={() => {/* TODO: navigate to offer */}}
+              onLinkClick={() => setShowOfferModal(true)}
             />
           </motion.div>
         </motion.div>
@@ -1040,6 +1062,275 @@ export function AoVivo() {
                 </p>
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ==================== OFFER MODAL ==================== */}
+      <AnimatePresence>
+        {showOfferModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowOfferModal(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.85)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '380px',
+                background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.98) 0%, rgba(10, 12, 18, 0.99) 100%)',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                borderRadius: '20px',
+                overflow: 'hidden',
+                position: 'relative',
+              }}
+            >
+              {/* Top glow effect */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '2px',
+                  background: 'linear-gradient(90deg, transparent 0%, #F59E0B 50%, transparent 100%)',
+                  boxShadow: '0 0 30px rgba(245, 158, 11, 0.5)',
+                }}
+              />
+
+              {/* Close button */}
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setShowOfferModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'rgba(100, 116, 139, 0.2)',
+                  border: '1px solid rgba(100, 116, 139, 0.3)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 10,
+                }}
+              >
+                <X size={16} color={theme.colors.text.secondary} />
+              </motion.button>
+
+              {/* Content */}
+              <div style={{ padding: '28px 24px' }}>
+                {/* Header */}
+                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                  <div
+                    style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.15) 100%)',
+                      border: '1px solid rgba(245, 158, 11, 0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 16px',
+                      boxShadow: '0 0 30px rgba(245, 158, 11, 0.3)',
+                    }}
+                  >
+                    <Ticket size={28} color={theme.colors.gold.DEFAULT} />
+                  </div>
+                  <h2
+                    style={{
+                      fontFamily: theme.typography.fontFamily.orbitron,
+                      fontSize: '18px',
+                      fontWeight: theme.typography.fontWeight.bold,
+                      color: theme.colors.text.primary,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      margin: '0 0 8px 0',
+                    }}
+                  >
+                    ESCOLHA SEU INGRESSO
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: '13px',
+                      color: theme.colors.text.secondary,
+                      margin: 0,
+                    }}
+                  >
+                    Imersão Presencial IMPACT - 3 Dias
+                  </p>
+                </div>
+
+                {/* Ingresso 1% - HIGHLIGHTED */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => window.open(buildOfferUrl(OFFER_LINKS.ingresso1Percent, 'ingresso1percent'), '_blank')}
+                  style={{
+                    width: '100%',
+                    padding: '20px',
+                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%)',
+                    border: '2px solid rgba(245, 158, 11, 0.6)',
+                    borderRadius: '14px',
+                    cursor: 'pointer',
+                    marginBottom: '12px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    boxShadow: '0 0 40px rgba(245, 158, 11, 0.25)',
+                  }}
+                >
+                  {/* Recommended badge */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '0',
+                      right: '0',
+                      background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                      padding: '4px 12px',
+                      borderRadius: '0 12px 0 12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Star size={10} color="#000" fill="#000" />
+                      <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#000', textTransform: 'uppercase' }}>
+                        RECOMENDADO
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Crown size={24} color="#000" />
+                    </div>
+                    <div style={{ textAlign: 'left', flex: 1 }}>
+                      <h3
+                        style={{
+                          fontFamily: theme.typography.fontFamily.orbitron,
+                          fontSize: '16px',
+                          fontWeight: theme.typography.fontWeight.bold,
+                          color: theme.colors.gold.DEFAULT,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          margin: '0 0 4px 0',
+                        }}
+                      >
+                        INGRESSO 1%
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: '11px',
+                          color: theme.colors.text.secondary,
+                          margin: 0,
+                        }}
+                      >
+                        Acesso VIP + Benefícios exclusivos
+                      </p>
+                    </div>
+                  </div>
+                </motion.button>
+
+                {/* Ingresso Executivo - Secondary */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => window.open(buildOfferUrl(OFFER_LINKS.ingressoExecutivo, 'ingressoexecutivo'), '_blank')}
+                  style={{
+                    width: '100%',
+                    padding: '18px',
+                    background: 'rgba(100, 116, 139, 0.1)',
+                    border: '1px solid rgba(100, 116, 139, 0.3)',
+                    borderRadius: '14px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '12px',
+                        background: 'rgba(100, 116, 139, 0.2)',
+                        border: '1px solid rgba(100, 116, 139, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Ticket size={22} color={theme.colors.text.secondary} />
+                    </div>
+                    <div style={{ textAlign: 'left', flex: 1 }}>
+                      <h3
+                        style={{
+                          fontFamily: theme.typography.fontFamily.orbitron,
+                          fontSize: '14px',
+                          fontWeight: theme.typography.fontWeight.bold,
+                          color: theme.colors.text.primary,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          margin: '0 0 4px 0',
+                        }}
+                      >
+                        INGRESSO EXECUTIVO
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: '11px',
+                          color: theme.colors.text.muted,
+                          margin: 0,
+                        }}
+                      >
+                        Acesso completo à imersão
+                      </p>
+                    </div>
+                  </div>
+                </motion.button>
+
+                {/* Footer note */}
+                <p
+                  style={{
+                    fontSize: '10px',
+                    color: theme.colors.text.muted,
+                    textAlign: 'center',
+                    marginTop: '16px',
+                    marginBottom: 0,
+                  }}
+                >
+                  Você será redirecionado para a página de pagamento seguro
+                </p>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

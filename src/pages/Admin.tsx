@@ -36,6 +36,7 @@ import {
   UserCheck,
   UserX,
   Activity,
+  FileText,
 } from 'lucide-react'
 import { EVENT_MODULES, TOTAL_MODULES, getCurrentDay } from '../data/modules'
 import { NotificationToast } from '../components/ui'
@@ -43,7 +44,7 @@ import type { Notification, NotificationType } from '../components/ui'
 import { theme } from '../styles/theme'
 
 // Estado do evento
-type EventStatus = 'offline' | 'live' | 'paused' | 'lunch'
+type EventStatus = 'offline' | 'live' | 'paused' | 'activity' | 'lunch'
 
 interface EventState {
   status: EventStatus
@@ -104,6 +105,17 @@ interface TabRelease {
   posEvento: { enabled: boolean; date: string; time: string }
 }
 
+// Links da oferta
+interface OfferLinks {
+  posEventoLink: string
+  ingresso1Percent: string
+  ingressoExecutivo: string
+  utmSource: string
+  utmMedium: string
+  utmCampaign: string
+  utmContent: string
+}
+
 // Tipos de aviso
 const notificationTypes: { type: NotificationType; label: string; icon: typeof Bell; color: string }[] = [
   { type: 'info', label: 'Info', icon: Bell, color: '#22D3EE' },
@@ -157,6 +169,17 @@ export function Admin() {
     preparacao: { enabled: true, date: '2026-02-01', time: '00:00' },
     aoVivo: { enabled: false, date: '2026-02-28', time: '09:30' },
     posEvento: { enabled: false, date: '2026-03-01', time: '18:00' },
+  })
+
+  // Offer Links (links da oferta)
+  const [offerLinks, setOfferLinks] = useState<OfferLinks>({
+    posEventoLink: 'https://imersao.neuropersuasao.com.br/',
+    ingresso1Percent: 'https://pay.hotmart.com/K91662125A?off=66czkxps',
+    ingressoExecutivo: 'https://pay.hotmart.com/K91662125A?off=y1frgqvy',
+    utmSource: 'appdiagn',
+    utmMedium: 'app',
+    utmCampaign: 'imersao2026',
+    utmContent: 'oferta',
   })
 
   // Confirmation Dialog
@@ -231,11 +254,13 @@ export function Admin() {
     }
   }, [eventState.participantsOnline, eventState.status])
 
-  // Filter participants by search
-  const filteredParticipants = participants.filter(p =>
-    p.name.toLowerCase().includes(participantSearch.toLowerCase()) ||
-    p.email.toLowerCase().includes(participantSearch.toLowerCase())
-  )
+  // Filter participants by search and sort by XP (highest first)
+  const filteredParticipants = participants
+    .filter(p =>
+      p.name.toLowerCase().includes(participantSearch.toLowerCase()) ||
+      p.email.toLowerCase().includes(participantSearch.toLowerCase())
+    )
+    .sort((a, b) => b.xp - a.xp)
 
   const currentModule = EVENT_MODULES[eventState.currentModule]
   const currentDay = getCurrentDay(eventState.currentModule)
@@ -267,6 +292,13 @@ export function Admin() {
     setEventState(prev => ({
       ...prev,
       status: prev.status === 'lunch' ? 'live' : 'lunch',
+    }))
+  }
+
+  const handleToggleActivity = () => {
+    setEventState(prev => ({
+      ...prev,
+      status: prev.status === 'activity' ? 'live' : 'activity',
     }))
   }
 
@@ -349,6 +381,7 @@ export function Admin() {
     switch (eventState.status) {
       case 'live': return 'AO VIVO'
       case 'paused': return 'PAUSADO'
+      case 'activity': return 'ATIVIDADE'
       case 'lunch': return 'ALMOÇO'
       default: return 'OFFLINE'
     }
@@ -358,6 +391,7 @@ export function Admin() {
     switch (eventState.status) {
       case 'live': return '#EF4444'
       case 'paused': return '#F59E0B'
+      case 'activity': return '#A855F7'
       case 'lunch': return '#F59E0B'
       default: return '#64748B'
     }
@@ -850,6 +884,196 @@ export function Admin() {
                     As abas serão liberadas automaticamente na data/hora configurada, ou você pode liberar manualmente usando o toggle.
                   </p>
                 </div>
+
+                {/* Offer Links Settings */}
+                <div style={{ marginTop: '24px' }}>
+                  <h2
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      color: theme.colors.text.primary,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      margin: '0 0 16px 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <Gift size={16} />
+                    Links da Oferta
+                  </h2>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {/* Link Pós-Evento */}
+                    <div>
+                      <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'block', marginBottom: '4px' }}>
+                        Link Pós-Evento (Imersão IMPACT)
+                      </label>
+                      <input
+                        type="url"
+                        value={offerLinks.posEventoLink}
+                        onChange={(e) => setOfferLinks(prev => ({ ...prev, posEventoLink: e.target.value }))}
+                        placeholder="https://imersao.neuropersuasao.com.br/"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          background: 'rgba(10, 12, 18, 0.8)',
+                          border: '1px solid rgba(245, 158, 11, 0.3)',
+                          borderRadius: '8px',
+                          color: theme.colors.text.primary,
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      {/* Ingresso 1% */}
+                      <div>
+                        <label style={{ fontSize: '11px', color: theme.colors.gold.DEFAULT, display: 'block', marginBottom: '4px' }}>
+                          Ingresso 1% (Destaque)
+                        </label>
+                        <input
+                          type="url"
+                          value={offerLinks.ingresso1Percent}
+                          onChange={(e) => setOfferLinks(prev => ({ ...prev, ingresso1Percent: e.target.value }))}
+                          placeholder="https://pay.hotmart.com/..."
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            background: 'rgba(10, 12, 18, 0.8)',
+                            border: '1px solid rgba(245, 158, 11, 0.4)',
+                            borderRadius: '8px',
+                            color: theme.colors.text.primary,
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        />
+                      </div>
+
+                      {/* Ingresso Executivo */}
+                      <div>
+                        <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'block', marginBottom: '4px' }}>
+                          Ingresso Executivo
+                        </label>
+                        <input
+                          type="url"
+                          value={offerLinks.ingressoExecutivo}
+                          onChange={(e) => setOfferLinks(prev => ({ ...prev, ingressoExecutivo: e.target.value }))}
+                          placeholder="https://pay.hotmart.com/..."
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            background: 'rgba(10, 12, 18, 0.8)',
+                            border: '1px solid rgba(100, 116, 139, 0.3)',
+                            borderRadius: '8px',
+                            color: theme.colors.text.primary,
+                            fontSize: '12px',
+                            outline: 'none',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* UTM Parameters */}
+                    <div style={{ marginTop: '8px' }}>
+                      <label style={{ fontSize: '11px', color: theme.colors.accent.cyan.DEFAULT, display: 'block', marginBottom: '8px' }}>
+                        Parâmetros UTM (adicionados automaticamente aos links)
+                      </label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                        <div>
+                          <label style={{ fontSize: '9px', color: theme.colors.text.muted, display: 'block', marginBottom: '2px' }}>
+                            utm_source
+                          </label>
+                          <input
+                            type="text"
+                            value={offerLinks.utmSource}
+                            onChange={(e) => setOfferLinks(prev => ({ ...prev, utmSource: e.target.value }))}
+                            placeholder="appdiagn"
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '9px', color: theme.colors.text.muted, display: 'block', marginBottom: '2px' }}>
+                            utm_medium
+                          </label>
+                          <input
+                            type="text"
+                            value={offerLinks.utmMedium}
+                            onChange={(e) => setOfferLinks(prev => ({ ...prev, utmMedium: e.target.value }))}
+                            placeholder="app"
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '9px', color: theme.colors.text.muted, display: 'block', marginBottom: '2px' }}>
+                            utm_campaign
+                          </label>
+                          <input
+                            type="text"
+                            value={offerLinks.utmCampaign}
+                            onChange={(e) => setOfferLinks(prev => ({ ...prev, utmCampaign: e.target.value }))}
+                            placeholder="imersao2026"
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '9px', color: theme.colors.text.muted, display: 'block', marginBottom: '2px' }}>
+                            utm_content
+                          </label>
+                          <input
+                            type="text"
+                            value={offerLinks.utmContent}
+                            onChange={(e) => setOfferLinks(prev => ({ ...prev, utmContent: e.target.value }))}
+                            placeholder="oferta"
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <p style={{ fontSize: '10px', color: theme.colors.text.muted, marginTop: '4px' }}>
+                      Exemplo de link final: {offerLinks.ingresso1Percent}{offerLinks.ingresso1Percent.includes('?') ? '&' : '?'}utm_source={offerLinks.utmSource}&utm_medium={offerLinks.utmMedium}&utm_campaign={offerLinks.utmCampaign}&utm_content={offerLinks.utmContent}
+                    </p>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1028,21 +1252,45 @@ export function Admin() {
                   whileTap={{ scale: 0.98 }}
                   onClick={handleTogglePause}
                   style={{
-                    padding: '14px 20px',
+                    padding: '14px 16px',
                     background: eventState.status === 'paused' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(245, 158, 11, 0.2)',
                     border: `1px solid ${eventState.status === 'paused' ? 'rgba(34, 211, 238, 0.5)' : 'rgba(245, 158, 11, 0.5)'}`,
                     borderRadius: '10px',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '6px',
                     color: eventState.status === 'paused' ? theme.colors.accent.cyan.DEFAULT : '#F59E0B',
-                    fontSize: '14px',
+                    fontSize: '13px',
                     fontWeight: 'bold',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  {eventState.status === 'paused' ? <Play size={18} /> : <Pause size={18} />}
+                  {eventState.status === 'paused' ? <Play size={16} /> : <Pause size={16} />}
                   {eventState.status === 'paused' ? 'RETOMAR' : 'PAUSAR'}
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleToggleActivity}
+                  style={{
+                    padding: '14px 16px',
+                    background: eventState.status === 'activity' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(168, 85, 247, 0.2)',
+                    border: `1px solid ${eventState.status === 'activity' ? 'rgba(34, 211, 238, 0.5)' : 'rgba(168, 85, 247, 0.5)'}`,
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: eventState.status === 'activity' ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light,
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <FileText size={16} />
+                  {eventState.status === 'activity' ? 'FIM' : 'ATIVIDADE'}
                 </motion.button>
 
                 <motion.button
@@ -1050,21 +1298,22 @@ export function Admin() {
                   whileTap={{ scale: 0.98 }}
                   onClick={handleToggleLunch}
                   style={{
-                    padding: '14px 20px',
+                    padding: '14px 16px',
                     background: eventState.status === 'lunch' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(245, 158, 11, 0.2)',
                     border: `1px solid ${eventState.status === 'lunch' ? 'rgba(34, 211, 238, 0.5)' : 'rgba(245, 158, 11, 0.5)'}`,
                     borderRadius: '10px',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '6px',
                     color: eventState.status === 'lunch' ? theme.colors.accent.cyan.DEFAULT : '#F59E0B',
-                    fontSize: '14px',
+                    fontSize: '13px',
                     fontWeight: 'bold',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  <Coffee size={18} />
-                  {eventState.status === 'lunch' ? 'FIM ALMOÇO' : 'ALMOÇO'}
+                  <Coffee size={16} />
+                  {eventState.status === 'lunch' ? 'FIM' : 'ALMOÇO'}
                 </motion.button>
               </>
             )}
@@ -1793,7 +2042,7 @@ export function Admin() {
                       alignItems: 'center',
                       gap: '6px',
                       padding: '4px 8px',
-                      background: eventState.status === 'lunch' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 68, 68, 0.15)',
+                      background: eventState.status === 'activity' ? 'rgba(168, 85, 247, 0.15)' : eventState.status === 'lunch' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 68, 68, 0.15)',
                       borderRadius: '4px',
                     }}
                   >
@@ -1811,8 +2060,9 @@ export function Admin() {
                     )}
                     {eventState.status === 'lunch' && <Coffee size={12} color="#F59E0B" />}
                     {eventState.status === 'paused' && <Pause size={12} color="#F59E0B" />}
-                    <span style={{ fontSize: '9px', fontWeight: 'bold', color: eventState.status === 'live' ? '#FF4444' : '#F59E0B' }}>
-                      {eventState.status === 'live' ? 'AO VIVO' : eventState.status === 'lunch' ? `ALMOÇO - Volta ${eventState.lunchReturnTime} (${lunchMinutesRemaining} min)` : 'PAUSADO'}
+                    {eventState.status === 'activity' && <FileText size={12} color="#A855F7" />}
+                    <span style={{ fontSize: '9px', fontWeight: 'bold', color: eventState.status === 'live' ? '#FF4444' : eventState.status === 'activity' ? '#A855F7' : '#F59E0B' }}>
+                      {eventState.status === 'live' ? 'AO VIVO' : eventState.status === 'lunch' ? `ALMOÇO - Volta ${eventState.lunchReturnTime} (${lunchMinutesRemaining} min)` : eventState.status === 'activity' ? 'ATIVIDADE EM ANDAMENTO' : 'PAUSADO'}
                     </span>
                   </div>
                 ) : (
@@ -1857,13 +2107,15 @@ export function Admin() {
                     width: '36px',
                     height: '36px',
                     borderRadius: '8px',
-                    background: eventState.status === 'lunch' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 68, 68, 0.2)',
+                    background: eventState.status === 'activity' ? 'rgba(168, 85, 247, 0.2)' : eventState.status === 'lunch' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 68, 68, 0.2)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  {eventState.status === 'lunch' ? (
+                  {eventState.status === 'activity' ? (
+                    <FileText size={18} color="#A855F7" />
+                  ) : eventState.status === 'lunch' ? (
                     <Coffee size={18} color="#F59E0B" />
                   ) : (
                     <Radio size={18} color="#FF4444" />
@@ -1879,10 +2131,10 @@ export function Admin() {
                       margin: 0,
                     }}
                   >
-                    {eventState.status === 'lunch' ? 'HORA DO ALMOÇO' : currentModule?.title}
+                    {eventState.status === 'lunch' ? 'HORA DO ALMOÇO' : eventState.status === 'activity' ? 'ATIVIDADE EM ANDAMENTO' : currentModule?.title}
                   </p>
                   <p style={{ fontSize: '9px', color: theme.colors.text.secondary, margin: '2px 0 0 0' }}>
-                    {eventState.status === 'lunch' ? `Retorno às ${eventState.lunchReturnTime} (em ${lunchMinutesRemaining} minutos)` : currentModule?.subtitle}
+                    {eventState.status === 'lunch' ? `Retorno às ${eventState.lunchReturnTime} (em ${lunchMinutesRemaining} minutos)` : eventState.status === 'activity' ? 'Complete a atividade antes de continuarmos' : currentModule?.subtitle}
                   </p>
                 </div>
               </div>
@@ -2174,7 +2426,7 @@ export function Admin() {
                       PARTICIPANTES ONLINE
                     </h3>
                     <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '2px 0 0 0' }}>
-                      {filteredParticipants.length} de {eventState.participantsOnline} exibidos
+                      {filteredParticipants.length} de {eventState.participantsOnline} exibidos • Ordenado por XP ↓
                     </p>
                   </div>
                 </div>
