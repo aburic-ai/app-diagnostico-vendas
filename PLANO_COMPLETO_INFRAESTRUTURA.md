@@ -554,19 +554,22 @@ Supabase (futuro)
   - Salva mensagem gerada
 ```
 
-### Perguntas da Pesquisa (survey-config.ts)
+### Perguntas da Pesquisa de Calibragem (survey-config.ts)
 
-| # | ID | Pergunta | Tipo | Condicional |
-|---|-----|----------|------|-------------|
-| 1 | motivacao | O que te motivou a entrar na Imersao? | textarea | - |
-| 2 | tipoNegocio | Qual o tipo do seu negocio? | select (6 opcoes) | - |
-| 3 | faturamento | Qual o faturamento mensal atual? | select (5 faixas) | - |
-| 4 | maiorGargalo | Qual o maior gargalo nas suas vendas? | select (4 opcoes) | - |
-| 5 | oQueJaTentou | O que ja tentou para resolver? | textarea | - |
-| 6 | quantoInvestiu | Quanto ja investiu em mentorias/cursos? | select (4 faixas) | - |
-| 7 | quaisMentorias | Quais mentorias ou cursos ja fez? | textarea | So aparece se quantoInvestiu != "Nunca investi" |
-| 8 | oQueQuerResolver | O que espera resolver com a Imersao? | textarea | - |
-| 9 | interesseAcompanhamento | Interesse em acompanhamento pos-evento? | select (3 opcoes) | - |
+**Intro exibido na primeira pergunta:**
+- **Titulo:** "Suas respostas vao calibrar seu diagnostico"
+- **Subtitulo:** "Preencha com atencao. Essas informacoes alimentam nosso sistema de diagnostico e permitem personalizar sua experiencia na imersao."
+
+| # | ID | Pergunta | Tipo | Obrigatoria | Orientacao |
+|---|-----|----------|------|-------------|------------|
+| 1 | modeloNegocio | O que voce vende, fundamentalmente? | select (6 opcoes) | Sim | Ajuda o sistema a trazer exemplos relevantes |
+| 2 | faturamento | Qual a faixa de faturamento mensal? | select (5 faixas) | Sim | Alimenta o simulador de impacto |
+| 3 | ondeTrava | Onde voce sente que sua venda trava? | select (4 opcoes) | Sim | Direciona o diagnostico para a etapa certa |
+| 4 | tentativasAnteriores | O que ja tentou fazer para resolver? | textarea | Sim | Evita sugerir algo ja tentado sem sucesso |
+| 5 | investimentoAnterior | Quanto ja investiu em cursos/mentorias? | select (4 faixas) | Sim | Calibra o nivel de profundidade |
+| 6 | cursosAnteriores | Quais cursos ou mentorias ja fez? | textarea | Nao | Evita repetir conceitos ja conhecidos |
+| 7 | problemaPrincipal | Se pudesse sair com UM problema resolvido? | textarea | Sim | Personaliza o diagnostico |
+| 8 | interessePos | Interesse em acompanhamento pos-imersao? | select (3 opcoes) | Sim | Prepara opcoes relevantes |
 
 ### Prompt Template (5 blocos)
 

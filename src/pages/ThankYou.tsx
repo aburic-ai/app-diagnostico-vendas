@@ -3,7 +3,7 @@
  *
  * Fluxo:
  * 1. Recebe transaction_id via URL (ou pede email se não tiver)
- * 2. Exibe pesquisa de calibragem (7 perguntas)
+ * 2. Exibe pesquisa de calibragem (8 perguntas)
  * 3. CTA WhatsApp
  * 4. Criação de senha
  * 5. Auto-login e redirect para /pre-evento
@@ -30,6 +30,7 @@ import { PageWrapper, Card, Button, Input } from '../components/ui'
 import { theme } from '../styles/theme'
 import {
   SURVEY_QUESTIONS,
+  SURVEY_INTRO,
   type SurveyData,
   createEmptySurveyData,
   getVisibleQuestions,
@@ -817,6 +818,40 @@ export function ThankYou() {
                 </div>
               </div>
 
+              {/* Survey Intro (first question only) */}
+              {currentQuestion === 0 && (
+                <div
+                  style={{
+                    marginBottom: '20px',
+                    padding: '14px 16px',
+                    background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(168, 85, 247, 0.05) 100%)',
+                    border: '1px solid rgba(124, 58, 237, 0.2)',
+                    borderRadius: '10px',
+                  }}
+                >
+                  <h3
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: theme.typography.fontWeight.bold,
+                      color: theme.colors.accent.purple.light,
+                      marginBottom: '6px',
+                    }}
+                  >
+                    {SURVEY_INTRO.title}
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: '12px',
+                      color: theme.colors.text.secondary,
+                      lineHeight: 1.5,
+                      margin: 0,
+                    }}
+                  >
+                    {SURVEY_INTRO.subtitle}
+                  </p>
+                </div>
+              )}
+
               {/* Question */}
               <div style={{ flex: 1 }}>
                 <h2
@@ -824,12 +859,25 @@ export function ThankYou() {
                     fontSize: '18px',
                     fontWeight: theme.typography.fontWeight.semibold,
                     color: theme.colors.text.primary,
-                    marginBottom: '20px',
+                    marginBottom: '8px',
                     lineHeight: 1.4,
                   }}
                 >
                   {currentQ.question}
                 </h2>
+
+                {/* Orientation */}
+                <p
+                  style={{
+                    fontSize: '13px',
+                    color: theme.colors.text.muted,
+                    lineHeight: 1.5,
+                    marginBottom: '20px',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {currentQ.orientation}
+                </p>
 
                 {currentQ.type === 'select' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -914,7 +962,7 @@ export function ThankYou() {
                 <div style={{ flex: 1 }}>
                   <Button
                     onClick={nextQuestion}
-                    disabled={!surveyData[currentQ.id as keyof SurveyData]}
+                    disabled={currentQ.required && !surveyData[currentQ.id as keyof SurveyData]}
                   >
                     {isLastQuestion ? 'FINALIZAR PESQUISA' : 'PRÓXIMA'}
                     <ChevronRight size={18} />
