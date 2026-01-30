@@ -1,73 +1,108 @@
-# React + TypeScript + Vite
+# App Diagnóstico de Vendas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> **"ISSO NÃO É UM APP. É UMA MÁQUINA DE COMPROMETIMENTO."**
 
-Currently, two official plugins are available:
+Infraestrutura cognitiva da Imersão Diagnóstico de Vendas - um ambiente de diagnóstico ativo que acompanha o participante antes, durante e depois do evento.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Visão Geral
 
-## React Compiler
+Este aplicativo **não é** um curso, comunidade ou repositório de conteúdo.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**É** um ambiente de diagnóstico ativo que:
+- Organiza o pensamento do participante em tempo real
+- Registra diagnósticos e torna visíveis os gargalos reais da jornada de venda
+- Conduz naturalmente à decisão de seguir para a Imersão IMPACT presencial
 
-## Expanding the ESLint configuration
+## Stack Tecnológico
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+| Tecnologia | Uso |
+|------------|-----|
+| React + Vite | Framework frontend |
+| TypeScript | Tipagem estática |
+| Framer Motion | Animações |
+| Lucide React | Ícones |
+| Vercel | Deploy |
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Rotas do App
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+| Rota | Página | Descrição |
+|------|--------|-----------|
+| `/login` | Login | Cockpit Access - tela de entrada |
+| `/pre-evento` | Pré-Evento | Dashboard de preparação com gamification |
+| `/ao-vivo` | Ao Vivo | Diagnóstico IMPACT durante o evento |
+| `/pos-evento` | Pós-Evento | Consolidação e plano de ação |
+| `/admin` | Admin | Painel de controle (desktop only) |
+| `/obrigado` | Thank You | Pós-compra Hotmart |
+| `/demo` | Demo | Preview para captura de vídeo |
+| `/dev` | DevNav | Navegação de desenvolvimento |
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Estrutura de Pastas
+
+```
+src/
+├── components/
+│   └── ui/           # Componentes reutilizáveis
+├── data/
+│   ├── modules.ts    # 17 módulos do evento (0-16)
+│   └── survey-config.ts # Pesquisa de calibragem (Single Source of Truth)
+├── lib/
+│   └── whatsapp-message.ts # Gerador de prompt WhatsApp (IA)
+├── pages/            # Páginas da aplicação
+├── styles/           # Theme tokens
+└── App.tsx           # Rotas
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Componentes UI
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Componente | Descrição |
+|------------|-----------|
+| AppLayout | Layout responsivo (mobile/desktop) |
+| PageWrapper | Wrapper com background animado |
+| Button | Botão com beam animation |
+| Card | Container glassmorphism |
+| Input | Input com borda gradiente |
+| RadarChart | Gráfico radar IMPACT |
+| Countdown | Timer regressivo |
+| ProgressBar | Barra de progresso com glow |
+| BottomNav | Navegação sequencial |
+| LiveTicker | Status do evento ao vivo |
+| DiagnosticSlider | Slider de diagnóstico |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Scripts
+
+```bash
+# Desenvolvimento
+npm run dev
+
+# Build
+npm run build
+
+# Preview do build
+npm run preview
+
+# Lint
+npm run lint
 ```
+
+## Deploy
+
+O projeto está configurado para deploy automático no Vercel via GitHub:
+
+```bash
+git push origin main
+```
+
+## Documentação Adicional
+
+- [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) - Sistema de design completo
+- [PLANO_COMPLETO_INFRAESTRUTURA.md](./PLANO_COMPLETO_INFRAESTRUTURA.md) - Arquitetura e backend
+
+## Evento
+
+- **Data:** 28/02/2026 e 01/03/2026
+- **Horário:** 09:30
+- **Participantes esperados:** ~1000
+
+---
+
+Desenvolvido para a Imersão Diagnóstico de Vendas

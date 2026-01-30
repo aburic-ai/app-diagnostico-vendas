@@ -28,115 +28,21 @@ import {
 
 import { PageWrapper, Card, Button, Input } from '../components/ui'
 import { theme } from '../styles/theme'
+import {
+  SURVEY_QUESTIONS,
+  type SurveyData,
+  createEmptySurveyData,
+  getVisibleQuestions,
+} from '../data/survey-config'
+import { generateWhatsAppMessage } from '../lib/whatsapp-message'
 
 // ============================================
 // TYPES
 // ============================================
 
-interface SurveyData {
-  motivacao: string
-  tipoNegocio: string
-  faturamento: string
-  maiorGargalo: string
-  oQueJaTentou: string
-  quantoInvestiu: string
-  quaisMentorias: string
-  oQueQuerResolver: string
-  interesseAcompanhamento: string
-}
-
 type Step = 'verification' | 'survey' | 'whatsapp' | 'password' | 'success' | 'error'
 
 type VerificationStatus = 'checking' | 'not_found' | 'found'
-
-// ============================================
-// CONSTANTS
-// ============================================
-
-const SURVEY_QUESTIONS = [
-  {
-    id: 'motivacao',
-    question: 'O que te motivou a entrar na Imersão Diagnóstico de Vendas?',
-    type: 'textarea' as const,
-    placeholder: 'Descreva o que te trouxe até aqui...',
-  },
-  {
-    id: 'tipoNegocio',
-    question: 'Qual o tipo do seu negócio?',
-    type: 'select' as const,
-    options: [
-      'Serviços (consultoria, agência, etc.)',
-      'Produtos físicos',
-      'Infoprodutos / Cursos',
-      'SaaS / Software',
-      'E-commerce',
-      'Outro',
-    ],
-  },
-  {
-    id: 'faturamento',
-    question: 'Qual o faturamento mensal atual?',
-    type: 'select' as const,
-    options: [
-      'Até R$ 10.000',
-      'R$ 10.000 a R$ 50.000',
-      'R$ 50.000 a R$ 100.000',
-      'R$ 100.000 a R$ 500.000',
-      'Acima de R$ 500.000',
-    ],
-  },
-  {
-    id: 'maiorGargalo',
-    question: 'Qual o maior gargalo atual nas suas vendas?',
-    type: 'select' as const,
-    options: [
-      'Atrair leads qualificados',
-      'Converter leads em clientes',
-      'Reter e fidelizar clientes',
-      'Escalar sem perder qualidade',
-    ],
-  },
-  {
-    id: 'oQueJaTentou',
-    question: 'O que você já tentou para resolver isso?',
-    type: 'textarea' as const,
-    placeholder: 'Descreva brevemente...',
-  },
-  {
-    id: 'quantoInvestiu',
-    question: 'Quanto já investiu em mentorias/cursos de vendas?',
-    type: 'select' as const,
-    options: [
-      'Nunca investi',
-      'Até R$ 5.000',
-      'R$ 5.000 a R$ 20.000',
-      'Mais de R$ 20.000',
-    ],
-  },
-  {
-    id: 'quaisMentorias',
-    question: 'Quais mentorias ou cursos já fez?',
-    type: 'textarea' as const,
-    placeholder: 'Liste os principais (ou "nenhum")...',
-    conditionalOn: { field: 'quantoInvestiu', notValue: 'Nunca investi' },
-  },
-  {
-    id: 'oQueQuerResolver',
-    question: 'O que você espera resolver com a Imersão?',
-    type: 'textarea' as const,
-    placeholder: 'Seja específico sobre seu objetivo...',
-  },
-  {
-    id: 'interesseAcompanhamento',
-    question: 'Interesse em acompanhamento pós-evento?',
-    type: 'select' as const,
-    options: [
-      'Sim, quero saber mais sobre mentoria',
-      'Talvez, depende dos resultados',
-      'Não, só quero participar do evento',
-    ],
-  },
-]
 
 const WHATSAPP_LINK = 'https://chat.whatsapp.com/GRUPO_EXCLUSIVO'
 const SUPPORT_WHATSAPP = '+5511942230050'
@@ -184,17 +90,7 @@ export function ThankYou() {
   const [identifier, setIdentifier] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState('')
-  const [surveyData, setSurveyData] = useState<SurveyData>({
-    motivacao: '',
-    tipoNegocio: '',
-    faturamento: '',
-    maiorGargalo: '',
-    oQueJaTentou: '',
-    quantoInvestiu: '',
-    quaisMentorias: '',
-    oQueQuerResolver: '',
-    interesseAcompanhamento: '',
-  })
+  const [surveyData, setSurveyData] = useState<SurveyData>(createEmptySurveyData())
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -282,27 +178,31 @@ export function ThankYou() {
     setStep('survey')
   }
 
-  // Get visible questions (handle conditional questions)
-  const getVisibleQuestions = () => {
-    return SURVEY_QUESTIONS.filter((q) => {
-      if (!q.conditionalOn) return true
-      const condField = q.conditionalOn.field as keyof SurveyData
-      return surveyData[condField] !== q.conditionalOn.notValue
-    })
-  }
-
   // Handle survey answer
   const handleSurveyAnswer = (questionId: string, value: string) => {
     setSurveyData((prev) => ({ ...prev, [questionId]: value }))
   }
 
   // Navigate survey
-  const visibleQuestions = getVisibleQuestions()
+  const visibleQuestions = getVisibleQuestions(surveyData)
   const currentQ = visibleQuestions[currentQuestion]
   const isLastQuestion = currentQuestion === visibleQuestions.length - 1
 
   const nextQuestion = () => {
     if (isLastQuestion) {
+      // Gerar mensagem WhatsApp personalizada em background
+      generateWhatsAppMessage(surveyData).then((result) => {
+        console.log('[ThankYou] Mensagem WhatsApp gerada:', result)
+        // TODO: Salvar no Supabase quando disponivel
+        // await supabase.from('whatsapp_messages').insert({
+        //   transaction_id: identifier,
+        //   email: email || null,
+        //   survey_data: surveyData,
+        //   prompt: result.prompt,
+        //   generated_message: result.message,
+        //   used_fallback: result.usedFallback,
+        // })
+      })
       setStep('whatsapp')
     } else {
       setCurrentQuestion((prev) => prev + 1)

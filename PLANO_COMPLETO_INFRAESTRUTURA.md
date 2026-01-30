@@ -114,7 +114,8 @@ diagnostic_entries (
 
 -- ESTADO DO EVENTO (singleton)
 event_state (
-  current_day, current_block, is_live
+  current_day, current_block, status
+  -- status: 'offline' | 'live' | 'paused' | 'activity' | 'lunch'
 )
 
 -- NOTIFICAÇÕES
@@ -127,6 +128,24 @@ notifications (
 user_progress (
   user_id, xp, completed_steps,
   bonus_videos_watched
+)
+
+-- MENSAGENS WHATSAPP (geradas por IA)
+whatsapp_messages (
+  id, user_id, transaction_id, email,
+  survey_data JSONB,     -- respostas da pesquisa
+  prompt TEXT,           -- prompt enviado ao Claude
+  generated_message TEXT, -- mensagem gerada
+  used_fallback BOOLEAN, -- se usou mensagem generica
+  status TEXT,           -- pending | sent | failed
+  created_at, sent_at
+)
+
+-- RESPOSTAS DA PESQUISA
+survey_responses (
+  id, user_id, transaction_id, email,
+  survey_data JSONB,     -- todas as respostas
+  created_at
 )
 ```
 
@@ -179,10 +198,16 @@ Rota protegida dentro do próprio app para usuários com `is_admin = true`.
 │  ○───○───●───○───○───○───○                                  │
 │  1   2   3   4   5   6   7                                  │
 │                                                             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐     │
-│  │  ◀ VOLTAR   │    │  AVANÇAR ▶  │    │             │     │
-│  │   BLOCO     │    │    BLOCO    │    │  🔴 PAUSAR  │     │
-│  └─────────────┘    └─────────────┘    └─────────────┘     │
+│  ┌─────────────┐    ┌─────────────┐                        │
+│  │  ◀ VOLTAR   │    │  AVANÇAR ▶  │                        │
+│  │   BLOCO     │    │    BLOCO    │                        │
+│  └─────────────┘    └─────────────┘                        │
+│                                                             │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐          │
+│  │ PAUSAR  │ │ATIVIDADE│ │ ALMOCO  │ │ENCERRAR │          │
+│  └─────────┘ └─────────┘ └─────────┘ └─────────┘          │
+│                                                             │
+│  Status: offline | live | paused | activity | lunch        │
 │                                                             │
 │  ─────────────────────────────────────────────────────     │
 │                                                             │
@@ -215,8 +240,17 @@ Rota protegida dentro do próprio app para usuários com `is_admin = true`.
      - Notificação aparece: "Bloco 4: Preparação começou!"
 
 3. **Intervalo:**
-   - Pode clicar "PAUSAR" (opcional)
+   - Pode clicar "PAUSAR" (pausa geral)
    - Participantes veem "Em intervalo"
+
+3b. **Atividade em andamento:**
+   - Clicar "ATIVIDADE" durante exercicios
+   - Participantes veem "ATIVIDADE EM ANDAMENTO" (cor roxa)
+   - Diferencia de pausa normal
+
+3c. **Almoco:**
+   - Clicar "ALMOCO" no horario de almoco
+   - Participantes veem "INTERVALO PARA ALMOCO"
 
 4. **Fim do Dia 1:**
    - Clica "ENCERRAR DIA 1"
@@ -488,7 +522,80 @@ Para agilizar durante o evento, já teremos templates prontos:
 
 ---
 
-## Integração de IA (Simulador)
+## Sistema de Mensagem WhatsApp Pos-Pesquisa (IA)
+
+### Visao Geral
+Apos o aluno completar a pesquisa de calibragem na Thank You Page (`/obrigado`),
+o sistema gera uma mensagem personalizada via Claude API e salva no banco de dados.
+
+**Decisao:** NAO enviar via WhatsApp API automaticamente. Apenas gerar o texto e salvar.
+
+### Arquitetura
+
+```
+Aluno preenche pesquisa (ThankYou.tsx)
+         │
+         ▼
+survey-config.ts (SINGLE SOURCE OF TRUTH)
+  - Define perguntas da pesquisa
+  - Cada pergunta tem promptLabel
+  - Alteracoes aqui propagam para UI + prompt
+         │
+         ▼
+whatsapp-message.ts
+  - buildWhatsAppPrompt() → monta prompt para Claude
+  - generateWhatsAppMessage() → chama API (TODO: Edge Function)
+  - getFallbackMessage() → mensagem generica de backup
+         │
+         ▼
+Supabase (futuro)
+  - Tabela whatsapp_messages
+  - Edge Function chama Claude API
+  - Salva mensagem gerada
+```
+
+### Perguntas da Pesquisa (survey-config.ts)
+
+| # | ID | Pergunta | Tipo | Condicional |
+|---|-----|----------|------|-------------|
+| 1 | motivacao | O que te motivou a entrar na Imersao? | textarea | - |
+| 2 | tipoNegocio | Qual o tipo do seu negocio? | select (6 opcoes) | - |
+| 3 | faturamento | Qual o faturamento mensal atual? | select (5 faixas) | - |
+| 4 | maiorGargalo | Qual o maior gargalo nas suas vendas? | select (4 opcoes) | - |
+| 5 | oQueJaTentou | O que ja tentou para resolver? | textarea | - |
+| 6 | quantoInvestiu | Quanto ja investiu em mentorias/cursos? | select (4 faixas) | - |
+| 7 | quaisMentorias | Quais mentorias ou cursos ja fez? | textarea | So aparece se quantoInvestiu != "Nunca investi" |
+| 8 | oQueQuerResolver | O que espera resolver com a Imersao? | textarea | - |
+| 9 | interesseAcompanhamento | Interesse em acompanhamento pos-evento? | select (3 opcoes) | - |
+
+### Prompt Template (5 blocos)
+
+1. **Saudacao** - Nome do aluno, tom acolhedor, reconhecer decisao
+2. **Validacao + Diagnostico** - Refletir respostas, apontar gargalo, usar dados especificos
+3. **Direcionamento para Dossie** - Video "Dossie de Inteligencia" com 7 Ruidos Neurais:
+   - Identidade (00:00), Sequencia (05:30), Prova (11:00)
+   - Complexidade (16:30), Urgencia (22:00), Comando (27:30), Dissonancia (33:00)
+4. **Elevacao da Imersao** - Importancia dos 2 dias, app como ferramenta
+5. **Fechamento** - Tom de parceria, assinatura Andre Buric
+
+### Como Modificar Perguntas
+
+1. Abrir `src/data/survey-config.ts`
+2. Modificar array `SURVEY_QUESTIONS`
+3. Nenhum outro arquivo precisa ser alterado
+4. UI e prompt se adaptam automaticamente
+
+### Arquivos
+
+| Arquivo | Descricao |
+|---------|-----------|
+| `src/data/survey-config.ts` | Config centralizada (single source of truth) |
+| `src/lib/whatsapp-message.ts` | Gerador de prompt + mensagem |
+| `src/pages/ThankYou.tsx` | Importa config, chama gerador apos pesquisa |
+
+---
+
+## Integracao de IA (Simulador)
 
 **Abordagem:** Vercel AI SDK + OpenAI GPT-4o-mini
 
@@ -700,28 +807,39 @@ Atualmente gamification só existe no Pré-Evento. Expandir para:
 
 ```
 src/
+├── data/
+│   ├── modules.ts            # ✅ 17 modulos do evento (0-16)
+│   └── survey-config.ts      # ✅ Pesquisa - Single Source of Truth
 ├── lib/
-│   ├── supabase.ts         # Cliente Supabase
-│   ├── auth.ts             # Helpers de auth
-│   └── ai.ts               # Setup Vercel AI SDK
+│   ├── whatsapp-message.ts   # ✅ Gerador de prompt WhatsApp
+│   ├── supabase.ts           # TODO: Cliente Supabase
+│   ├── auth.ts               # TODO: Helpers de auth
+│   └── ai.ts                 # TODO: Setup Vercel AI SDK
 ├── hooks/
-│   ├── useAuth.ts          # Auth context
-│   ├── useEventState.ts    # Real-time evento
-│   ├── useNotifications.ts # Real-time notificações
-│   └── useDiagnostic.ts    # CRUD diagnóstico
+│   ├── useAuth.ts            # TODO: Auth context
+│   ├── useEventState.ts      # TODO: Real-time evento
+│   ├── useNotifications.ts   # TODO: Real-time notificacoes
+│   └── useDiagnostic.ts      # TODO: CRUD diagnostico
 ├── context/
-│   ├── AuthContext.tsx     # Provider de sessão
-│   └── EventContext.tsx    # Provider do evento
+│   ├── AuthContext.tsx        # TODO: Provider de sessao
+│   └── EventContext.tsx       # TODO: Provider do evento
 ├── pages/
-│   ├── Admin.tsx           # Dashboard admin (NOVO)
-│   └── AIChat.tsx          # Simulador IA (NOVO)
+│   ├── Login.tsx              # ✅ Cockpit Access
+│   ├── PreEvento.tsx          # ✅ Dashboard pre-evento
+│   ├── AoVivo.tsx             # ✅ Durante o evento
+│   ├── PosEvento.tsx          # ✅ Pos-evento
+│   ├── Admin.tsx              # ✅ Painel de controle
+│   ├── ThankYou.tsx           # ✅ Pos-compra (usa survey-config)
+│   ├── Demo.tsx               # ✅ Demonstracao
+│   ├── DevNav.tsx             # ✅ Navegacao dev
+│   └── AIChat.tsx             # TODO: Simulador IA
 ├── components/ui/
-│   ├── SponsorBadge.tsx    # Badge patrocínio (NOVO)
-│   ├── AIChat.tsx          # Interface chat (NOVO)
-│   └── InstallPrompt.tsx   # PWA prompt (NOVO)
+│   ├── SponsorBadge.tsx       # TODO: Badge patrocinio
+│   ├── AIChat.tsx             # TODO: Interface chat
+│   └── InstallPrompt.tsx      # TODO: PWA prompt
 └── public/
-    ├── manifest.json       # PWA manifest (NOVO)
-    └── sw.js               # Service worker (NOVO)
+    ├── manifest.json          # TODO: PWA manifest
+    └── sw.js                  # TODO: Service worker
 ```
 
 ---

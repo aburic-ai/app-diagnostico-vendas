@@ -17,6 +17,8 @@ import {
   Star,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Power,
   Pause,
   Play,
@@ -48,6 +50,7 @@ type EventStatus = 'offline' | 'live' | 'paused' | 'activity' | 'lunch'
 
 interface EventState {
   status: EventStatus
+  currentDay: 1 | 2
   currentModule: number
   offerReleased: boolean
   aiEnabled: boolean
@@ -147,6 +150,7 @@ export function Admin() {
   // Event State
   const [eventState, setEventState] = useState<EventState>({
     status: 'offline',
+    currentDay: 1,
     currentModule: 0,
     offerReleased: false,
     aiEnabled: false,
@@ -204,6 +208,7 @@ export function Admin() {
   const [showParticipants, setShowParticipants] = useState(false)
   const [participants, setParticipants] = useState<OnlineParticipant[]>([])
   const [participantSearch, setParticipantSearch] = useState('')
+  const [moduleDropdownOpen, setModuleDropdownOpen] = useState(false)
 
   // Calculate minutes remaining until lunch return
   const calculateLunchMinutes = () => {
@@ -263,7 +268,11 @@ export function Admin() {
     .sort((a, b) => b.xp - a.xp)
 
   const currentModule = EVENT_MODULES[eventState.currentModule]
-  const currentDay = getCurrentDay(eventState.currentModule)
+  const currentDay = eventState.currentDay
+
+  const handleSetDay = (day: 1 | 2) => {
+    setEventState(prev => ({ ...prev, currentDay: day }))
+  }
 
   const handleToggleLive = () => {
     if (eventState.status === 'offline') {
@@ -1428,85 +1437,195 @@ export function Admin() {
             </div>
           </div>
 
-          {/* Module Selector with names visible */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '8px',
-            }}
-          >
-            {EVENT_MODULES.map((module) => (
-              <motion.button
-                key={module.id}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleSelectModule(module.id)}
-                style={{
-                  padding: '10px 8px',
-                  background:
-                    module.id === eventState.currentModule
-                      ? 'rgba(168, 85, 247, 0.3)'
-                      : module.id < eventState.currentModule
-                      ? 'rgba(34, 211, 238, 0.15)'
-                      : 'rgba(100, 116, 139, 0.1)',
-                  border: `1px solid ${
-                    module.id === eventState.currentModule
-                      ? 'rgba(168, 85, 247, 0.6)'
-                      : module.id < eventState.currentModule
-                      ? 'rgba(34, 211, 238, 0.3)'
-                      : 'rgba(100, 116, 139, 0.2)'
-                  }`,
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      color:
-                        module.id === eventState.currentModule
-                          ? theme.colors.accent.purple.light
-                          : module.id < eventState.currentModule
-                          ? theme.colors.accent.cyan.DEFAULT
-                          : theme.colors.text.muted,
-                    }}
-                  >
-                    {module.id}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '8px',
-                      padding: '1px 4px',
-                      background: module.day === 1 ? 'rgba(34, 211, 238, 0.2)' : 'rgba(168, 85, 247, 0.2)',
-                      borderRadius: '3px',
-                      color: module.day === 1 ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light,
-                    }}
-                  >
-                    D{module.day}
-                  </span>
-                </div>
-                <p
+          {/* Day Toggle */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleSetDay(1)}
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                background: currentDay === 1 ? 'rgba(34, 211, 238, 0.2)' : 'rgba(100, 116, 139, 0.1)',
+                border: `1px solid ${currentDay === 1 ? 'rgba(34, 211, 238, 0.5)' : 'rgba(100, 116, 139, 0.2)'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                color: currentDay === 1 ? theme.colors.accent.cyan.DEFAULT : theme.colors.text.muted,
+                fontSize: '12px',
+                fontWeight: 'bold',
+                letterSpacing: '0.05em',
+              }}
+            >
+              DIA 1
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleSetDay(2)}
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                background: currentDay === 2 ? 'rgba(168, 85, 247, 0.2)' : 'rgba(100, 116, 139, 0.1)',
+                border: `1px solid ${currentDay === 2 ? 'rgba(168, 85, 247, 0.5)' : 'rgba(100, 116, 139, 0.2)'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                color: currentDay === 2 ? theme.colors.accent.purple.light : theme.colors.text.muted,
+                fontSize: '12px',
+                fontWeight: 'bold',
+                letterSpacing: '0.05em',
+              }}
+            >
+              DIA 2
+            </motion.button>
+          </div>
+
+          {/* Module Selector Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              onClick={() => setModuleDropdownOpen(!moduleDropdownOpen)}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                background: 'rgba(168, 85, 247, 0.15)',
+                border: '1px solid rgba(168, 85, 247, 0.4)',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span
                   style={{
-                    fontSize: '9px',
-                    color:
-                      module.id === eventState.currentModule
-                        ? theme.colors.text.primary
-                        : theme.colors.text.secondary,
-                    margin: 0,
-                    lineHeight: 1.2,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    color: theme.colors.accent.purple.light,
                   }}
                 >
-                  {module.title}
-                </p>
-              </motion.button>
-            ))}
+                  {currentModule.id}.
+                </span>
+                <span
+                  style={{
+                    fontSize: '8px',
+                    padding: '2px 6px',
+                    background: currentDay === 1 ? 'rgba(34, 211, 238, 0.2)' : 'rgba(168, 85, 247, 0.2)',
+                    borderRadius: '4px',
+                    color: currentDay === 1 ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light,
+                  }}
+                >
+                  DIA {currentDay}
+                </span>
+                <span style={{ fontSize: '12px', color: theme.colors.text.primary }}>
+                  {currentModule.title}
+                </span>
+              </div>
+              {moduleDropdownOpen ? (
+                <ChevronUp size={18} color={theme.colors.accent.purple.light} />
+              ) : (
+                <ChevronDown size={18} color={theme.colors.accent.purple.light} />
+              )}
+            </motion.button>
+
+            <AnimatePresence>
+              {moduleDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: 'auto' }}
+                  exit={{ opacity: 0, y: -10, height: 0 }}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    background: 'rgba(15, 17, 21, 0.98)',
+                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                    borderRadius: '10px',
+                    overflow: 'hidden',
+                    zIndex: 50,
+                    maxHeight: '280px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {EVENT_MODULES.map((module) => (
+                    <motion.button
+                      key={module.id}
+                      whileHover={{ backgroundColor: 'rgba(168, 85, 247, 0.15)' }}
+                      onClick={() => {
+                        handleSelectModule(module.id)
+                        setModuleDropdownOpen(false)
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        background:
+                          module.id === eventState.currentModule
+                            ? 'rgba(168, 85, 247, 0.25)'
+                            : 'transparent',
+                        border: 'none',
+                        borderBottom: '1px solid rgba(100, 116, 139, 0.1)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          color:
+                            module.id === eventState.currentModule
+                              ? theme.colors.accent.purple.light
+                              : module.id < eventState.currentModule
+                              ? theme.colors.accent.cyan.DEFAULT
+                              : theme.colors.text.muted,
+                          minWidth: '18px',
+                        }}
+                      >
+                        {module.id}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '7px',
+                          padding: '2px 4px',
+                          background: module.day === 1 ? 'rgba(34, 211, 238, 0.2)' : 'rgba(168, 85, 247, 0.2)',
+                          borderRadius: '3px',
+                          color: module.day === 1 ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light,
+                        }}
+                      >
+                        D{module.day}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          color:
+                            module.id === eventState.currentModule
+                              ? theme.colors.text.primary
+                              : theme.colors.text.secondary,
+                          flex: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {module.title}
+                      </span>
+                      {module.id < eventState.currentModule && (
+                        <Check size={14} color={theme.colors.accent.cyan.DEFAULT} />
+                      )}
+                      {module.id === eventState.currentModule && (
+                        <Radio size={14} color={theme.colors.accent.purple.light} />
+                      )}
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 

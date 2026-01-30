@@ -34,6 +34,11 @@ import { theme } from '../styles/theme'
 src/
 ├── styles/
 │   └── theme.ts          # DESIGN TOKENS (fonte unica da verdade)
+├── data/
+│   ├── modules.ts        # 17 modulos do evento (0-16), dias, helpers
+│   └── survey-config.ts  # PESQUISA - Single Source of Truth (perguntas, tipos, prompt labels)
+├── lib/
+│   └── whatsapp-message.ts # Gerador de prompt WhatsApp (usa survey-config)
 ├── components/
 │   └── ui/
 │       ├── index.ts      # Exports centralizados
@@ -46,10 +51,14 @@ src/
 │       ├── ProgressBar.tsx # Barra de progresso
 │       └── BottomNav.tsx # Navegacao sequencial
 └── pages/
-    ├── Login.tsx
-    ├── PreEvento.tsx
-    ├── DevNav.tsx
-    └── Sandbox.tsx
+    ├── Login.tsx       # Tela de login (Cockpit Access)
+    ├── PreEvento.tsx   # Dashboard pre-evento com gamification
+    ├── AoVivo.tsx      # Durante o evento - Diagnostico IMPACT
+    ├── PosEvento.tsx   # Pos-evento - Relatorio final e oferta
+    ├── Admin.tsx       # Painel de controle do evento
+    ├── ThankYou.tsx    # Pagina pos-compra (usa survey-config.ts)
+    ├── Demo.tsx        # Demonstracao do app
+    └── DevNav.tsx      # Navegacao de desenvolvimento
 ```
 
 ---
@@ -239,7 +248,27 @@ import {
   Input,
   Countdown,
   ProgressBar,
-  BottomNav
+  BottomNav,
+  PageHeader,
+  JourneyStep,
+  LiveTicker,
+  RadarChart,
+  DiagnosticSlider,
+  GargaloAlert,
+  LockedOffer,
+  SystemAlert,
+  FinalReport,
+  ScenarioProjection,
+  ActionPlan,
+  NotificationToast,
+  NotificationDrawer,
+  PresenceConfirmCard,
+  AvatarButton,
+  ProfileCard,
+  AIChatFAB,
+  AIChatInterface,
+  SponsorBadge,
+  NPSForm,
 } from '../components/ui'
 ```
 
@@ -428,6 +457,56 @@ export function NomeDaPagina() {
   )
 }
 ```
+
+---
+
+## Paginas Implementadas
+
+### Login (`/login`)
+- Tela de acesso ao cockpit
+- Background com imagem + canvas animado
+- Inputs com borda gradiente
+- BeamButton com animacao
+
+### Pre-Evento (`/pre-evento`)
+- Dashboard de preparacao
+- Countdown para o evento
+- Sistema de gamification (XP + Journey)
+- Modal de perfil e notificacoes
+
+### Ao Vivo (`/ao-vivo`)
+- LiveTicker com modulo atual
+- Sistema de Diagnostico IMPACT
+- Grafico radar interativo
+- NPS Form e oferta travada
+
+### Pos-Evento (`/pos-evento`)
+- Relatorio final consolidado
+- Projecao de cenarios (30/60/90 dias)
+- Plano de acao de 7 dias
+- Oferta desbloqueada
+
+### Admin (`/admin`)
+- Layout desktop split-view
+- Preview mobile em tempo real
+- Controle do evento (dia, modulo, status)
+- Status disponiveis: `offline | live | paused | activity | lunch`
+- Ordem dos botoes: PAUSAR → ATIVIDADE → ALMOCO → ENCERRAR
+- Central de avisos com templates
+- Lista de participantes ordenada por XP
+
+### Thank You (`/obrigado`)
+- Fluxo pos-compra Hotmart (pagina independente, sem BottomNav/AppLayout)
+- 5 estados: verificacao → pesquisa → whatsapp → senha → success/error
+- Mini radar animado na verificacao
+- Pesquisa de calibragem (9 perguntas, config em `src/data/survey-config.ts`)
+- Geracao de mensagem WhatsApp personalizada apos pesquisa (IA)
+- Indicadores de passo (Passo 1 de 2, Passo 2 de 2)
+- Criacao de senha com indicador de forca
+
+### Demo (`/demo`)
+- Demonstracao do app para visitantes
+- Fluxo simplificado sem autenticacao
 
 ---
 
