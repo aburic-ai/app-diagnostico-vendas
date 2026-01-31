@@ -13,18 +13,42 @@ import { Eye, EyeOff } from 'lucide-react'
 // Componentes centralizados
 import { PageWrapper, Input, Button } from '../components/ui'
 import { theme } from '../styles/theme'
+import { useAuth } from '../hooks/useAuth'
 
 export function Login() {
   const navigate = useNavigate()
+  const { signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implementar autenticação real
-    console.log('Login attempt:', { email, password })
-    navigate('/pre-evento')
+    setLoading(true)
+    setError('')
+
+    const { error: signInError } = await signIn(email, password)
+
+    if (signInError) {
+      // Mensagens amigáveis para o usuário
+      let friendlyMessage = 'Erro ao fazer login'
+
+      if (signInError.message.includes('Email not confirmed')) {
+        friendlyMessage = 'Seu email ainda não foi confirmado. Verifique sua caixa de entrada.'
+      } else if (signInError.message.includes('Invalid login credentials')) {
+        friendlyMessage = 'Email ou senha incorretos'
+      } else if (signInError.message.includes('Email')) {
+        friendlyMessage = 'Email inválido'
+      }
+
+      setError(friendlyMessage)
+      setLoading(false)
+    } else {
+      // AuthContext vai redirecionar automaticamente via ProtectedRoute
+      navigate('/pre-evento')
+    }
   }
 
   return (
@@ -89,9 +113,24 @@ export function Login() {
             />
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div style={{
+              marginBottom: theme.spacing.md,
+              padding: theme.spacing.sm,
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '8px',
+              color: '#ef4444',
+              fontSize: '14px',
+            }}>
+              {error}
+            </div>
+          )}
+
           {/* Submit Button */}
-          <Button type="submit" variant="primary" withBeam>
-            ACESSAR COCKPIT
+          <Button type="submit" variant="primary" withBeam disabled={loading}>
+            {loading ? 'ENTRANDO...' : 'ACESSAR COCKPIT'}
           </Button>
         </motion.form>
 

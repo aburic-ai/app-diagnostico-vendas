@@ -36,6 +36,8 @@ import {
   getVisibleQuestions,
 } from '../data/survey-config'
 import { generateWhatsAppMessage } from '../lib/whatsapp-message'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 
 // ============================================
 // TYPES
@@ -125,19 +127,22 @@ export function ThankYou() {
     const poll = async () => {
       attempts++
 
-      // TODO: Replace with actual Supabase query
-      // const { data } = await supabase
-      //   .from('users')
-      //   .select('*')
-      //   .or(`transaction_id.eq.${searchIdentifier},email.eq.${searchIdentifier}`)
-      //   .single()
       console.log(`Polling for user with identifier: ${searchIdentifier}, attempt ${attempts}`)
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Buscar usuário no Supabase (por email ou transaction_id em purchases)
+      const { data: purchaseData } = await supabase
+        .from('purchases')
+        .select('user_id')
+        .or(`transaction_id.eq.${searchIdentifier},user_id.in.(select id from profiles where email=${searchIdentifier})`)
+        .limit(1)
 
-      // For demo, simulate finding user after a few attempts
-      const userExists = attempts >= 2 // Simulated
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', searchIdentifier)
+        .limit(1)
+
+      const userExists = (purchaseData && purchaseData.length > 0) || (profileData && profileData.length > 0)
 
       if (userExists) {
         setUserFound(true)
@@ -192,17 +197,23 @@ export function ThankYou() {
   const nextQuestion = () => {
     if (isLastQuestion) {
       // Gerar mensagem WhatsApp personalizada em background
-      generateWhatsAppMessage(surveyData).then((result) => {
+      generateWhatsAppMessage(surveyData).then(async (result) => {
         console.log('[ThankYou] Mensagem WhatsApp gerada:', result)
-        // TODO: Salvar no Supabase quando disponivel
-        // await supabase.from('whatsapp_messages').insert({
-        //   transaction_id: identifier,
-        //   email: email || null,
-        //   survey_data: surveyData,
-        //   prompt: result.prompt,
-        //   generated_message: result.message,
-        //   used_fallback: result.usedFallback,
-        // })
+
+        // Salvar no Supabase
+        try {
+          await supabase.from('whatsapp_messages').insert({
+            transaction_id: identifier,
+            email: email || null,
+            survey_data: surveyData,
+            prompt: result.prompt,
+            generated_message: result.message,
+            used_fallback: result.usedFallback,
+          })
+          console.log('[ThankYou] Mensagem WhatsApp salva no Supabase')
+        } catch (error) {
+          console.error('[ThankYou] Erro ao salvar mensagem WhatsApp:', error)
+        }
       })
       setStep('whatsapp')
     } else {
@@ -240,21 +251,27 @@ export function ThankYou() {
     setIsSubmitting(true)
 
     try {
-      // TODO: Save to Supabase
-      // await supabase.from('survey_responses').insert({
-      //   transaction_id: identifier,
-      //   email: email || null,
-      //   ...surveyData,
-      // })
-      //
-      // if (userFound) {
-      //   await supabase.auth.updateUser({ password })
-      //   // Auto-login is handled by Supabase
-      // }
-      console.log('Saving data for identifier:', identifier, 'email:', email, 'survey:', surveyData)
+      // Salvar respostas da pesquisa
+      const { error: surveyError } = await supabase.from('survey_responses').insert({
+        transaction_id: identifier,
+        email: email || null,
+        survey_data: surveyData,
+      })
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      if (surveyError) throw surveyError
+
+      // Criar conta ou atualizar senha do usuário existente
+      if (!userFound) {
+        // Criar nova conta
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: email || '',
+          password,
+        })
+
+        if (signUpError) throw signUpError
+      }
+
+      console.log('[ThankYou] Survey salvo e conta criada/atualizada com sucesso')
 
       if (userFound) {
         // Success - redirect to app

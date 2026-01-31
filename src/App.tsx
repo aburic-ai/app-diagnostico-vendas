@@ -16,40 +16,62 @@ import { Admin } from './pages/Admin'
 import { Demo } from './pages/Demo'
 import { Sandbox } from './pages/Sandbox'
 import { ThankYou } from './pages/ThankYou'
-import { AppLayout } from './components/ui'
+import { AppLayout, ProtectedRoute } from './components/ui'
+import { AuthProvider } from './context/AuthContext'
 import './index.css'
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Admin tem layout próprio - desktop only com split view */}
-        <Route path="/admin" element={<Admin />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Admin tem layout próprio - desktop only com split view - PROTEGIDO (requer admin) */}
+          <Route path="/admin" element={
+            <ProtectedRoute requireAdmin>
+              <Admin />
+            </ProtectedRoute>
+          } />
 
-        {/* Demo tem layout próprio - otimizado para captura de vídeo */}
-        <Route path="/demo" element={<Demo />} />
+          {/* Demo tem layout próprio - otimizado para captura de vídeo */}
+          <Route path="/demo" element={<Demo />} />
 
-        {/* Sandbox tem layout próprio - para prints e forms */}
-        <Route path="/sandbox" element={<Sandbox />} />
+          {/* Sandbox tem layout próprio - para prints e forms */}
+          <Route path="/sandbox" element={<Sandbox />} />
 
-        {/* ThankYou page - pós-compra Hotmart */}
-        <Route path="/obrigado" element={<ThankYou />} />
+          {/* ThankYou page - pós-compra Hotmart - PÚBLICO */}
+          <Route path="/obrigado" element={<ThankYou />} />
 
-        {/* Todas as outras páginas usam AppLayout (mobile-first) */}
-        <Route path="/*" element={
-          <AppLayout>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dev" replace />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/pre-evento" element={<PreEvento />} />
-              <Route path="/ao-vivo" element={<AoVivo />} />
-              <Route path="/pos-evento" element={<PosEvento />} />
-              <Route path="/dev" element={<DevNav />} />
-            </Routes>
-          </AppLayout>
-        } />
-      </Routes>
-    </BrowserRouter>
+          {/* Todas as outras páginas usam AppLayout (mobile-first) */}
+          <Route path="/*" element={
+            <AppLayout>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dev" replace />} />
+                <Route path="/login" element={<Login />} />
+
+                {/* Rotas protegidas - requerem autenticação */}
+                <Route path="/pre-evento" element={
+                  <ProtectedRoute>
+                    <PreEvento />
+                  </ProtectedRoute>
+                } />
+                <Route path="/ao-vivo" element={
+                  <ProtectedRoute>
+                    <AoVivo />
+                  </ProtectedRoute>
+                } />
+                <Route path="/pos-evento" element={
+                  <ProtectedRoute>
+                    <PosEvento />
+                  </ProtectedRoute>
+                } />
+
+                <Route path="/dev" element={<DevNav />} />
+              </Routes>
+            </AppLayout>
+          } />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
 

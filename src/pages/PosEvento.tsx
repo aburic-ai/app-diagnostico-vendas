@@ -39,6 +39,9 @@ import {
 } from '../components/ui'
 import type { IMPACTData, ActionItem, Notification } from '../components/ui'
 import { theme } from '../styles/theme'
+import { useAuth } from '../hooks/useAuth'
+import { useUserProgress } from '../hooks/useUserProgress'
+import { XP_CONFIG, STEP_IDS } from '../config/xp-system'
 
 // Dados do perfil
 interface ProfileData {
@@ -66,6 +69,9 @@ const buildOfferUrl = (baseUrl: string, utmContent?: string): string => {
 }
 
 export function PosEvento() {
+  const { profile: userProfile } = useAuth()
+  const { completeStep, isStepCompleted } = useUserProgress()
+
   const [activeNav, setActiveNav] = useState('posevento')
   const [showAlert, setShowAlert] = useState(true)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -73,8 +79,8 @@ export function PosEvento() {
 
   // Profile state
   const [profile, setProfile] = useState<ProfileData>({
-    name: 'João Silva',
-    email: 'joao.silva@email.com',
+    name: userProfile?.name || 'Participante',
+    email: userProfile?.email || '',
     phone: '(11) 99999-9999',
     company: 'Empresa XYZ',
     role: 'CEO',

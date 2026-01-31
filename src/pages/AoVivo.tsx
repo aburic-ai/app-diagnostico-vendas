@@ -5,7 +5,7 @@
  * alertas de gargalo, módulos em scroll horizontal e oferta bloqueada.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Rocket,
@@ -43,6 +43,9 @@ import {
 import type { IMPACTData, Notification } from '../components/ui'
 import { theme } from '../styles/theme'
 import { getModuleById, EVENT_MODULES } from '../data/modules'
+import { useDiagnostic, useAuth } from '../hooks'
+import type { DiagnosticScores } from '../hooks'
+import { XP_CONFIG } from '../config/xp-system'
 
 // Links da oferta (viriam do Admin/Backend)
 const OFFER_LINKS = {
@@ -60,7 +63,44 @@ const buildOfferUrl = (baseUrl: string, utmContent?: string): string => {
   return `${baseUrl}${separator}utm_source=${OFFER_LINKS.utmSource}&utm_medium=${OFFER_LINKS.utmMedium}&utm_campaign=${OFFER_LINKS.utmCampaign}&utm_content=${utmContent || OFFER_LINKS.utmContent}`
 }
 
+// Helper: Converter DiagnosticScores para IMPACTData
+const scoresToIMPACT = (scores: DiagnosticScores | null): IMPACTData => {
+  if (!scores) {
+    return {
+      inspiracao: 0,
+      motivacao: 0,
+      preparacao: 0,
+      apresentacao: 0,
+      conversao: 0,
+      transformacao: 0,
+    }
+  }
+  return {
+    inspiracao: scores.intention_score,
+    motivacao: scores.message_score,
+    preparacao: scores.pain_score,
+    apresentacao: scores.authority_score,
+    conversao: scores.commitment_score,
+    transformacao: scores.transformation_score,
+  }
+}
+
+// Helper: Converter IMPACTData para DiagnosticScores
+const impactToScores = (impact: IMPACTData): DiagnosticScores => {
+  return {
+    intention_score: impact.inspiracao,
+    message_score: impact.motivacao,
+    pain_score: impact.preparacao,
+    authority_score: impact.apresentacao,
+    commitment_score: impact.conversao,
+    transformation_score: impact.transformacao,
+  }
+}
+
 export function AoVivo() {
+  const { profile } = useAuth()
+  const { getDiagnosticByDay, saveDiagnostic, loading: diagnosticLoading } = useDiagnostic()
+
   const [activeNav, setActiveNav] = useState('aovivo')
   const [selectedDay, setSelectedDay] = useState<1 | 2>(1)
   const [showSliders, setShowSliders] = useState(true)
@@ -94,14 +134,14 @@ export function AoVivo() {
 
   const unreadCount = notifications.filter(n => !n.read).length
 
-  // Dados do diagnóstico
+  // Dados do diagnóstico - inicializados vazios, carregados do banco via useEffect
   const [day1Data, setDay1Data] = useState<IMPACTData>({
-    inspiracao: 7,
-    motivacao: 6,
-    preparacao: 5,
-    apresentacao: 4,
-    conversao: 3,
-    transformacao: 6,
+    inspiracao: 0,
+    motivacao: 0,
+    preparacao: 0,
+    apresentacao: 0,
+    conversao: 0,
+    transformacao: 0,
   })
 
   const [day2Data, setDay2Data] = useState<IMPACTData>({
@@ -112,6 +152,20 @@ export function AoVivo() {
     conversao: 0,
     transformacao: 0,
   })
+
+  // Carregar diagnósticos do banco quando disponíveis
+  useEffect(() => {
+    const day1Diagnostic = getDiagnosticByDay(1)
+    const day2Diagnostic = getDiagnosticByDay(2)
+
+    if (day1Diagnostic) {
+      setDay1Data(scoresToIMPACT(day1Diagnostic))
+    }
+
+    if (day2Diagnostic) {
+      setDay2Data(scoresToIMPACT(day2Diagnostic))
+    }
+  }, [diagnosticLoading])
 
   const currentData = selectedDay === 1 ? day1Data : day2Data
   const setCurrentData = selectedDay === 1 ? setDay1Data : setDay2Data
@@ -141,7 +195,7 @@ export function AoVivo() {
 
   // Contexto do usuário para o chat
   const userContext = {
-    name: 'João Silva',
+    name: profile?.name || 'Participante',
     businessType: 'Consultoria B2B',
     gargalo: { etapa: gargaloMap[gargalo[0]].etapa, valor: gargalo[1] },
     diagnostico: currentData,
@@ -166,8 +220,24 @@ export function AoVivo() {
     visible: { y: 0, opacity: 1, transition: { duration: 0.5 } },
   }
 
-  const updateDimension = (key: keyof IMPACTData, value: number) => {
-    setCurrentData(prev => ({ ...prev, [key]: value }))
+  const updateDimension = async (key: keyof IMPACTData, value: number) => {
+    // Atualizar estado local imediatamente (UX responsivo)
+    const updatedData = { ...currentData, [key]: value }
+    setCurrentData(updatedData)
+
+    // Salvar no banco em background
+    try {
+      const scores = impactToScores(updatedData)
+      const { error } = await saveDiagnostic(selectedDay, scores)
+
+      if (error) {
+        console.error('Erro ao salvar diagnóstico:', error)
+      } else {
+        console.log(`✅ Diagnóstico Dia ${selectedDay} salvo`)
+      }
+    } catch (err) {
+      console.error('Erro ao salvar diagnóstico:', err)
+    }
   }
 
   // Get current day from module
@@ -212,7 +282,7 @@ export function AoVivo() {
   const canGoNext = viewingIndex < dayModules.length - 1
 
   // Calculate total XP from confirmed modules
-  const totalXP = confirmedModules.length * 15
+  const totalXP = confirmedModules.length * XP_CONFIG.EVENT.MODULE_CHECKIN
 
   return (
     <PageWrapper
@@ -536,7 +606,7 @@ export function AoVivo() {
                       }}
                     >
                       <Zap size={16} />
-                      ESTOU ASSISTINDO +15 XP
+                      ESTOU ASSISTINDO +{XP_CONFIG.EVENT.MODULE_CHECKIN} XP
                     </motion.button>
                   ) : (
                     <div

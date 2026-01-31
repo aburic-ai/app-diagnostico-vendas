@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Star, X, Zap, Send, Check } from 'lucide-react'
 import { theme } from '../../styles/theme'
+import { XP_CONFIG } from '../../config/xp-system'
 
 type NPSType = 'day1' | 'final'
 
@@ -32,12 +33,12 @@ const npsConfig: Record<NPSType, { title: string; question: string; xp: number }
   day1: {
     title: 'NPS - DIA 1',
     question: 'De 0 a 10, o quanto você recomendaria o primeiro dia da Imersão para um amigo?',
-    xp: 25,
+    xp: XP_CONFIG.EVENT.NPS_DAY1,
   },
   final: {
     title: 'NPS - EVENTO COMPLETO',
     question: 'De 0 a 10, o quanto você recomendaria a Imersão Diagnóstico de Vendas para um amigo?',
-    xp: 50,
+    xp: XP_CONFIG.EVENT.NPS_FINAL,
   },
 }
 

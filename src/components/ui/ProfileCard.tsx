@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Camera, Zap, Briefcase, Mail, Trophy, Target, Brain, Flame, Award, LogOut } from 'lucide-react'
 import { theme } from '../../styles/theme'
+import { XP_CONFIG, getLevelName, getXPForNextLevel } from '../../config/xp-system'
 
 interface Badge {
   id: string
@@ -29,8 +30,8 @@ interface ProfileCardProps {
   photoUrl?: string
   /** XP atual */
   currentXp: number
-  /** XP total possível */
-  totalXp: number
+  /** XP total possível (default: 1000) */
+  totalXp?: number
   /** Badges conquistados */
   badges?: Badge[]
   /** Gargalo identificado */
@@ -71,7 +72,7 @@ export function ProfileCard({
   businessType,
   photoUrl,
   currentXp,
-  totalXp,
+  totalXp = XP_CONFIG.MAX_XP,
   badges = defaultBadges,
   gargalo,
   onPhotoUpload,
@@ -81,6 +82,8 @@ export function ProfileCard({
   const initials = getInitials(name)
   const bgColor = getColorFromName(name)
   const progressPercent = Math.round((currentXp / totalXp) * 100)
+  const levelName = getLevelName(currentXp)
+  const xpForNext = getXPForNextLevel(currentXp)
 
   return (
     <div
@@ -301,6 +304,33 @@ export function ProfileCard({
         >
           <span>{currentXp} XP</span>
           <span>{totalXp} XP</span>
+        </div>
+
+        {/* Nível */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: '12px',
+            fontSize: '12px',
+          }}
+        >
+          <span
+            style={{
+              color: theme.colors.gold.DEFAULT,
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            {levelName}
+          </span>
+          {xpForNext > 0 && (
+            <span style={{ color: theme.colors.text.muted, fontSize: '10px' }}>
+              Faltam {xpForNext} XP para próximo nível
+            </span>
+          )}
         </div>
       </div>
 

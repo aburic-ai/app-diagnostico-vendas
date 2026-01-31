@@ -4,7 +4,7 @@
  * Exibida após login, antes do evento começar.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Rocket,
@@ -35,6 +35,8 @@ import {
 import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } from '../components/ui'
 import type { Notification } from '../components/ui'
 import { theme } from '../styles/theme'
+import { useAuth } from '../hooks/useAuth'
+import { XP_CONFIG, STEP_IDS } from '../config/xp-system'
 
 interface JourneyStep {
   id: string
@@ -99,6 +101,7 @@ const LESSONS: LessonData[] = [
 ]
 
 export function PreEvento() {
+  const { profile: userProfile } = useAuth()
   const [activeNav, setActiveNav] = useState('preparacao')
   const [showSchedule, setShowSchedule] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -106,15 +109,26 @@ export function PreEvento() {
   const [selectedLesson, setSelectedLesson] = useState<LessonData | null>(null)
   const [lessons, setLessons] = useState<LessonData[]>(LESSONS)
 
-  // Profile state
+  // Profile state - inicializar com dados do Supabase
   const [profile, setProfile] = useState<ProfileData>({
-    name: 'João Silva',
-    email: 'joao.silva@email.com',
+    name: userProfile?.name || '',
+    email: userProfile?.email || '',
     phone: '',
     company: '',
     role: '',
     photoUrl: null,
   })
+
+  // Atualizar profile quando userProfile carregar do Supabase
+  useEffect(() => {
+    if (userProfile) {
+      setProfile(prev => ({
+        ...prev,
+        name: userProfile.name || '',
+        email: userProfile.email || '',
+      }))
+    }
+  }, [userProfile])
 
   // Calculate profile completion
   const profileFields = [profile.name, profile.email, profile.phone, profile.company, profile.role, profile.photoUrl]
@@ -154,56 +168,48 @@ export function PreEvento() {
   // Steps depend on profile completion
   const getSteps = (): JourneyStep[] => [
     {
-      id: 'imersao',
-      title: 'Imersão Diagnóstico de Vendas',
-      subtitle: 'Dois dias de um profundo diagnóstico no evento ao vivo sem gravação',
-      icon: <Radio size={28} />,
-      status: 'completed',
-      xp: 50,
-    },
-    {
-      id: 'protocolo',
+      id: STEP_IDS.PROTOCOL_SURVEY,
       title: 'Protocolo de Iniciação',
       subtitle: 'Calibre seus dados para o seu sistema ser personalizado para o seu negócio',
       icon: <Network size={28} />,
-      status: 'completed', // Protocolo agora é só concluído ou não, sem %
-      xp: 100,
+      status: 'completed',
+      xp: XP_CONFIG.PRE_EVENT.PROTOCOL_SURVEY,
     },
     {
-      id: 'perfil',
+      id: STEP_IDS.COMPLETE_PROFILE,
       title: 'Complete seu Perfil',
       subtitle: 'Adicione sua foto e informações para personalizar sua experiência',
       icon: <User size={28} />,
       status: isProfileComplete ? 'completed' : 'current',
       progress: isProfileComplete ? undefined : profileProgress,
-      xp: 75,
+      xp: XP_CONFIG.PRE_EVENT.COMPLETE_PROFILE,
     },
     {
-      id: 'dossie',
-      title: 'Dossiê do Negócio',
-      subtitle: 'Análise completa do seu processo de vendas',
-      icon: <FileText size={28} />,
-      status: 'purchase',
-      isPurchase: true,
-      xp: 75,
-    },
-    {
-      id: 'aulas',
-      title: 'Aulas Editadas',
-      subtitle: 'Chance de revisar o conteúdo do evento durante 1 ano',
-      icon: <Video size={28} />,
-      status: 'purchase',
-      isPurchase: true,
-      xp: 50,
-    },
-    {
-      id: 'bonus',
+      id: STEP_IDS.WATCH_BONUS_LESSONS,
       title: 'Assistir Aulas Bônus',
       subtitle: 'Clique abaixo para assistir as aulas bônus e chegar preparado para o evento',
       icon: <Play size={28} />,
       status: 'current',
       progress: 0,
-      xp: 50,
+      xp: XP_CONFIG.PRE_EVENT.WATCH_BONUS_LESSONS,
+    },
+    {
+      id: STEP_IDS.PURCHASE_PDF_DIAGNOSIS,
+      title: 'Dossiê do Negócio (PDF)',
+      subtitle: 'Análise completa do seu processo de vendas',
+      icon: <FileText size={28} />,
+      status: 'purchase',
+      isPurchase: true,
+      xp: XP_CONFIG.PRE_EVENT.PURCHASE_PDF_DIAGNOSIS,
+    },
+    {
+      id: STEP_IDS.PURCHASE_EDITED_LESSONS,
+      title: 'Aulas Editadas',
+      subtitle: 'Chance de revisar o conteúdo do evento durante 1 ano',
+      icon: <Video size={28} />,
+      status: 'purchase',
+      isPurchase: true,
+      xp: XP_CONFIG.PRE_EVENT.PURCHASE_EDITED_LESSONS,
     },
   ]
 
@@ -306,8 +312,8 @@ export function PreEvento() {
     <PageWrapper
       backgroundColor={theme.colors.background.dark}
       showAnimatedBackground={true}
-      showOverlay={false}
-    >
+        showOverlay={false}
+      >
       {/* Scrollable Content */}
       <div
         style={{
@@ -606,7 +612,7 @@ export function PreEvento() {
                     marginLeft: '4px',
                   }}
                 >
-                  / 200 XP
+                  / {XP_CONFIG.PRE_EVENT.TOTAL} XP
                 </span>
               </div>
 
@@ -624,7 +630,7 @@ export function PreEvento() {
                 >
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${(totalXP / 200) * 100}%` }}
+                    animate={{ width: `${(totalXP / XP_CONFIG.PRE_EVENT.TOTAL) * 100}%` }}
                     transition={{ duration: 0.8, ease: 'easeOut' }}
                     style={{
                       height: '100%',
@@ -645,7 +651,7 @@ export function PreEvento() {
                     textAlign: 'center',
                   }}
                 >
-                  NÍVEL DE PRONTIDÃO DO SEU SISTEMA: {Math.round((totalXP / 200) * 100)}%
+                  NÍVEL DE PRONTIDÃO DO SEU SISTEMA: {Math.round((totalXP / XP_CONFIG.PRE_EVENT.TOTAL) * 100)}%
                 </span>
               </div>
             </div>
