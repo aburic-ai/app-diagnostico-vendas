@@ -214,9 +214,12 @@ export function ThankYou() {
   const currentQ = visibleQuestions[currentQuestion]
   const isLastQuestion = currentQuestion === visibleQuestions.length - 1
 
-  const nextQuestion = () => {
+  const nextQuestion = async () => {
     if (isLastQuestion) {
-      // Gerar mensagem WhatsApp personalizada em background
+      // Última questão respondida → ir para tela de senha
+      console.log('[ThankYou] Survey completo, indo para criação de senha...')
+
+      // Gerar mensagem WhatsApp em background (será usada depois)
       generateWhatsAppMessage(surveyData).then(async (result) => {
         console.log('[ThankYou] Mensagem WhatsApp gerada:', result)
 
@@ -235,7 +238,8 @@ export function ThankYou() {
           console.error('[ThankYou] Erro ao salvar mensagem WhatsApp:', error)
         }
       })
-      setStep('whatsapp')
+
+      setStep('password')
     } else {
       setCurrentQuestion((prev) => prev + 1)
     }
@@ -271,41 +275,39 @@ export function ThankYou() {
     setIsSubmitting(true)
 
     try {
-      // Salvar respostas da pesquisa
+      // 1. Salvar survey
+      console.log('[ThankYou] Salvando survey...')
       const { error: surveyError } = await supabase.from('survey_responses').insert({
         transaction_id: identifier,
         email: email || null,
         survey_data: surveyData,
       })
 
-      if (surveyError) throw surveyError
+      if (surveyError) {
+        console.error('[ThankYou] ERRO ao salvar survey:', surveyError)
+        throw surveyError
+      }
+      console.log('[ThankYou] ✅ Survey salvo!')
 
-      // Criar conta ou atualizar senha do usuário existente
+      // 2. Criar conta
+      console.log('[ThankYou] Criando conta...')
       if (!userFound) {
-        // Criar nova conta
         const { error: signUpError } = await supabase.auth.signUp({
           email: email || '',
           password,
         })
 
         if (signUpError) throw signUpError
-      }
-
-      console.log('[ThankYou] Survey salvo e conta criada/atualizada com sucesso')
-
-      if (userFound) {
-        // Success - redirect to app
-        setStep('success')
-        setTimeout(() => {
-          navigate('/pre-evento')
-        }, 2000)
+        console.log('[ThankYou] ✅ Conta criada!')
       } else {
-        // Show error state with WhatsApp support
-        setStep('error')
+        console.log('[ThankYou] ✅ Usuário já existe')
       }
+
+      // 3. Ir para WhatsApp (obrigatório: entrar e voltar para acessar sistema)
+      setStep('whatsapp')
     } catch (error) {
-      console.error('Error saving data:', error)
-      setStep('error')
+      console.error('[ThankYou] Erro ao salvar dados:', error)
+      setPasswordError('Erro ao criar conta. Tente novamente.')
     } finally {
       setIsSubmitting(false)
     }
@@ -544,26 +546,6 @@ export function ThankYou() {
                 </div>
               </div>
 
-              {/* Greeting - Shows buyer name or fallback */}
-              <div
-                style={{
-                  textAlign: 'center',
-                  marginTop: '16px',
-                  marginBottom: '8px',
-                }}
-              >
-                <h3
-                  style={{
-                    fontSize: '24px',
-                    fontWeight: theme.typography.fontWeight.bold,
-                    color: theme.colors.text.primary,
-                    margin: 0,
-                  }}
-                >
-                  {buyerName ? `Olá ${formatFirstName(buyerName)}!` : 'Olá!'}
-                </h3>
-              </div>
-
               {/* Content Card */}
               <Card variant="default">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -575,7 +557,15 @@ export function ThankYou() {
                       margin: 0,
                     }}
                   >
-                    Seu lugar na Imersão está garantido. Agora, precisamos ativar a sua principal ferramenta de trabalho.
+                    {buyerName ? (
+                      <>
+                        <strong>Olá {formatFirstName(buyerName)}!</strong> Seu lugar na Imersão está garantido. Agora, precisamos ativar a sua principal ferramenta de trabalho.
+                      </>
+                    ) : (
+                      <>
+                        <strong>Olá!</strong> Seu lugar na Imersão está garantido. Agora, precisamos ativar a sua principal ferramenta de trabalho.
+                      </>
+                    )}
                   </p>
 
                   <p
@@ -712,18 +702,6 @@ export function ThankYou() {
                           <CheckCircle size={40} color={theme.colors.accent.cyan.DEFAULT} />
                         </motion.div>
                         <div style={{ textAlign: 'center' }}>
-                          {buyerName && (
-                            <p
-                              style={{
-                                fontSize: '18px',
-                                color: theme.colors.text.primary,
-                                marginBottom: '12px',
-                                fontWeight: 500,
-                              }}
-                            >
-                              Olá {formatFirstName(buyerName)}!
-                            </p>
-                          )}
                           <p
                             style={{
                               fontFamily: theme.typography.fontFamily.orbitron,
@@ -1211,9 +1189,10 @@ export function ThankYou() {
                         fontSize: '12px',
                         color: theme.colors.text.secondary,
                         lineHeight: 1.5,
+                        marginBottom: '12px',
                       }}
                     >
-                      Este é o grupo silencioso onde serão enviados os materiais e avisos importantes para você não perder nenhuma informação.
+                      <strong>Entre no grupo</strong> e volte a essa página para acessar o sistema. Este é o grupo onde serão enviados os materiais e avisos importantes.
                     </p>
                   </div>
                 </div>
@@ -1244,8 +1223,8 @@ export function ThankYou() {
                 </motion.a>
               </Card>
 
-              <Button onClick={() => setStep('password')}>
-                PRÓXIMO PASSO
+              <Button onClick={() => { setStep('success'); setTimeout(() => window.location.href = '/pre-evento', 2000) }}>
+                JÁ ENTREI, ACESSAR SISTEMA
                 <ChevronRight size={18} />
               </Button>
             </motion.div>
@@ -1287,7 +1266,7 @@ export function ThankYou() {
                       letterSpacing: '0.1em',
                     }}
                   >
-                    PASSO 2 DE 2
+                    ÚLTIMA ETAPA
                   </span>
                   <span
                     style={{
@@ -1330,7 +1309,7 @@ export function ThankYou() {
                   }}
                 >
                   <span style={{ fontSize: '9px', color: theme.colors.accent.cyan.DEFAULT }}>
-                    WhatsApp ✓
+                    Pesquisa ✓
                   </span>
                   <span style={{ fontSize: '9px', color: theme.colors.accent.purple.light }}>
                     Criar Senha
@@ -1364,7 +1343,7 @@ export function ThankYou() {
                     marginBottom: '8px',
                   }}
                 >
-                  Crie sua senha
+                  Pesquisa Completa! Última etapa: crie sua senha
                 </h2>
                 <p
                   style={{
@@ -1373,7 +1352,7 @@ export function ThankYou() {
                     lineHeight: 1.5,
                   }}
                 >
-                  Essa senha será usada para acessar seu cockpit durante e após o evento.
+                  Você está a um passo de ativar seu acesso ao cockpit. Crie uma senha segura para entrar durante e após o evento.
                 </p>
               </div>
 
