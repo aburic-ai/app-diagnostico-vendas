@@ -1,0 +1,81 @@
+{
+  "purchase_complete_pdf": {
+    "event": "PURCHASE_COMPLETE",
+    "data": {
+      "transaction": "HP-TEST-PDF-001",
+      "product": {
+        "id": 123456,
+        "name": "Diagnóstico de Vendas - PDF Completo"
+      },
+      "buyer": {
+        "email": "teste.pdf@exemplo.com",
+        "name": "João Silva"
+      },
+      "purchase": {
+        "price": {
+          "value": 97.00,
+          "currency_code": "BRL"
+        },
+        "approved_date": 1706745600000
+      }
+    }
+  },
+
+  "purchase_complete_aulas": {
+    "event": "PURCHASE_COMPLETE",
+    "data": {
+      "transaction": "HP-TEST-AULAS-002",
+      "product": {
+        "id": 234567,
+        "name": "Aulas Editadas - Diagnóstico de Vendas"
+      },
+      "buyer": {
+        "email": "teste.aulas@exemplo.com",
+        "name": "Maria Santos"
+      },
+      "purchase": {
+        "price": {
+          "value": 197.00,
+          "currency_code": "BRL"
+        },
+        "approved_date": 1706746000000
+      }
+    }
+  },
+
+  "purchase_complete_impact": {
+    "event": "PURCHASE_COMPLETE",
+    "data": {
+      "transaction": "HP-TEST-IMPACT-003",
+      "product": {
+        "id": 345678,
+        "name": "Imersão Presencial IMPACT"
+      },
+      "buyer": {
+        "email": "teste.impact@exemplo.com",
+        "name": "Carlos Oliveira"
+      },
+      "purchase": {
+        "price": {
+          "value": 3997.00,
+          "currency_code": "BRL"
+        },
+        "approved_date": 1706746400000
+      }
+    }
+  },
+
+  "purchase_refunded": {
+    "event": "PURCHASE_REFUNDED",
+    "data": {
+      "transaction": "HP-TEST-PDF-001"
+    }
+  },
+
+  "purchase_canceled": {
+    "event": "PURCHASE_CANCELED",
+    "data": {
+      "transaction": "HP-TEST-AULAS-002"
+    }
+  }
+}

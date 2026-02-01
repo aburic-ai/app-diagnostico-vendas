@@ -44,6 +44,8 @@ import { EVENT_MODULES, TOTAL_MODULES, getCurrentDay } from '../data/modules'
 import { NotificationToast } from '../components/ui'
 import type { Notification, NotificationType } from '../components/ui'
 import { theme } from '../styles/theme'
+import { supabase } from '../lib/supabase'
+import type { Profile } from '../lib/supabase'
 
 // Estado do evento
 type EventStatus = 'offline' | 'live' | 'paused' | 'activity' | 'lunch'
@@ -207,6 +209,7 @@ export function Admin() {
   // Participants modal
   const [showParticipants, setShowParticipants] = useState(false)
   const [participants, setParticipants] = useState<OnlineParticipant[]>([])
+  const [loadingParticipants, setLoadingParticipants] = useState(true)
   const [participantSearch, setParticipantSearch] = useState('')
   const [moduleDropdownOpen, setModuleDropdownOpen] = useState(false)
 
@@ -231,33 +234,51 @@ export function Admin() {
     }
   }, [eventState.status, eventState.lunchReturnTime])
 
-  // Simulated online count
-  useEffect(() => {
-    if (eventState.status === 'live') {
-      // Generate initial participants
-      setParticipants(generateMockParticipants(eventState.participantsOnline || 50))
+  // (Mock simulation removed - using real Supabase data now)
 
-      const interval = setInterval(() => {
-        setEventState(prev => {
-          const newCount = Math.min(700, prev.participantsOnline + Math.floor(Math.random() * 10))
-          return {
-            ...prev,
-            participantsOnline: newCount,
-          }
-        })
-      }, 2000)
-      return () => clearInterval(interval)
-    } else {
-      setParticipants([])
-    }
-  }, [eventState.status])
-
-  // Update participants list when count changes
+  // Fetch real participants from Supabase
   useEffect(() => {
-    if (eventState.status === 'live' && eventState.participantsOnline > 0) {
-      setParticipants(generateMockParticipants(eventState.participantsOnline))
+    const fetchParticipants = async () => {
+      try {
+        setLoadingParticipants(true)
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('xp', { ascending: false }) // Sort by XP (highest first)
+
+        if (error) throw error
+
+        // Map Profile to OnlineParticipant
+        const mappedParticipants: OnlineParticipant[] = (data || []).map((profile: Profile) => ({
+          id: profile.id,
+          name: profile.name || 'Participante',
+          email: profile.email,
+          xp: profile.xp,
+          currentModule: 0, // TODO: Track current module per user
+          lastActivity: new Date(profile.updated_at),
+          status: 'active' as const, // TODO: Track real activity status
+        }))
+
+        setParticipants(mappedParticipants)
+        setEventState(prev => ({ ...prev, participantsOnline: mappedParticipants.length }))
+
+        console.log(`📊 ${mappedParticipants.length} participantes carregados do Supabase`)
+      } catch (error) {
+        console.error('❌ Erro ao carregar participantes:', error)
+        // Fallback to mock data if error
+        setParticipants(generateMockParticipants(50))
+      } finally {
+        setLoadingParticipants(false)
+      }
     }
-  }, [eventState.participantsOnline, eventState.status])
+
+    fetchParticipants()
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchParticipants, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Filter participants by search and sort by XP (highest first)
   const filteredParticipants = participants

@@ -79,6 +79,20 @@ const strengthLabels = {
   strong: 'Forte',
 }
 
+/**
+ * Formatar nome: pegar apenas primeiro nome + Title Case
+ * Ex: "ANDRE AFFONSO BURIC" → "Andre"
+ */
+const formatFirstName = (fullName: string): string => {
+  if (!fullName) return ''
+
+  // Pegar apenas o primeiro nome
+  const firstName = fullName.trim().split(' ')[0]
+
+  // Converter para Title Case (primeira letra maiúscula, resto minúsculo)
+  return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+}
+
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -102,6 +116,7 @@ export function ThankYou() {
   const [passwordError, setPasswordError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [userFound, setUserFound] = useState(false)
+  const [buyerName, setBuyerName] = useState<string>('')  // Nome do comprador
 
   // Get transaction from URL on mount
   useEffect(() => {
@@ -129,22 +144,27 @@ export function ThankYou() {
 
       console.log(`Polling for user with identifier: ${searchIdentifier}, attempt ${attempts}`)
 
-      // Buscar usuário no Supabase (por email ou transaction_id em purchases)
+      // Buscar compra no Supabase (por transaction_id ou email)
       const { data: purchaseData } = await supabase
         .from('purchases')
-        .select('user_id')
-        .or(`transaction_id.eq.${searchIdentifier},user_id.in.(select id from profiles where email=${searchIdentifier})`)
+        .select('user_id, buyer_name')
+        .eq('transaction_id', searchIdentifier)
         .limit(1)
+        .single()
 
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, name')
         .eq('email', searchIdentifier)
         .limit(1)
+        .single()
 
-      const userExists = (purchaseData && purchaseData.length > 0) || (profileData && profileData.length > 0)
+      const userExists = purchaseData || profileData
 
       if (userExists) {
+        // Pegar nome do comprador (prioridade: purchase.buyer_name > profile.name)
+        const name = purchaseData?.buyer_name || profileData?.name || ''
+        setBuyerName(name)
         setUserFound(true)
         setVerificationStatus('found')
         return
@@ -524,6 +544,26 @@ export function ThankYou() {
                 </div>
               </div>
 
+              {/* Greeting - Shows buyer name or fallback */}
+              <div
+                style={{
+                  textAlign: 'center',
+                  marginTop: '16px',
+                  marginBottom: '8px',
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: '24px',
+                    fontWeight: theme.typography.fontWeight.bold,
+                    color: theme.colors.text.primary,
+                    margin: 0,
+                  }}
+                >
+                  {buyerName ? `Olá ${formatFirstName(buyerName)}!` : 'Olá!'}
+                </h3>
+              </div>
+
               {/* Content Card */}
               <Card variant="default">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -672,6 +712,18 @@ export function ThankYou() {
                           <CheckCircle size={40} color={theme.colors.accent.cyan.DEFAULT} />
                         </motion.div>
                         <div style={{ textAlign: 'center' }}>
+                          {buyerName && (
+                            <p
+                              style={{
+                                fontSize: '18px',
+                                color: theme.colors.text.primary,
+                                marginBottom: '12px',
+                                fontWeight: 500,
+                              }}
+                            >
+                              Olá {formatFirstName(buyerName)}!
+                            </p>
+                          )}
                           <p
                             style={{
                               fontFamily: theme.typography.fontFamily.orbitron,

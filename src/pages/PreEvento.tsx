@@ -36,7 +36,9 @@ import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } f
 import type { Notification } from '../components/ui'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
+import { useUserProgress } from '../hooks/useUserProgress'
 import { XP_CONFIG, STEP_IDS } from '../config/xp-system'
+import { supabase } from '../lib/supabase'
 
 interface JourneyStep {
   id: string
@@ -101,13 +103,16 @@ const LESSONS: LessonData[] = [
 ]
 
 export function PreEvento() {
-  const { profile: userProfile } = useAuth()
+  const { user, profile: userProfile, refreshProfile } = useAuth()
+  const { xp, completedSteps, completeStep, isStepCompleted } = useUserProgress()
   const [activeNav, setActiveNav] = useState('preparacao')
   const [showSchedule, setShowSchedule] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [selectedLesson, setSelectedLesson] = useState<LessonData | null>(null)
   const [lessons, setLessons] = useState<LessonData[]>(LESSONS)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [profileSaved, setProfileSaved] = useState(false)
 
   // Profile state - inicializar com dados do Supabase
   const [profile, setProfile] = useState<ProfileData>({
@@ -122,17 +127,37 @@ export function PreEvento() {
   // Atualizar profile quando userProfile carregar do Supabase
   useEffect(() => {
     if (userProfile) {
+      console.log('📥 Carregando dados do perfil do Supabase:', {
+        name: userProfile.name,
+        email: userProfile.email,
+        phone: userProfile.phone,
+        company: userProfile.company,
+        role: userProfile.role,
+        photo_url: userProfile.photo_url,
+      })
+
       setProfile(prev => ({
         ...prev,
         name: userProfile.name || '',
         email: userProfile.email || '',
+        phone: userProfile.phone || '',
+        company: userProfile.company || '',
+        role: userProfile.role || '',
+        photoUrl: userProfile.photo_url || null,
       }))
     }
   }, [userProfile])
 
-  // Calculate profile completion
-  const profileFields = [profile.name, profile.email, profile.phone, profile.company, profile.role, profile.photoUrl]
-  const completedFields = profileFields.filter(f => f && f.trim() !== '').length
+  // Calculate profile completion from Supabase profile
+  const profileFields = [
+    userProfile?.name,
+    userProfile?.email,
+    userProfile?.phone,
+    userProfile?.company,
+    userProfile?.role,
+    userProfile?.photo_url,
+  ]
+  const completedFields = profileFields.filter(f => f && String(f).trim() !== '').length
   const profileProgress = Math.round((completedFields / profileFields.length) * 100)
   const isProfileComplete = profileProgress === 100
 
@@ -172,8 +197,9 @@ export function PreEvento() {
       title: 'Protocolo de Iniciação',
       subtitle: 'Calibre seus dados para o seu sistema ser personalizado para o seu negócio',
       icon: <Network size={28} />,
-      status: 'completed',
+      status: isStepCompleted(STEP_IDS.PROTOCOL_SURVEY) ? 'completed' : 'current',
       xp: XP_CONFIG.PRE_EVENT.PROTOCOL_SURVEY,
+      tooltip: isStepCompleted(STEP_IDS.PROTOCOL_SURVEY) ? 'Protocolo já concluído ✓' : 'Complete o protocolo de calibragem',
     },
     {
       id: STEP_IDS.COMPLETE_PROFILE,
@@ -183,6 +209,7 @@ export function PreEvento() {
       status: isProfileComplete ? 'completed' : 'current',
       progress: isProfileComplete ? undefined : profileProgress,
       xp: XP_CONFIG.PRE_EVENT.COMPLETE_PROFILE,
+      tooltip: isProfileComplete ? 'Perfil completo ✓' : 'Clique para preencher seu perfil',
     },
     {
       id: STEP_IDS.WATCH_BONUS_LESSONS,
@@ -192,6 +219,7 @@ export function PreEvento() {
       status: 'current',
       progress: 0,
       xp: XP_CONFIG.PRE_EVENT.WATCH_BONUS_LESSONS,
+      tooltip: 'Clique para ir às aulas preparatórias ↓',
     },
     {
       id: STEP_IDS.PURCHASE_PDF_DIAGNOSIS,
@@ -201,6 +229,7 @@ export function PreEvento() {
       status: 'purchase',
       isPurchase: true,
       xp: XP_CONFIG.PRE_EVENT.PURCHASE_PDF_DIAGNOSIS,
+      tooltip: 'Clique para ver oferta especial do PDF',
     },
     {
       id: STEP_IDS.PURCHASE_EDITED_LESSONS,
@@ -210,51 +239,203 @@ export function PreEvento() {
       status: 'purchase',
       isPurchase: true,
       xp: XP_CONFIG.PRE_EVENT.PURCHASE_EDITED_LESSONS,
+      tooltip: 'Clique para ver oferta de Aulas Editadas',
     },
   ]
 
   const [steps, setSteps] = useState<JourneyStep[]>(getSteps())
+
+  // Update steps when profile or completed steps changes
+  useEffect(() => {
+    setSteps(getSteps())
+  }, [userProfile, completedSteps])
 
   // Update steps when profile changes
   const updateStepsWithProfile = () => {
     setSteps(getSteps())
   }
 
-  const totalXP = steps
-    .filter(s => s.status === 'completed')
-    .reduce((acc, s) => acc + (s.xp || 0), 0)
+  // Use XP from Supabase instead of local calculation
+  const totalXP = xp
 
-  const handleComplete = (stepId: string) => {
-    setSteps(prev => {
-      const stepIndex = prev.findIndex(s => s.id === stepId)
-      const newSteps = [...prev]
-      newSteps[stepIndex] = { ...newSteps[stepIndex], status: 'completed', progress: 100 }
-      return newSteps
-    })
+  const handleComplete = async (stepId: string) => {
+    // Find step to get XP value
+    const step = steps.find(s => s.id === stepId)
+    if (!step) return
+
+    // Save to Supabase
+    await completeStep(stepId, step.xp || 0)
+
+    // Update local state will happen automatically via useEffect
   }
 
   const handleStepClick = (stepId: string, status: JourneyStep['status']) => {
-    if (stepId === 'perfil') {
+    if (stepId === STEP_IDS.COMPLETE_PROFILE) {
       setShowProfileModal(true)
+    } else if (stepId === STEP_IDS.WATCH_BONUS_LESSONS) {
+      // Scroll suave para seção de aulas
+      const lessonsSection = document.getElementById('aulas-bonus-section')
+      if (lessonsSection) {
+        lessonsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
     } else if (status === 'current') {
       handleComplete(stepId)
     }
   }
 
-  // Handle photo upload simulation
-  const handlePhotoUpload = () => {
-    // Simula upload de foto
-    setProfile(prev => ({
-      ...prev,
-      photoUrl: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(prev.name) + '&background=22d3ee&color=050505&size=200',
-    }))
-    setTimeout(updateStepsWithProfile, 100)
+  // Upload de foto para Supabase Storage
+  const handlePhotoUpload = async () => {
+    if (!user) return
+
+    // Criar input de arquivo
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      console.log('📸 Starting photo upload...', {
+        fileName: file.name,
+        fileSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+        fileType: file.type,
+        userId: user.id,
+      })
+
+      try {
+        // Validar tamanho (máx 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+          console.log('❌ File too large:', file.size)
+          alert('Foto muito grande! Máximo 2MB.')
+          return
+        }
+
+        // Validar tipo
+        if (!file.type.startsWith('image/')) {
+          console.log('❌ Invalid file type:', file.type)
+          alert('Arquivo inválido! Use apenas imagens.')
+          return
+        }
+
+        // Upload para Supabase Storage
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`
+        const filePath = `avatars/${fileName}`
+
+        console.log('📤 Uploading to Supabase Storage...', {
+          bucket: 'profiles',
+          path: filePath,
+        })
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('profiles')
+          .upload(filePath, file, { upsert: true })
+
+        if (uploadError) {
+          console.error('❌ Upload error:', {
+            message: uploadError.message,
+            statusCode: uploadError.statusCode,
+            error: uploadError,
+          })
+          throw uploadError
+        }
+
+        console.log('✅ Upload successful:', uploadData)
+
+        // Pegar URL pública
+        const { data: { publicUrl } } = supabase.storage
+          .from('profiles')
+          .getPublicUrl(filePath)
+
+        console.log('🔗 Public URL:', publicUrl)
+
+        // Atualizar state local
+        setProfile(prev => ({ ...prev, photoUrl: publicUrl }))
+        setTimeout(updateStepsWithProfile, 100)
+
+        console.log('✅ Photo upload complete!')
+
+      } catch (error: any) {
+        console.error('❌ Error uploading photo:', error)
+
+        // Mostrar erro específico para debug
+        const errorMessage = error?.message || error?.error_description || JSON.stringify(error)
+        alert(`Erro ao fazer upload da foto:\n\n${errorMessage}\n\nVerifique as políticas do Storage no Supabase.`)
+      }
+    }
+
+    // Abrir seletor de arquivo
+    input.click()
   }
 
   // Handle profile field change
   const handleProfileChange = (field: keyof ProfileData, value: string) => {
     setProfile(prev => ({ ...prev, [field]: value }))
     setTimeout(updateStepsWithProfile, 100)
+  }
+
+  // Save profile to Supabase
+  const handleSaveProfile = async () => {
+    if (!user) {
+      console.error('❌ No user found')
+      return
+    }
+
+    console.log('💾 Salvando perfil...', {
+      user_id: user.id,
+      data: {
+        name: profile.name,
+        phone: profile.phone,
+        company: profile.company,
+        role: profile.role,
+        photo_url: profile.photoUrl,
+      }
+    })
+
+    setIsSavingProfile(true)
+    setProfileSaved(false)
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: profile.name || null,
+          phone: profile.phone || null,
+          company: profile.company || null,
+          role: profile.role || null,
+          photo_url: profile.photoUrl || null,
+        })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      console.log('✅ Profile saved to database successfully!')
+
+      // Refresh profile from database
+      await refreshProfile()
+      console.log('🔄 Profile refreshed from database')
+
+      // Mostrar feedback de sucesso
+      setProfileSaved(true)
+
+      // Se perfil está completo, marcar step como concluído
+      if (isProfileComplete) {
+        console.log('🎯 Perfil completo! Marcando step como concluído...')
+        await completeStep(STEP_IDS.COMPLETE_PROFILE, XP_CONFIG.PRE_EVENT.COMPLETE_PROFILE)
+      }
+
+      // Fechar modal após 1 segundo
+      setTimeout(() => {
+        setShowProfileModal(false)
+        setProfileSaved(false)
+      }, 1500)
+    } catch (error) {
+      console.error('❌ Error saving profile:', error)
+      alert('Erro ao salvar perfil. Tente novamente.')
+    } finally {
+      setIsSavingProfile(false)
+    }
   }
 
   // Mark lesson as watched
@@ -918,7 +1099,7 @@ export function PreEvento() {
           </motion.div>
 
           {/* ==================== MÓDULOS PREPARATÓRIOS ==================== */}
-          <motion.div variants={itemVariants} style={{ marginTop: '24px' }}>
+          <motion.div variants={itemVariants} id="aulas-bonus-section" style={{ marginTop: '24px', scrollMarginTop: '80px' }}>
             {/* Section Title */}
             <h3
               style={{
@@ -1103,7 +1284,7 @@ export function PreEvento() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                     <Zap size={12} color={theme.colors.gold.DEFAULT} />
                     <span style={{ fontSize: '10px', color: theme.colors.gold.DEFAULT, fontWeight: 'bold' }}>
-                      +75 XP ao completar
+                      +{XP_CONFIG.PRE_EVENT.COMPLETE_PROFILE} XP ao completar
                     </span>
                   </div>
                 </div>
@@ -1208,11 +1389,8 @@ export function PreEvento() {
                   </div>
                 </motion.button>
               </div>
-              <p style={{ fontSize: '11px', color: theme.colors.text.muted, textAlign: 'center', marginBottom: '4px' }}>
+              <p style={{ fontSize: '11px', color: theme.colors.text.muted, textAlign: 'center', marginBottom: '20px' }}>
                 {profile.photoUrl ? 'Clique para alterar a foto' : 'Clique para adicionar uma foto'}
-              </p>
-              <p style={{ fontSize: '9px', color: theme.colors.text.muted, textAlign: 'center', marginBottom: '20px', fontStyle: 'italic' }}>
-                Não aparecerá para outros participantes
               </p>
 
               {/* Form Fields */}
@@ -1367,31 +1545,55 @@ export function PreEvento() {
               }}
             >
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowProfileModal(false)}
+                whileHover={{ scale: isSavingProfile ? 1 : 1.02 }}
+                whileTap={{ scale: isSavingProfile ? 1 : 0.98 }}
+                onClick={handleSaveProfile}
+                disabled={isSavingProfile}
                 style={{
                   width: '100%',
                   padding: '14px',
-                  background: isProfileComplete
+                  background: profileSaved
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(5, 150, 105, 0.2) 100%)'
+                    : isProfileComplete
                     ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.3) 0%, rgba(6, 182, 212, 0.2) 100%)'
                     : 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
-                  border: `1px solid ${isProfileComplete ? 'rgba(34, 211, 238, 0.5)' : 'rgba(168, 85, 247, 0.5)'}`,
+                  border: `1px solid ${profileSaved ? 'rgba(16, 185, 129, 0.5)' : isProfileComplete ? 'rgba(34, 211, 238, 0.5)' : 'rgba(168, 85, 247, 0.5)'}`,
                   borderRadius: '12px',
-                  cursor: 'pointer',
+                  cursor: isSavingProfile ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  color: isProfileComplete ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light,
+                  color: profileSaved
+                    ? '#10B981'
+                    : isProfileComplete
+                    ? theme.colors.accent.cyan.DEFAULT
+                    : theme.colors.accent.purple.light,
                   fontSize: '14px',
                   fontWeight: 'bold',
+                  opacity: isSavingProfile ? 0.7 : 1,
                 }}
               >
-                {isProfileComplete ? (
+                {isSavingProfile ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                      style={{ display: 'flex' }}
+                    >
+                      <Zap size={18} />
+                    </motion.div>
+                    SALVANDO...
+                  </>
+                ) : profileSaved ? (
                   <>
                     <Check size={18} />
-                    PERFIL COMPLETO
+                    SALVO COM SUCESSO!
+                  </>
+                ) : isProfileComplete ? (
+                  <>
+                    <Check size={18} />
+                    SALVAR PERFIL COMPLETO
                   </>
                 ) : (
                   'SALVAR ALTERAÇÕES'

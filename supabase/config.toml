@@ -1,0 +1,6 @@
+# Supabase Configuration
+# Docs: https://supabase.com/docs/guides/cli/config
+
+[functions.hotmart-webhook]
+# Desabilitar validação JWT para permitir webhooks públicos da Hotmart
+verify_jwt = false

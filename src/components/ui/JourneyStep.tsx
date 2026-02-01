@@ -5,7 +5,7 @@
  * (completed, current, purchase, locked)
  */
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { Check, Lock, ShoppingCart, ChevronRight } from 'lucide-react'
 import { theme } from '../../styles/theme'
@@ -33,6 +33,8 @@ export interface JourneyStepProps {
   index?: number
   /** Se e o ultimo item (nao mostra linha conectora) */
   isLast?: boolean
+  /** Tooltip de orientação (opcional) */
+  tooltip?: string
 }
 
 export function JourneyStep({
@@ -46,7 +48,9 @@ export function JourneyStep({
   onClick,
   index = 0,
   isLast = false,
+  tooltip,
 }: JourneyStepProps) {
+  const [showTooltip, setShowTooltip] = useState(false)
   const statusConfig = theme.gamification.stepStatus[status]
 
   const getStatusIcon = () => {
@@ -84,7 +88,10 @@ export function JourneyStep({
       <motion.div
         whileTap={status === 'current' || status === 'purchase' ? { scale: 0.98 } : {}}
         onClick={onClick}
+        onMouseEnter={() => tooltip && setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
         style={{
+          position: 'relative',
           display: 'flex',
           alignItems: 'center',
           gap: '14px',
@@ -102,6 +109,82 @@ export function JourneyStep({
           transition: 'all 0.3s ease',
         }}
       >
+        {/* Tooltip */}
+        {tooltip && showTooltip && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              position: 'absolute',
+              bottom: 'calc(100% + 8px)',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '8px 12px',
+              background: 'rgba(15, 17, 21, 0.98)',
+              border: `1px solid ${statusConfig.color}`,
+              borderRadius: '8px',
+              boxShadow: `0 4px 12px ${statusConfig.color}33`,
+              zIndex: 10,
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '11px',
+                color: statusConfig.color,
+                fontWeight: theme.typography.fontWeight.medium,
+              }}
+            >
+              {tooltip}
+            </span>
+            {/* Seta do tooltip */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '-5px',
+                left: '50%',
+                transform: 'translateX(-50%) rotate(45deg)',
+                width: '10px',
+                height: '10px',
+                background: 'rgba(15, 17, 21, 0.98)',
+                borderRight: `1px solid ${statusConfig.color}`,
+                borderBottom: `1px solid ${statusConfig.color}`,
+              }}
+            />
+          </motion.div>
+        )}
+        {/* Badge "COMPLETO" para status completed */}
+        {status === 'completed' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '8px',
+              right: '8px',
+              padding: '4px 8px',
+              background: 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              zIndex: 1,
+            }}
+          >
+            <Check size={10} color="#10B981" strokeWidth={3} />
+            <span
+              style={{
+                fontSize: '9px',
+                color: '#10B981',
+                fontWeight: theme.typography.fontWeight.bold,
+                textTransform: 'uppercase',
+                letterSpacing: '0.03em',
+              }}
+            >
+              Completo
+            </span>
+          </div>
+        )}
         {/* Icon Circle */}
         <div
           style={{

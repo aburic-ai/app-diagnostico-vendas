@@ -8,7 +8,7 @@
  * de estratégia decidindo o próximo ataque.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Rocket,
@@ -226,12 +226,70 @@ export function PosEvento() {
   // Dia atual (simulado - seria calculado pela data real)
   const currentDay = 1
 
-  const handleToggleAction = (id: string) => {
+  // Carregar ações completadas do perfil (completed_steps)
+  useEffect(() => {
+    if (userProfile?.completed_steps) {
+      const completedDays = userProfile.completed_steps
+        .filter(step => step.startsWith('plan-7-days-day-'))
+        .map(step => {
+          const match = step.match(/plan-7-days-day-(\d+)/)
+          return match ? parseInt(match[1]) : null
+        })
+        .filter((day): day is number => day !== null)
+
+      if (completedDays.length > 0) {
+        setActions(prev =>
+          prev.map(action =>
+            completedDays.includes(action.day)
+              ? { ...action, completed: true }
+              : action
+          )
+        )
+        console.log('📥 Dias completados carregados:', completedDays)
+      }
+    }
+  }, [userProfile?.completed_steps])
+
+  const handleToggleAction = async (id: string) => {
+    const action = actions.find(a => a.id === id)
+    if (!action) return
+
+    const isCompleting = !action.completed
+
+    // Atualizar estado local imediatamente (UX responsivo)
     setActions(prev =>
-      prev.map(action =>
-        action.id === id ? { ...action, completed: !action.completed } : action
+      prev.map(a =>
+        a.id === id ? { ...a, completed: !a.completed } : a
       )
     )
+
+    // Se estiver marcando como completo, salvar no Supabase com XP
+    if (isCompleting) {
+      try {
+        // Calcular XP baseado no dia (progressão crescente)
+        const day = action.day
+        let xp: number
+        if (day <= 3) {
+          xp = XP_CONFIG.POST_EVENT.PLAN_7_DAYS.DAY_1 // 10 XP (dias 1-3)
+        } else if (day <= 5) {
+          xp = XP_CONFIG.POST_EVENT.PLAN_7_DAYS.DAY_4 // 15 XP (dias 4-5)
+        } else {
+          xp = XP_CONFIG.POST_EVENT.PLAN_7_DAYS.DAY_6 // 20 XP (dias 6-7)
+        }
+
+        const stepId = `plan-7-days-day-${day}`
+        await completeStep(stepId, xp)
+        console.log(`✅ Dia ${day} do Plano 7 Dias completo! +${xp} XP`)
+      } catch (error) {
+        console.error('❌ Erro ao completar ação:', error)
+        // Reverter estado se falhar
+        setActions(prev =>
+          prev.map(a =>
+            a.id === id ? { ...a, completed: false } : a
+          )
+        )
+      }
+    }
   }
 
   const navItems = [
@@ -442,7 +500,14 @@ export function PosEvento() {
               title="IMERSÃO PRESENCIAL IMPACT"
               subtitle="Protocolo de Correção em 3 Dias"
               isUnlocked={true}
-              onClick={() => window.open(buildOfferUrl(OFFER_LINKS.posEventoLink, 'oferta'), '_blank')}
+              onClick={() => {
+                // Abrir link
+                window.open(buildOfferUrl(OFFER_LINKS.posEventoLink, 'oferta'), '_blank')
+
+                // Tracking: Interesse em IMPACT (o XP total de 300 virá do webhook Hotmart)
+                console.log('📊 Usuário clicou em "Imersão IMPACT"')
+                // TODO: Track event para analytics
+              }}
             />
           </motion.div>
 

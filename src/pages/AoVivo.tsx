@@ -43,7 +43,7 @@ import {
 import type { IMPACTData, Notification } from '../components/ui'
 import { theme } from '../styles/theme'
 import { getModuleById, EVENT_MODULES } from '../data/modules'
-import { useDiagnostic, useAuth } from '../hooks'
+import { useDiagnostic, useAuth, useUserProgress } from '../hooks'
 import type { DiagnosticScores } from '../hooks'
 import { XP_CONFIG } from '../config/xp-system'
 
@@ -100,6 +100,7 @@ const impactToScores = (impact: IMPACTData): DiagnosticScores => {
 export function AoVivo() {
   const { profile } = useAuth()
   const { getDiagnosticByDay, saveDiagnostic, loading: diagnosticLoading } = useDiagnostic()
+  const { completeStep } = useUserProgress()
 
   const [activeNav, setActiveNav] = useState('aovivo')
   const [selectedDay, setSelectedDay] = useState<1 | 2>(1)
@@ -166,6 +167,24 @@ export function AoVivo() {
       setDay2Data(scoresToIMPACT(day2Diagnostic))
     }
   }, [diagnosticLoading])
+
+  // Carregar módulos confirmados do perfil (completed_steps)
+  useEffect(() => {
+    if (profile?.completed_steps) {
+      const moduleSteps = profile.completed_steps
+        .filter(step => step.startsWith('module-') && step.endsWith('-checkin'))
+        .map(step => {
+          const match = step.match(/module-(\d+)-checkin/)
+          return match ? parseInt(match[1]) : null
+        })
+        .filter((id): id is number => id !== null)
+
+      if (moduleSteps.length > 0) {
+        setConfirmedModules(moduleSteps)
+        console.log('📥 Módulos confirmados carregados:', moduleSteps)
+      }
+    }
+  }, [profile?.completed_steps])
 
   const currentData = selectedDay === 1 ? day1Data : day2Data
   const setCurrentData = selectedDay === 1 ? setDay1Data : setDay2Data
@@ -252,9 +271,19 @@ export function AoVivo() {
   const canConfirmViewing = isViewingCurrent && !isViewingConfirmed
 
   // Handle presence confirmation
-  const handleConfirmPresence = (moduleId: number) => {
+  const handleConfirmPresence = async (moduleId: number) => {
     if (!confirmedModules.includes(moduleId)) {
+      // Atualizar estado local imediatamente (UX responsivo)
       setConfirmedModules(prev => [...prev, moduleId])
+
+      // Salvar no Supabase com XP
+      try {
+        const stepId = `module-${moduleId}-checkin`
+        await completeStep(stepId, XP_CONFIG.EVENT.MODULE_CHECKIN)
+        console.log(`✅ Módulo ${moduleId} confirmado! +${XP_CONFIG.EVENT.MODULE_CHECKIN} XP`)
+      } catch (error) {
+        console.error('❌ Erro ao confirmar presença:', error)
+      }
     }
   }
 
