@@ -1150,8 +1150,51 @@ export function ThankYou() {
                 </p>
               </div>
 
-              {/* WhatsApp Card */}
+              {/* PASSO 1: WhatsApp Card */}
               <Card variant="gold">
+                {/* Badge Passo 1 */}
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 12px',
+                    background: 'rgba(34, 211, 238, 0.15)',
+                    borderRadius: '20px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: theme.colors.accent.cyan.DEFAULT,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: theme.typography.fontFamily.orbitron,
+                      fontSize: '12px',
+                      fontWeight: theme.typography.fontWeight.bold,
+                      color: theme.colors.background.dark,
+                    }}
+                  >
+                    1
+                  </div>
+                  <span
+                    style={{
+                      fontFamily: theme.typography.fontFamily.orbitron,
+                      fontSize: '11px',
+                      color: theme.colors.accent.cyan.DEFAULT,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      fontWeight: theme.typography.fontWeight.bold,
+                    }}
+                  >
+                    Passo 1 de 2
+                  </span>
+                </div>
+
                 <div
                   style={{
                     display: 'flex',
@@ -1223,10 +1266,102 @@ export function ThankYou() {
                 </motion.a>
               </Card>
 
-              <Button onClick={() => { setStep('success'); setTimeout(() => window.location.href = '/pre-evento', 2000) }}>
-                JÁ ENTREI, ACESSAR SISTEMA
-                <ChevronRight size={18} />
-              </Button>
+              {/* PASSO 2: Acessar Sistema */}
+              <Card variant="default">
+                {/* Badge Passo 2 */}
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 12px',
+                    background: 'rgba(168, 85, 247, 0.15)',
+                    borderRadius: '20px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: theme.colors.accent.purple.light,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: theme.typography.fontFamily.orbitron,
+                      fontSize: '12px',
+                      fontWeight: theme.typography.fontWeight.bold,
+                      color: theme.colors.background.dark,
+                    }}
+                  >
+                    2
+                  </div>
+                  <span
+                    style={{
+                      fontFamily: theme.typography.fontFamily.orbitron,
+                      fontSize: '11px',
+                      color: theme.colors.accent.purple.light,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      fontWeight: theme.typography.fontWeight.bold,
+                    }}
+                  >
+                    Passo 2 de 2
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '14px',
+                      background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
+                      border: '2px solid rgba(168, 85, 247, 0.5)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ChevronRight size={28} color={theme.colors.accent.purple.light} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h3
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: theme.typography.fontWeight.bold,
+                        color: theme.colors.text.primary,
+                        marginBottom: '4px',
+                      }}
+                    >
+                      Acesse o Sistema
+                    </h3>
+                    <p
+                      style={{
+                        fontSize: '12px',
+                        color: theme.colors.text.secondary,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      Após entrar no grupo, volte aqui e clique no botão abaixo para acessar seu cockpit.
+                    </p>
+                  </div>
+                </div>
+
+                <Button onClick={() => { setStep('success'); setTimeout(() => window.location.href = '/pre-evento', 2000) }}>
+                  JÁ ENTREI, ACESSAR SISTEMA
+                  <ChevronRight size={18} />
+                </Button>
+              </Card>
             </motion.div>
           )}
 
