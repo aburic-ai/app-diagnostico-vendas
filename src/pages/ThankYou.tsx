@@ -1151,7 +1151,7 @@ export function ThankYou() {
               </div>
 
               {/* PASSO 1: WhatsApp Card */}
-              <Card variant="gold">
+              <Card variant="default">
                 {/* Badge Passo 1 */}
                 <div
                   style={{
@@ -1200,6 +1200,7 @@ export function ThankYou() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '16px',
+                    marginBottom: '16px',
                   }}
                 >
                   <div
@@ -1207,21 +1208,22 @@ export function ThankYou() {
                       width: '56px',
                       height: '56px',
                       borderRadius: '14px',
-                      background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                      background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.3) 0%, rgba(6, 182, 212, 0.2) 100%)',
+                      border: '2px solid rgba(34, 211, 238, 0.5)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
                     }}
                   >
-                    <MessageCircle size={28} color="#FFF" />
+                    <MessageCircle size={28} color={theme.colors.accent.cyan.DEFAULT} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <h3
                       style={{
                         fontSize: '14px',
                         fontWeight: theme.typography.fontWeight.bold,
-                        color: theme.colors.gold.light,
+                        color: theme.colors.text.primary,
                         marginBottom: '4px',
                       }}
                     >
@@ -1232,13 +1234,13 @@ export function ThankYou() {
                         fontSize: '12px',
                         color: theme.colors.text.secondary,
                         lineHeight: 1.5,
-                        marginBottom: '12px',
                       }}
                     >
                       <strong>Entre no grupo</strong> e volte a essa página para acessar o sistema. Este é o grupo onde serão enviados os materiais e avisos importantes.
                     </p>
                   </div>
                 </div>
+
                 <motion.a
                   href={WHATSAPP_LINK}
                   target="_blank"
@@ -1249,7 +1251,6 @@ export function ThankYou() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    marginTop: '16px',
                     padding: '14px',
                     background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
                     borderRadius: '12px',
@@ -1259,6 +1260,8 @@ export function ThankYou() {
                     textDecoration: 'none',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
+                    border: 'none',
+                    cursor: 'pointer',
                   }}
                 >
                   <MessageCircle size={18} />
