@@ -291,6 +291,7 @@ export function ThankYou() {
 
       // 2. Criar conta
       console.log('[ThankYou] Criando conta...')
+      let newUserCreated = false
       if (!userFound) {
         const { error: signUpError } = await supabase.auth.signUp({
           email: email || '',
@@ -299,11 +300,46 @@ export function ThankYou() {
 
         if (signUpError) throw signUpError
         console.log('[ThankYou] ✅ Conta criada!')
+        newUserCreated = true
       } else {
         console.log('[ThankYou] ✅ Usuário já existe')
       }
 
-      // 3. Ir para WhatsApp (obrigatório: entrar e voltar para acessar sistema)
+      // 3. Dar XP do protocolo de iniciação (+30 XP)
+      if (newUserCreated) {
+        console.log('[ThankYou] Creditando +30 XP do protocolo...')
+
+        // Aguardar um pouco para o trigger do banco criar o profile
+        await new Promise(resolve => setTimeout(resolve, 1500))
+
+        // Buscar o profile criado
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', email)
+          .single()
+
+        if (profileError) {
+          console.error('[ThankYou] Erro ao buscar profile:', profileError)
+        } else if (profile) {
+          // Atualizar com XP e step completo
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              completed_steps: ['protocol-survey'],
+              xp: 30,
+            })
+            .eq('id', profile.id)
+
+          if (updateError) {
+            console.error('[ThankYou] Erro ao atualizar XP:', updateError)
+          } else {
+            console.log('[ThankYou] ✅ +30 XP creditados! (Protocolo de Iniciação completo)')
+          }
+        }
+      }
+
+      // 4. Ir para WhatsApp (obrigatório: entrar e voltar para acessar sistema)
       setStep('whatsapp')
     } catch (error) {
       console.error('[ThankYou] Erro ao salvar dados:', error)
