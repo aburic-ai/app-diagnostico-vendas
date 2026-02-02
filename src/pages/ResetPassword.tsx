@@ -88,7 +88,7 @@ export function ResetPassword() {
         >
           {/* Logo / Title */}
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <Lock size={48} color={theme.colors.primary.cyan} style={{ margin: '0 auto 16px' }} />
+            <Lock size={48} color="#22D3EE" style={{ margin: '0 auto 16px' }} />
             <h1
               style={{
                 fontFamily: theme.typography.fontFamily.orbitron,
@@ -116,7 +116,7 @@ export function ResetPassword() {
               style={{
                 padding: '16px',
                 background: 'rgba(34, 211, 238, 0.1)',
-                border: `1px solid ${theme.colors.primary.cyan}`,
+                border: '1px solid #22D3EE',
                 borderRadius: '12px',
                 marginBottom: '24px',
                 display: 'flex',
@@ -124,12 +124,12 @@ export function ResetPassword() {
                 gap: '12px',
               }}
             >
-              <CheckCircle size={20} color={theme.colors.primary.cyan} />
+              <CheckCircle size={20} color="#22D3EE" />
               <div>
                 <p
                   style={{
                     fontSize: '14px',
-                    color: theme.colors.primary.cyan,
+                    color: '#22D3EE',
                     fontWeight: theme.typography.fontWeight.semibold,
                     margin: 0,
                   }}
@@ -240,7 +240,7 @@ export function ResetPassword() {
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: theme.colors.primary.cyan,
+                color: '#22D3EE',
                 fontSize: '13px',
                 fontWeight: theme.typography.fontWeight.semibold,
                 cursor: 'pointer',
