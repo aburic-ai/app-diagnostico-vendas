@@ -52,17 +52,82 @@ http://localhost:5173/**
 http://localhost:3000/**
 ```
 
-### Email Templates
+### Email Templates (Customizados)
 
-#### Reset Password Email
-- **Subject:** `Resetar senha - Diagnóstico de Vendas`
+A aplicação usa templates de email personalizados com o visual do app (dark theme, gradiente cyan/purple).
+
+**Localização no Supabase:**
+`Authentication → Email Templates`
+
+#### 1. Reset Password Email
+- **Subject:** `Redefinir senha - Diagnóstico de Vendas`
+- **Sender:** `Supabase Auth <noreply@mail.app.supabase.io>`
+- **Template:** HTML customizado (dark theme)
 - **Redirect URL:** `https://neuro-app.brainpower.com.br/reset-password`
-- Template padrão do Supabase (modificado)
+- **Variável usada:** `{{ .ConfirmationURL }}`
+- **Validade do link:** 1 hora
 
-#### Magic Link Email
+**Conteúdo do Email:**
+```
+🔐 Redefinir Senha
+Imersão Diagnóstico de Vendas
+
+Olá!
+
+Recebemos uma solicitação para redefinir a senha da sua conta na
+Imersão Diagnóstico de Vendas.
+
+Clique no botão abaixo para criar uma nova senha:
+
+[CRIAR NOVA SENHA] <- Botão com gradiente cyan
+
+Ou copie e cole este link:
+https://neuro-app.brainpower.com.br/reset-password#access_token=...
+
+⚠️ Importante: Este link expira em 1 hora por segurança.
+
+Se você não solicitou esta redefinição de senha, pode ignorar
+este email com segurança. Sua senha atual permanecerá inalterada.
+```
+
+#### 2. Magic Link Email
 - **Subject:** `Seu link de acesso - Diagnóstico de Vendas`
+- **Sender:** `Supabase Auth <noreply@mail.app.supabase.io>`
+- **Template:** HTML customizado (dark theme)
 - **Redirect URL:** `https://neuro-app.brainpower.com.br/pre-evento`
-- Template padrão do Supabase
+- **Variável usada:** `{{ .ConfirmationURL }}`
+- **Validade do link:** 1 hora
+
+**Conteúdo do Email:**
+```
+🚀 Seu Acesso Está Pronto
+Imersão Diagnóstico de Vendas
+
+Olá!
+
+Você solicitou um link de acesso para entrar na sua área de
+membro da Imersão Diagnóstico de Vendas.
+
+Clique no botão abaixo para acessar instantaneamente:
+
+[ACESSAR AGORA] <- Botão com gradiente cyan
+
+Ou copie e cole este link:
+https://neuro-app.brainpower.com.br/pre-evento#access_token=...
+
+⚡ Acesso Rápido e Seguro
+Este link expira em 1 hora. Após clicar, você será conectado
+automaticamente sem precisar digitar senha.
+
+Se você não solicitou este acesso, pode ignorar este email
+com segurança.
+```
+
+**Nota sobre o Sender:**
+- O email sai de `noreply@mail.app.supabase.io`
+- Só pode ser alterado no **Supabase Pro** ($25/mês) configurando Custom SMTP
+- No plano gratuito, não há opção de mudar o sender email
+- O domínio é confiável e não vai para spam
 
 ---
 
@@ -155,67 +220,314 @@ http://localhost:3000/**
 
 ## 🔓 Reset de Senha
 
-### Como Funciona
+### Fluxo Completo de Reset de Senha
 
-1. **Admin inicia reset** via Supabase Dashboard:
-   - `Authentication → Users → ... → Reset Password`
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   FLUXO DE RESET DE SENHA                   │
+└─────────────────────────────────────────────────────────────┘
 
-2. **Usuário recebe email** com link:
-   ```
-   https://neuro-app.brainpower.com.br/reset-password#access_token=...&type=recovery
-   ```
+1. ADMIN INICIA RESET
+   ┌─────────────────┐
+   │ Supabase        │
+   │ Dashboard       │
+   └────────┬────────┘
+            │
+            │ Authentication → Users
+            │ ... → Reset Password
+            ▼
+   ┌─────────────────┐
+   │ Email enviado   │
+   │ para usuário    │
+   └────────┬────────┘
 
-3. **Página `/reset-password` detecta o token** na URL:
-   ```typescript
-   const hashParams = new URLSearchParams(window.location.hash.substring(1))
-   const type = hashParams.get('type')
+2. USUÁRIO RECEBE EMAIL
+   ┌───────────────────────────────────────────┐
+   │ De: Supabase Auth                         │
+   │ Assunto: Redefinir senha - Diagnóstico... │
+   │                                           │
+   │ 🔐 Redefinir Senha                        │
+   │                                           │
+   │ Clique no botão para criar nova senha:    │
+   │                                           │
+   │ [CRIAR NOVA SENHA] <- Botão cyan          │
+   │                                           │
+   │ ⚠️ Link expira em 1 hora                  │
+   └────────┬──────────────────────────────────┘
+            │
+            │ Clica no link
+            ▼
+   URL: https://neuro-app.brainpower.com.br/
+        login#access_token=xxx&type=recovery
 
-   if (type !== 'recovery') {
-     navigate('/login')
-   }
-   ```
+3. AUTO-REDIRECT (Login.tsx)
+   ┌─────────────────┐
+   │ /login detecta  │
+   │ type=recovery   │
+   └────────┬────────┘
+            │
+            │ useEffect detecta hash
+            │ if (type === 'recovery')
+            ▼
+   ┌─────────────────┐
+   │ Redirect para   │
+   │ /reset-password │
+   │ + hash intacto  │
+   └────────┬────────┘
 
-4. **Usuário cria nova senha**:
-   ```typescript
-   await supabase.auth.updateUser({ password: novaSenha })
-   ```
+4. PÁGINA DE RESET
+   ┌─────────────────┐
+   │ /reset-password │
+   │                 │
+   │ 🔐 CRIAR NOVA   │
+   │    SENHA        │
+   │                 │
+   │ Nova Senha:     │
+   │ [__________]    │
+   │                 │
+   │ Confirmar:      │
+   │ [__________]    │
+   │                 │
+   │ [ALTERAR SENHA] │
+   └────────┬────────┘
+            │
+            │ supabase.auth.updateUser()
+            ▼
+   ┌─────────────────┐
+   │ ✓ Senha alterada│
+   │   com sucesso!  │
+   │                 │
+   │ Redirecionando..│
+   └────────┬────────┘
+            │
+            │ Redirect após 2s
+            ▼
+   ┌─────────────────┐
+   │  /pre-evento    │
+   │  (logado)       │
+   └─────────────────┘
+```
 
-5. **Redireciona automaticamente** para `/pre-evento`
+### Como Iniciar Reset (Admin)
+
+1. **Acesse:** https://supabase.com/dashboard/project/yvjzkhxczbxidtdmkafx/auth/users
+
+2. **Encontre o usuário** pelo email
+
+3. **Clique nos 3 pontinhos** ao lado do email
+
+4. **Selecione "Reset Password"**
+
+5. **Email é enviado automaticamente**
 
 ### Arquivos Envolvidos
 
-- **Página:** `src/pages/ResetPassword.tsx`
-- **Rota:** `/reset-password` (público, sem autenticação)
-- **Context:** `src/context/AuthContext.tsx`
+**1. src/pages/ResetPassword.tsx**
+- Página de criar nova senha
+- Detecta token de recovery na URL
+- Valida senha (mínimo 8 caracteres)
+- Confirma que senhas coincidem
+- Chama `supabase.auth.updateUser({ password })`
+- Redireciona para `/pre-evento` após sucesso
+
+**2. src/pages/Login.tsx**
+- **Auto-redirect:** Detecta `type=recovery` no hash
+- Se detectado, redireciona para `/reset-password` mantendo o hash
+- Resolve problema do Supabase redirecionar para Site URL ao invés de redirect específico
+
+```typescript
+// Login.tsx - Auto-redirect para reset-password
+useEffect(() => {
+  const hashParams = new URLSearchParams(window.location.hash.substring(1))
+  const type = hashParams.get('type')
+
+  if (type === 'recovery') {
+    navigate('/reset-password' + window.location.hash, { replace: true })
+  }
+}, [navigate])
+```
+
+**3. src/App.tsx**
+- Rota `/reset-password` é **pública** (não protegida)
+- Qualquer um pode acessar SE tiver token válido
+
+```typescript
+<Route path="/reset-password" element={<ResetPassword />} />
+```
 
 ### Validações
 
-- Senha mínima: **8 caracteres**
-- Confirmação de senha obrigatória
-- Token de recovery válido (detectado na URL)
+- ✅ Senha mínima: **8 caracteres**
+- ✅ Confirmação de senha obrigatória (devem coincidir)
+- ✅ Token de recovery válido (detectado no hash da URL)
+- ✅ Token expira em **1 hora**
+- ✅ Se token inválido ou expirado, redireciona para `/login`
+
+### Segurança
+
+- Token JWT único por solicitação
+- Expira após 1 hora
+- Só pode ser usado uma vez
+- Transportado via hash fragment (não enviado ao servidor)
+- HTTPS obrigatório em produção
 
 ---
 
 ## ✨ Magic Link (Link Mágico)
 
-### Quando Usar
+### Fluxo Completo de Magic Link
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    FLUXO DE MAGIC LINK                      │
+└─────────────────────────────────────────────────────────────┘
+
+1. USUÁRIO TENTA LOGIN (FALHA)
+   ┌─────────────────┐
+   │ /login          │
+   │                 │
+   │ Email: andre@...│
+   │ Senha: xxxxxx   │
+   │                 │
+   │ [ACESSAR]       │
+   └────────┬────────┘
+            │
+            │ signIn(email, password)
+            ▼
+   ┌─────────────────┐
+   │ ❌ Login falhou │
+   │                 │
+   │ Email ou senha  │
+   │ incorretos      │
+   └────────┬────────┘
+
+2. BOTÃO DE MAGIC LINK APARECE
+   ┌─────────────────────────────┐
+   │ ❌ Email ou senha incorretos│
+   │                             │
+   │ Email: andre@exemplo.com    │
+   │ Senha: _________________    │
+   │                             │
+   │ [ACESSAR COCKPIT]           │
+   │                             │
+   │ [📧 RECEBER LINK DE         │
+   │     ACESSO VIA EMAIL]       │ ← Botão aparece!
+   └────────┬────────────────────┘
+            │
+            │ Usuário clica
+            ▼
+   ┌─────────────────┐
+   │ handleMagicLink │
+   │ supabase.auth   │
+   │ .signInWithOtp()│
+   └────────┬────────┘
+
+3. EMAIL ENVIADO
+   ┌───────────────────────────────────────────┐
+   │ De: Supabase Auth                         │
+   │ Assunto: Seu link de acesso - Diagnóst... │
+   │                                           │
+   │ 🚀 Seu Acesso Está Pronto                 │
+   │                                           │
+   │ Clique para acessar instantaneamente:     │
+   │                                           │
+   │ [ACESSAR AGORA] <- Botão cyan             │
+   │                                           │
+   │ ⚡ Link expira em 1 hora                  │
+   └────────┬──────────────────────────────────┘
+            │
+            │ Usuário clica no link
+            ▼
+   URL: https://neuro-app.brainpower.com.br/
+        pre-evento#access_token=xxx&type=magiclink
+
+4. AUTO-LOGIN
+   ┌─────────────────┐
+   │ Supabase detecta│
+   │ token válido    │
+   └────────┬────────┘
+            │
+            │ Session criada
+            │ automaticamente
+            ▼
+   ┌─────────────────┐
+   │  /pre-evento    │
+   │  (logado!)      │
+   └─────────────────┘
+```
+
+### Quando o Botão Aparece
 
 O botão de **Magic Link** só aparece em **UMA situação**:
 
-1. Usuário tenta fazer login com senha
-2. Login **falha** (senha errada, email incorreto, etc.)
-3. Sistema mostra botão alternativo
+1. ✅ Usuário tenta fazer login com senha
+2. ❌ Login **falha** (senha errada, email incorreto, etc.)
+3. 🔵 Sistema mostra botão alternativo
 
-### Por Que Esse Design?
+**Por que esse design?**
 
-**Evita confusão:**
-- Se mostrar logo de cara, usuário acha que pode entrar "de qualquer jeito"
+- Evita confusão: se mostrar logo de cara, usuário acha que pode entrar "de qualquer jeito"
 - Ao aparecer só após erro, fica claro que é uma **alternativa** de recuperação
+- Reduz suporte: usuário não precisa lembrar senha
 
-### UX Flow
+### Implementação
+
+**Arquivo:** `src/pages/Login.tsx`
+
+**1. State que controla visibilidade:**
+```typescript
+const [showMagicLinkOption, setShowMagicLinkOption] = useState(false)
+```
+
+**2. Ativado em caso de erro de login:**
+```typescript
+const handleSubmit = async (e: React.FormEvent) => {
+  const { error: signInError } = await signIn(email, password)
+
+  if (signInError) {
+    setError('Email ou senha incorretos')
+    setShowMagicLinkOption(true) // ← Mostra o botão!
+    setLoading(false)
+  }
+}
+```
+
+**3. Envio do Magic Link:**
+```typescript
+const handleMagicLink = async () => {
+  if (!email || !email.includes('@')) {
+    setError('Digite um email válido primeiro')
+    return
+  }
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: `${window.location.origin}/pre-evento`,
+    },
+  })
+
+  if (!error) {
+    setMagicLinkSent(true)
+    // Mostra: "✓ Link enviado! Verifique seu email"
+  }
+}
+```
+
+**4. Renderização condicional:**
+```typescript
+{showMagicLinkOption && (
+  <button onClick={handleMagicLink} disabled={loading || magicLinkSent}>
+    <Mail size={18} />
+    {magicLinkSent ? 'LINK ENVIADO' : 'RECEBER LINK DE ACESSO VIA EMAIL'}
+  </button>
+)}
+```
+
+### UX Estados
 
 ```
-LOGIN INICIAL
+ESTADO 1: Inicial (Botão escondido)
 ┌─────────────────────────────┐
 │ Email: _________________    │
 │ Senha: _________________    │
@@ -223,9 +535,7 @@ LOGIN INICIAL
 │ [ACESSAR COCKPIT]           │
 └─────────────────────────────┘
 
-        ↓ (usuário erra senha)
-
-APÓS ERRO
+ESTADO 2: Após Erro (Botão aparece)
 ┌─────────────────────────────┐
 │ ❌ Email ou senha incorretos│
 │                             │
@@ -235,34 +545,31 @@ APÓS ERRO
 │ [ACESSAR COCKPIT]           │
 │                             │
 │ [📧 RECEBER LINK DE         │
-│     ACESSO VIA EMAIL]       │ ← SÓ APARECE AQUI
+│     ACESSO VIA EMAIL]       │ ← Aparece aqui
+└─────────────────────────────┘
+
+ESTADO 3: Link Enviado
+┌─────────────────────────────┐
+│ ✓ Link enviado! Verifique   │
+│   seu email andre@...       │
+│                             │
+│ Email: andre@exemplo.com    │
+│ Senha: _________________    │
+│                             │
+│ [ACESSAR COCKPIT]           │
+│                             │
+│ [📧 LINK ENVIADO]           │ ← Desabilitado
 └─────────────────────────────┘
 ```
 
-### Implementação
+### Segurança
 
-**State que controla visibilidade:**
-```typescript
-const [showMagicLinkOption, setShowMagicLinkOption] = useState(false)
-```
-
-**Ativado em caso de erro:**
-```typescript
-if (signInError) {
-  setError(friendlyMessage)
-  setShowMagicLinkOption(true) // ← Mostra o botão
-  setLoading(false)
-}
-```
-
-**Renderização condicional:**
-```typescript
-{showMagicLinkOption && (
-  <button onClick={handleMagicLink}>
-    RECEBER LINK DE ACESSO VIA EMAIL
-  </button>
-)}
-```
+- ✅ Token JWT único por solicitação
+- ✅ Expira após **1 hora**
+- ✅ Só pode ser usado **uma vez**
+- ✅ Enviado apenas para o email do usuário
+- ✅ HTTPS obrigatório
+- ✅ Não funciona se email não existir no sistema
 
 ---
 
