@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 
 import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } from '../components/ui'
-import type { Notification } from '../components/ui'
+import type { ToastNotification } from '../components/ui'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
 import { useUserProgress } from '../hooks/useUserProgress'
@@ -162,7 +162,7 @@ export function PreEvento() {
   const isProfileComplete = profileProgress === 100
 
   // Notificações de exemplo
-  const [notifications] = useState<Notification[]>([
+  const [notifications] = useState<ToastNotification[]>([
     {
       id: '1',
       type: 'info',
@@ -199,7 +199,6 @@ export function PreEvento() {
       icon: <Network size={28} />,
       status: isStepCompleted(STEP_IDS.PROTOCOL_SURVEY) ? 'completed' : 'current',
       xp: XP_CONFIG.PRE_EVENT.PROTOCOL_SURVEY,
-      tooltip: isStepCompleted(STEP_IDS.PROTOCOL_SURVEY) ? 'Protocolo já concluído ✓' : 'Complete o protocolo de calibragem',
     },
     {
       id: STEP_IDS.COMPLETE_PROFILE,
@@ -209,7 +208,6 @@ export function PreEvento() {
       status: isProfileComplete ? 'completed' : 'current',
       progress: isProfileComplete ? undefined : profileProgress,
       xp: XP_CONFIG.PRE_EVENT.COMPLETE_PROFILE,
-      tooltip: isProfileComplete ? 'Perfil completo ✓' : 'Clique para preencher seu perfil',
     },
     {
       id: STEP_IDS.WATCH_BONUS_LESSONS,
@@ -219,7 +217,6 @@ export function PreEvento() {
       status: 'current',
       progress: 0,
       xp: XP_CONFIG.PRE_EVENT.WATCH_BONUS_LESSONS,
-      tooltip: 'Clique para ir às aulas preparatórias ↓',
     },
     {
       id: STEP_IDS.PURCHASE_PDF_DIAGNOSIS,
@@ -229,7 +226,6 @@ export function PreEvento() {
       status: 'purchase',
       isPurchase: true,
       xp: XP_CONFIG.PRE_EVENT.PURCHASE_PDF_DIAGNOSIS,
-      tooltip: 'Clique para ver oferta especial do PDF',
     },
     {
       id: STEP_IDS.PURCHASE_EDITED_LESSONS,
@@ -239,7 +235,6 @@ export function PreEvento() {
       status: 'purchase',
       isPurchase: true,
       xp: XP_CONFIG.PRE_EVENT.PURCHASE_EDITED_LESSONS,
-      tooltip: 'Clique para ver oferta de Aulas Editadas',
     },
   ]
 

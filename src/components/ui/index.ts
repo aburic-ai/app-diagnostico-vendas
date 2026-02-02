@@ -31,7 +31,7 @@ export type { ActionItem } from './ActionPlan'
 
 // Novos componentes v2
 export { NotificationToast } from './NotificationToast'
-export type { Notification, NotificationType } from './NotificationToast'
+export type { ToastNotification, ToastNotificationType } from './NotificationToast'
 export { NotificationDrawer } from './NotificationDrawer'
 export { PresenceConfirmCard } from './PresenceConfirmCard'
 export { AvatarButton } from './AvatarButton'

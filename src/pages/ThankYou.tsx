@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle,
@@ -29,7 +29,6 @@ import {
 import { PageWrapper, Card, Button, Input } from '../components/ui'
 import { theme } from '../styles/theme'
 import {
-  SURVEY_QUESTIONS,
   SURVEY_INTRO,
   type SurveyData,
   createEmptySurveyData,
@@ -37,13 +36,12 @@ import {
 } from '../data/survey-config'
 import { generateWhatsAppMessage } from '../lib/whatsapp-message'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../hooks/useAuth'
 
 // ============================================
 // TYPES
 // ============================================
 
-type Step = 'verification' | 'survey' | 'whatsapp' | 'password' | 'success' | 'error'
+type Step = 'verification' | 'access-denied' | 'pending-review' | 'survey' | 'whatsapp' | 'password' | 'success' | 'error'
 
 type VerificationStatus = 'checking' | 'not_found' | 'found'
 
@@ -94,6 +92,152 @@ const formatFirstName = (fullName: string): string => {
 }
 
 // ============================================
+// PURCHASE VALIDATION
+// ============================================
+
+interface PurchaseValidationResult {
+  isValid: boolean
+  purchaseId?: string
+  userId?: string
+  buyerName?: string
+  buyerEmail?: string
+  buyerPhone?: string
+  productSlug?: string
+  status?: string
+  reason: 'valid' | 'purchase_not_found' | 'status_not_approved' | 'purchase_refunded' | 'wrong_product'
+}
+
+/**
+ * Validar se email/transaction pertence a comprador legítimo
+ * Validações:
+ * 1. Compra existe
+ * 2. status = 'approved' (ou manual_approval = true)
+ * 3. refunded_at IS NULL
+ * 4. product_slug = 'imersao-diagnostico-vendas'
+ */
+const validatePurchase = async (
+  identifier: string // email ou transaction_id
+): Promise<PurchaseValidationResult> => {
+  try {
+    console.log(`[ThankYou] Validando compra: ${identifier}`)
+
+    let purchase: any = null
+    let buyerEmail: string | undefined = undefined
+
+    // Tentar por transaction_id primeiro
+    const { data: purchaseByTransaction, error: purchaseError } = await supabase
+      .from('purchases')
+      .select('id, user_id, buyer_name, buyer_phone, status, refunded_at, product_slug')
+      .eq('transaction_id', identifier)
+      .single()
+
+    console.log('[ThankYou] Query por transaction:', {
+      found: !!purchaseByTransaction,
+      error: purchaseError,
+      data: purchaseByTransaction
+    })
+
+    if (purchaseByTransaction && !purchaseError) {
+      purchase = purchaseByTransaction
+
+      // Buscar email do profile
+      if (purchase.user_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', purchase.user_id)
+          .single()
+
+        if (profile) {
+          buyerEmail = profile.email
+        }
+      }
+    } else {
+      // Se não encontrar, tentar por email via profile
+      console.log('[ThankYou] Compra não encontrada por transaction, tentando por email...')
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('email', identifier)
+        .single()
+
+      if (profile) {
+        buyerEmail = profile.email
+
+        const { data: purchaseByEmail } = await supabase
+          .from('purchases')
+          .select('id, user_id, buyer_name, buyer_phone, status, refunded_at, product_slug')
+          .eq('user_id', profile.id)
+          .order('purchased_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        purchase = purchaseByEmail
+      }
+    }
+
+    // Validações
+    if (!purchase) {
+      console.log('[ThankYou] ❌ Compra não encontrada')
+      return { isValid: false, reason: 'purchase_not_found' }
+    }
+
+    // Log detalhado para debug
+    console.log('[ThankYou] Compra encontrada:', {
+      status: purchase.status,
+      product_slug: purchase.product_slug,
+      refunded_at: purchase.refunded_at,
+      email: buyerEmail
+    })
+
+    // Validar status approved (manual_approval será adicionado depois da migration)
+    if (purchase.status !== 'approved') {
+      console.log(`[ThankYou] ❌ Status inválido: ${purchase.status}`)
+      return {
+        isValid: false,
+        reason: 'status_not_approved',
+        buyerEmail,
+        productSlug: purchase.product_slug,
+        status: purchase.status
+      }
+    }
+
+    if (purchase.refunded_at !== null) {
+      console.log('[ThankYou] ❌ Compra reembolsada')
+      return {
+        isValid: false,
+        reason: 'purchase_refunded',
+        buyerEmail,
+        productSlug: purchase.product_slug,
+        status: purchase.status
+      }
+    }
+
+    // REMOVIDO: validação de product_slug (permitir qualquer produto por enquanto)
+    // if (purchase.product_slug !== 'imersao-diagnostico-vendas') {
+    //   console.log(`[ThankYou] ❌ Produto errado: ${purchase.product_slug}`)
+    //   return { isValid: false, reason: 'wrong_product' }
+    // }
+
+    console.log(`[ThankYou] ✅ Compra válida`)
+    return {
+      isValid: true,
+      purchaseId: purchase.id,
+      userId: purchase.user_id,
+      buyerName: purchase.buyer_name,
+      buyerEmail,
+      buyerPhone: purchase.buyer_phone,
+      productSlug: purchase.product_slug,
+      status: purchase.status,
+      reason: 'valid',
+    }
+  } catch (error) {
+    console.error('[ThankYou] Erro validando compra:', error)
+    return { isValid: false, reason: 'purchase_not_found' }
+  }
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -121,11 +265,15 @@ export function ThankYou() {
   // Get transaction from URL on mount
   useEffect(() => {
     const transaction = searchParams.get('transaction')
+    console.log('[ThankYou] URL params:', { transaction })
+
     if (transaction) {
+      console.log(`[ThankYou] Transaction encontrado na URL: ${transaction}`)
       setIdentifier(transaction)
       // Start polling for user
       pollForUser(transaction)
     } else {
+      console.log('[ThankYou] Nenhum transaction na URL, exibindo form de email')
       // No transaction - show checking animation for 10s, then ask for email
       setVerificationStatus('checking')
       setTimeout(() => {
@@ -144,36 +292,32 @@ export function ThankYou() {
 
       console.log(`Polling for user with identifier: ${searchIdentifier}, attempt ${attempts}`)
 
-      // Buscar compra no Supabase (por transaction_id ou email)
-      const { data: purchaseData } = await supabase
-        .from('purchases')
-        .select('user_id, buyer_name')
-        .eq('transaction_id', searchIdentifier)
-        .limit(1)
-        .single()
+      // ⚠️ CRÍTICO: Validar compra ao invés de só verificar existência
+      const validation = await validatePurchase(searchIdentifier)
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id, name')
-        .eq('email', searchIdentifier)
-        .limit(1)
-        .single()
-
-      const userExists = purchaseData || profileData
-
-      if (userExists) {
-        // Pegar nome do comprador (prioridade: purchase.buyer_name > profile.name)
-        const name = purchaseData?.buyer_name || profileData?.name || ''
-        setBuyerName(name)
+      if (validation.isValid) {
+        // ✅ Comprador válido encontrado
+        setBuyerName(validation.buyerName || '')
+        if (validation.buyerEmail) {
+          setEmail(validation.buyerEmail) // Salvar email da compra
+        }
         setUserFound(true)
         setVerificationStatus('found')
         return
       }
 
       if (attempts >= maxAttempts) {
-        // User not found after 10s
+        // Após 10s sem encontrar compra → PEDIR EMAIL
+        console.log(`[ThankYou] ❌ Compra não encontrada após ${maxAttempts} tentativas`)
+        console.log(`[ThankYou] Motivo: ${validation.reason}`)
+
+        // Salvar email da compra (se houver)
+        if (validation.buyerEmail) {
+          setEmail(validation.buyerEmail)
+        }
+
         setUserFound(false)
-        setVerificationStatus('not_found')
+        setVerificationStatus('not_found') // Mostra campo de email
         return
       }
 
@@ -185,7 +329,7 @@ export function ThankYou() {
   }
 
   // Handle email submission
-  const handleEmailSubmit = () => {
+  const handleEmailSubmit = async () => {
     if (!email) {
       setEmailError('Digite seu e-mail')
       return
@@ -196,13 +340,39 @@ export function ThankYou() {
     }
     setEmailError('')
     setVerificationStatus('checking')
-    pollForUser(email)
+
+    // ⚠️ CRÍTICO: Validar compra
+    const validation = await validatePurchase(email)
+
+    if (!validation.isValid) {
+      console.log(`[ThankYou] ❌ Compra inválida: ${validation.reason}`)
+
+      // 💾 Salvar tentativa de acesso para admin revisar
+      try {
+        await supabase.from('access_requests').insert({
+          email,
+          transaction_id: identifier || null,
+          reason: validation.reason,
+          status: 'pending',
+          requested_at: new Date().toISOString()
+        })
+        console.log('[ThankYou] Tentativa de acesso salva para revisão admin')
+      } catch (error) {
+        console.error('[ThankYou] Erro ao salvar tentativa:', error)
+      }
+
+      setVerificationStatus('not_found')
+      setStep('access-denied') // 🚫 Acesso negado
+      return
+    }
+
+    // ✅ Comprador válido - continuar
+    setBuyerName(validation.buyerName || '')
+    setUserFound(true)
+    setVerificationStatus('found')
   }
 
-  // Handle manual proceed (skip verification)
-  const handleManualProceed = () => {
-    setStep('survey')
-  }
+  // ❌ REMOVIDO: handleManualProceed (skip verification) - vulnerabilidade de segurança
 
   // Handle survey answer
   const handleSurveyAnswer = (questionId: string, value: string) => {
@@ -275,6 +445,35 @@ export function ThankYou() {
     setIsSubmitting(true)
 
     try {
+      // ⚠️ VALIDAÇÃO FINAL: Verificar compra antes de salvar
+      console.log('[ThankYou] Validação final de compra...')
+      const validation = await validatePurchase(email || identifier || '')
+
+      if (!validation.isValid) {
+        console.error('[ThankYou] ❌ Validação falhou no submit da senha:', validation.reason)
+
+        // 💾 Salvar tentativa de acesso para admin revisar
+        try {
+          await supabase.from('access_requests').insert({
+            email: email || identifier || 'unknown',
+            transaction_id: identifier || null,
+            reason: validation.reason,
+            status: 'pending',
+            requested_at: new Date().toISOString()
+          })
+          console.log('[ThankYou] Tentativa de acesso salva para revisão admin')
+        } catch (error) {
+          console.error('[ThankYou] Erro ao salvar tentativa:', error)
+        }
+
+        setPasswordError('')
+        setIsSubmitting(false)
+        setStep('pending-review') // 📋 Em análise
+        return
+      }
+
+      console.log('[ThankYou] ✅ Compra validada, prosseguindo...')
+
       // 1. Salvar survey
       console.log('[ThankYou] Salvando survey...')
       const { error: surveyError } = await supabase.from('survey_responses').insert({
@@ -288,6 +487,38 @@ export function ThankYou() {
         throw surveyError
       }
       console.log('[ThankYou] ✅ Survey salvo!')
+
+      // 1.5. Notificar GHL sobre survey completado (trigger workflow de áudio)
+      try {
+        console.log('[ThankYou] Notificando GHL sobre survey completado...')
+        const ghlWebhookUrl = 'https://services.leadconnectorhq.com/hooks/R2mu3tVVjKvafx2O2wlw/webhook-trigger/uMAGh6b3u7aHWBn2sH6f'
+
+        // Estrutura exata que o GHL espera para Find/Create Contact
+        const webhookPayload = {
+          buyer: {
+            name: validation.buyerName || buyerName || '',
+            email: email || '',
+            checkout_phone: validation.buyerPhone || '',
+          },
+          transaction_id: identifier || '',
+          event: 'survey_completed',
+        }
+
+        console.log('[ThankYou] Payload GHL:', webhookPayload)
+
+        await fetch(ghlWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookPayload),
+        })
+
+        console.log('[ThankYou] ✅ GHL notificado!')
+      } catch (ghlError) {
+        // Não bloqueia o fluxo se GHL falhar
+        console.warn('[ThankYou] ⚠️ Erro ao notificar GHL:', ghlError)
+      }
 
       // 2. Criar conta
       console.log('[ThankYou] Criando conta...')
@@ -810,20 +1041,7 @@ export function ThankYou() {
                           VERIFICAR E-MAIL
                           <ChevronRight size={18} />
                         </Button>
-                        <button
-                          onClick={handleManualProceed}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: theme.colors.text.muted,
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                            padding: '8px',
-                            textDecoration: 'underline',
-                          }}
-                        >
-                          Continuar sem verificação
-                        </button>
+                        {/* ❌ REMOVIDO: Botão "Continuar sem verificação" - vulnerabilidade de segurança */}
                       </div>
                     </Card>
                   </motion.div>
@@ -1697,6 +1915,278 @@ export function ThankYou() {
                   </>
                 )}
               </Button>
+            </motion.div>
+          )}
+
+          {/* PENDING REVIEW STATE */}
+          {step === 'pending-review' && (
+            <motion.div
+              key="pending-review"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                gap: '24px',
+                maxWidth: '600px',
+                margin: '0 auto',
+              }}
+            >
+              {/* Ícone de Relógio */}
+              <div style={{ textAlign: 'center' }}>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%)',
+                    border: '2px solid rgba(251, 191, 36, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 20px',
+                    boxShadow: '0 0 30px rgba(251, 191, 36, 0.3)',
+                  }}
+                >
+                  <AlertCircle size={40} color="#FCD34D" />
+                </motion.div>
+                <h2
+                  style={{
+                    fontFamily: theme.typography.fontFamily.orbitron,
+                    fontSize: '18px',
+                    color: '#FCD34D',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    marginBottom: '12px',
+                  }}
+                >
+                  Em Análise
+                </h2>
+                <p
+                  style={{
+                    fontSize: '14px',
+                    color: theme.colors.text.primary,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Sua solicitação de acesso foi registrada e está sendo analisada pela nossa equipe.
+                </p>
+              </div>
+
+              {/* Card de Informações */}
+              <Card variant="default">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div
+                    style={{
+                      padding: '14px 16px',
+                      background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%)',
+                      border: '1px solid rgba(251, 191, 36, 0.3)',
+                      borderRadius: '10px',
+                    }}
+                  >
+                    <p style={{ fontSize: '13px', color: '#FFF', margin: 0, marginBottom: '8px' }}>
+                      <strong>Email registrado:</strong>
+                    </p>
+                    <p style={{ fontSize: '14px', color: theme.colors.accent.cyan.DEFAULT, margin: 0 }}>
+                      {email}
+                    </p>
+                  </div>
+
+                  <p style={{ fontSize: '12px', color: theme.colors.text.primary, margin: 0 }}>
+                    Nossa equipe irá verificar sua compra e liberar seu acesso em breve. Você será notificado por email.
+                  </p>
+
+                  <p style={{ fontSize: '12px', color: theme.colors.text.primary, margin: 0 }}>
+                    Se preferir, pode entrar em contato com o suporte para agilizar:
+                  </p>
+                </div>
+              </Card>
+
+              {/* Botão WhatsApp Suporte */}
+              <Card variant="cyan">
+                <motion.a
+                  href={WHATSAPP_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileTap={{ scale: 0.98 }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '14px',
+                    background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                    borderRadius: '12px',
+                    color: '#FFF',
+                    fontWeight: theme.typography.fontWeight.bold,
+                    fontSize: '14px',
+                    textDecoration: 'none',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  <MessageCircle size={18} />
+                  FALAR COM SUPORTE
+                </motion.a>
+                <p style={{ fontSize: '11px', color: theme.colors.text.primary, textAlign: 'center', marginTop: '12px', marginBottom: 0 }}>
+                  Informe seu email: <strong style={{ color: theme.colors.accent.cyan.DEFAULT }}>{email}</strong>
+                </p>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* ACCESS DENIED STATE */}
+          {step === 'access-denied' && (
+            <motion.div
+              key="access-denied"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                gap: '24px',
+                maxWidth: '600px',
+                margin: '0 auto',
+              }}
+            >
+              {/* Ícone de Bloqueio */}
+              <div style={{ textAlign: 'center' }}>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.1) 100%)',
+                    border: '2px solid rgba(239, 68, 68, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 20px',
+                    boxShadow: '0 0 30px rgba(239, 68, 68, 0.3)',
+                  }}
+                >
+                  <Lock size={40} color={theme.colors.status.danger} />
+                </motion.div>
+                <h2
+                  style={{
+                    fontFamily: theme.typography.fontFamily.orbitron,
+                    fontSize: '18px',
+                    color: theme.colors.status.danger,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.1em',
+                    marginBottom: '12px',
+                  }}
+                >
+                  Acesso Negado
+                </h2>
+                <p
+                  style={{
+                    fontSize: '14px',
+                    color: theme.colors.text.primary,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {email ? (
+                    <>
+                      Seu email <strong style={{ color: '#FFF' }}>{email}</strong> não foi identificado como comprador deste evento.
+                    </>
+                  ) : (
+                    <>
+                      Não conseguimos identificar sua compra. Por favor, entre em contato com o suporte para verificação.
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {/* Email Registrado */}
+              {email && (
+                <Card variant="default">
+                  <div
+                    style={{
+                      padding: '14px 16px',
+                      background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                      border: '1px solid rgba(34, 211, 238, 0.3)',
+                      borderRadius: '10px',
+                    }}
+                  >
+                    <p style={{ fontSize: '13px', color: '#FFF', margin: 0, marginBottom: '8px' }}>
+                      <strong>Email registrado:</strong>
+                    </p>
+                    <p style={{ fontSize: '14px', color: theme.colors.accent.cyan.DEFAULT, margin: 0 }}>
+                      {email}
+                    </p>
+                  </div>
+                </Card>
+              )}
+
+              {/* Card de Possíveis Motivos */}
+              <Card variant="default">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div
+                    style={{
+                      padding: '14px 16px',
+                      background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.1) 100%)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      borderRadius: '10px',
+                    }}
+                  >
+                    <p style={{ fontSize: '13px', color: '#FFF', margin: 0 }}>
+                      <strong>Possíveis motivos:</strong>
+                    </p>
+                    <ul style={{ fontSize: '12px', color: theme.colors.text.primary, paddingLeft: '20px', marginTop: '8px', marginBottom: 0 }}>
+                      <li>Email diferente do usado na compra</li>
+                      <li>Compra ainda não processada (aguarde alguns minutos)</li>
+                      <li>Compra reembolsada ou cancelada</li>
+                      <li>Produto diferente (este app é exclusivo para "Imersão Diagnóstico de Vendas")</li>
+                    </ul>
+                  </div>
+
+                  <p style={{ fontSize: '12px', color: theme.colors.text.primary, margin: 0 }}>
+                    Por favor, clique abaixo para chamar nosso suporte:
+                  </p>
+                </div>
+              </Card>
+
+              {/* Botão WhatsApp Suporte */}
+              <Card variant="cyan">
+                <motion.a
+                  href={`https://wa.me/5511942230050?text=${encodeURIComponent(`Olá! Não consegui acessar o App Diagnóstico de Vendas.\n\nMeu email: ${email || '[informar]'}\n\nPor favor, verifiquem minha compra e liberem meu acesso.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileTap={{ scale: 0.98 }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '14px',
+                    background: 'linear-gradient(135deg, #25D366 0%, #128C7E 100%)',
+                    borderRadius: '12px',
+                    color: '#FFF',
+                    fontWeight: theme.typography.fontWeight.bold,
+                    fontSize: '14px',
+                    textDecoration: 'none',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  <MessageCircle size={18} />
+                  ENTRE EM CONTATO COM O SUPORTE
+                </motion.a>
+                {email && (
+                  <p style={{ fontSize: '11px', color: theme.colors.text.primary, textAlign: 'center', marginTop: '12px', marginBottom: 0 }}>
+                    Informe seu email: <strong style={{ color: theme.colors.accent.cyan.DEFAULT }}>{email}</strong>
+                  </p>
+                )}
+              </Card>
             </motion.div>
           )}
 

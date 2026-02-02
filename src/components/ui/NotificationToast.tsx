@@ -9,11 +9,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Bell, AlertTriangle, Gift, Star, ExternalLink } from 'lucide-react'
 import { theme } from '../../styles/theme'
 
-export type NotificationType = 'info' | 'alert' | 'offer' | 'nps'
+export type ToastNotificationType = 'info' | 'alert' | 'offer' | 'nps'
 
-export interface Notification {
+export interface ToastNotification {
   id: string
-  type: NotificationType
+  type: ToastNotificationType
   title: string
   message: string
   actionLabel?: string
@@ -23,12 +23,12 @@ export interface Notification {
 }
 
 interface NotificationToastProps {
-  notification: Notification | null
+  notification: ToastNotification | null
   onClose: () => void
   onAction?: () => void
 }
 
-const typeConfig: Record<NotificationType, {
+const typeConfig: Record<ToastNotificationType, {
   icon: typeof Bell
   color: string
   bg: string

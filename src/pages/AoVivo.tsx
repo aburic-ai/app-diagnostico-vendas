@@ -41,7 +41,8 @@ import {
   AIChatFAB,
   SponsorBadge,
 } from '../components/ui'
-import type { IMPACTData, Notification } from '../components/ui'
+import type { IMPACTData } from '../components/ui'
+import type { Notification } from '../hooks/useNotifications'
 import { theme } from '../styles/theme'
 import { getModuleById, EVENT_MODULES } from '../data/modules'
 import { useDiagnostic, useAuth, useUserProgress } from '../hooks'

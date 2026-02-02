@@ -38,7 +38,8 @@ import {
   NotificationDrawer,
   PageHeader,
 } from '../components/ui'
-import type { IMPACTData, ActionItem, Notification } from '../components/ui'
+import type { IMPACTData, ActionItem } from '../components/ui'
+import type { Notification } from '../hooks/useNotifications'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
 import { useUserProgress } from '../hooks/useUserProgress'
@@ -240,7 +241,7 @@ export function PosEvento() {
     if (!state?.scrollTo) return
 
     // Mapear target_section para ref
-    const sectionRefs: Record<string, React.RefObject<HTMLDivElement>> = {
+    const sectionRefs = {
       'final-report': finalReportRef,
       'scenario-projection': scenarioProjectionRef,
       'impact-offer': impactOfferRef,
