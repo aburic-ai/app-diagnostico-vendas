@@ -213,27 +213,26 @@ export function PreEvento() {
         progress: allLessonsWatched ? undefined : lessonsProgress,
         xp: remainingLessonsXP, // XP restante, não total
       },
+      {
+        id: STEP_IDS.PURCHASE_PDF_DIAGNOSIS,
+        title: 'Dossiê do Negócio (PDF)',
+        subtitle: 'Análise completa do seu processo de vendas',
+        icon: <FileText size={28} />,
+        status: 'purchase',
+        isPurchase: true,
+        xp: XP_CONFIG.PRE_EVENT.PURCHASE_PDF_DIAGNOSIS,
+      },
+      {
+        id: STEP_IDS.PURCHASE_EDITED_LESSONS,
+        title: 'Aulas Editadas',
+        subtitle: 'Chance de revisar o conteúdo do evento durante 1 ano',
+        icon: <Video size={28} />,
+        status: 'purchase',
+        isPurchase: true,
+        xp: XP_CONFIG.PRE_EVENT.PURCHASE_EDITED_LESSONS,
+      },
     ]
   }
-    {
-      id: STEP_IDS.PURCHASE_PDF_DIAGNOSIS,
-      title: 'Dossiê do Negócio (PDF)',
-      subtitle: 'Análise completa do seu processo de vendas',
-      icon: <FileText size={28} />,
-      status: 'purchase',
-      isPurchase: true,
-      xp: XP_CONFIG.PRE_EVENT.PURCHASE_PDF_DIAGNOSIS,
-    },
-    {
-      id: STEP_IDS.PURCHASE_EDITED_LESSONS,
-      title: 'Aulas Editadas',
-      subtitle: 'Chance de revisar o conteúdo do evento durante 1 ano',
-      icon: <Video size={28} />,
-      status: 'purchase',
-      isPurchase: true,
-      xp: XP_CONFIG.PRE_EVENT.PURCHASE_EDITED_LESSONS,
-    },
-  ]
 
   const [steps, setSteps] = useState<JourneyStep[]>(getSteps())
 
