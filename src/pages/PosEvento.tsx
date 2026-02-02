@@ -8,7 +8,8 @@
  * de estratégia decidindo o próximo ataque.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Rocket,
@@ -69,8 +70,15 @@ const buildOfferUrl = (baseUrl: string, utmContent?: string): string => {
 }
 
 export function PosEvento() {
-  const { profile: userProfile } = useAuth()
+  const { profile: userProfile, user } = useAuth()
   const { completeStep, isStepCompleted } = useUserProgress()
+  const location = useLocation()
+
+  // Refs para scroll to section (avisos clickables)
+  const finalReportRef = useRef<HTMLDivElement>(null)
+  const scenarioProjectionRef = useRef<HTMLDivElement>(null)
+  const impactOfferRef = useRef<HTMLDivElement>(null)
+  const actionPlanRef = useRef<HTMLDivElement>(null)
 
   const [activeNav, setActiveNav] = useState('posevento')
   const [showAlert, setShowAlert] = useState(true)
@@ -225,6 +233,41 @@ export function PosEvento() {
 
   // Dia atual (simulado - seria calculado pela data real)
   const currentDay = 1
+
+  // Scroll to section (avisos clickables)
+  useEffect(() => {
+    const state = location.state as { scrollTo?: string; highlight?: boolean } | undefined
+    if (!state?.scrollTo) return
+
+    // Mapear target_section para ref
+    const sectionRefs: Record<string, React.RefObject<HTMLDivElement>> = {
+      'final-report': finalReportRef,
+      'scenario-projection': scenarioProjectionRef,
+      'impact-offer': impactOfferRef,
+      'locked-offer': impactOfferRef,
+      'action-plan': actionPlanRef,
+      'plano-7-dias': actionPlanRef,
+    }
+
+    const targetRef = sectionRefs[state.scrollTo]
+    if (!targetRef?.current) return
+
+    // Aguardar animações carregarem
+    setTimeout(() => {
+      targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+      // Highlight opcional
+      if (state.highlight && targetRef.current) {
+        const element = targetRef.current
+        element.style.animation = 'pulse 1s ease-in-out 2'
+
+        // Remover animation após terminar
+        setTimeout(() => {
+          element.style.animation = ''
+        }, 2000)
+      }
+    }, 500) // Delay para garantir que componentes renderizaram
+  }, [location])
 
   // Carregar ações completadas do perfil (completed_steps)
   useEffect(() => {
@@ -480,7 +523,7 @@ export function PosEvento() {
           )}
 
           {/* ==================== FINAL REPORT ==================== */}
-          <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
+          <motion.div ref={finalReportRef} variants={itemVariants} style={{ marginBottom: '20px' }}>
             <FinalReport
               data={diagnosticData}
               score={score}
@@ -490,12 +533,12 @@ export function PosEvento() {
           </motion.div>
 
           {/* ==================== SCENARIO PROJECTION ==================== */}
-          <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
+          <motion.div ref={scenarioProjectionRef} variants={itemVariants} style={{ marginBottom: '20px' }}>
             <ScenarioProjection gargalo={gargalo.etapa} />
           </motion.div>
 
           {/* ==================== UNLOCKED OFFER (PREMIUM) ==================== */}
-          <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
+          <motion.div ref={impactOfferRef} variants={itemVariants} style={{ marginBottom: '20px' }}>
             <LockedOffer
               title="IMERSÃO PRESENCIAL IMPACT"
               subtitle="Protocolo de Correção em 3 Dias"
@@ -512,7 +555,7 @@ export function PosEvento() {
           </motion.div>
 
           {/* ==================== ACTION PLAN ==================== */}
-          <motion.div variants={itemVariants}>
+          <motion.div ref={actionPlanRef} variants={itemVariants}>
             <ActionPlan
               actions={actions}
               currentDay={currentDay}
@@ -915,6 +958,7 @@ export function PosEvento() {
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
         onMarkAllRead={() => {}}
+        userId={user?.id}
       />
 
       {/* ==================== BOTTOM NAVIGATION ==================== */}

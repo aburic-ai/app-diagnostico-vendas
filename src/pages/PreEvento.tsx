@@ -1922,6 +1922,7 @@ export function PreEvento() {
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
         onMarkAllRead={() => {}}
+        userId={user?.id}
       />
 
       {/* ==================== BOTTOM NAVIGATION ==================== */}

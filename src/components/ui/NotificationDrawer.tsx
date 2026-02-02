@@ -3,18 +3,21 @@
  *
  * Abre ao clicar no ícone de sino no header
  * Mostra notificações do dia com timestamp
+ * Suporta navegação (avisos clickables)
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Bell, AlertTriangle, Gift, Star, Check } from 'lucide-react'
+import { X, Bell, AlertTriangle, Gift, Star, Check, ExternalLink, ChevronRight } from 'lucide-react'
 import { theme } from '../../styles/theme'
-import type { Notification, NotificationType } from './NotificationToast'
+import type { Notification, NotificationType } from '../../hooks/useNotifications'
+import { useNotificationNavigation } from '../../hooks/useNotificationNavigation'
 
 interface NotificationDrawerProps {
   isOpen: boolean
   notifications: Notification[]
   onClose: () => void
   onMarkAllRead: () => void
+  userId?: string // Necessário para verificar read_by
 }
 
 const typeConfig: Record<NotificationType, {
@@ -22,12 +25,13 @@ const typeConfig: Record<NotificationType, {
   color: string
 }> = {
   info: { icon: Bell, color: '#22D3EE' },
-  alert: { icon: AlertTriangle, color: '#EF4444' },
-  offer: { icon: Gift, color: '#F59E0B' },
-  nps: { icon: Star, color: '#A855F7' },
+  success: { icon: Star, color: '#10B981' },
+  warning: { icon: AlertTriangle, color: '#F59E0B' },
+  error: { icon: AlertTriangle, color: '#EF4444' },
 }
 
-function formatTime(date: Date): string {
+function formatTime(timestamp: string | Date): string {
+  const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp
   return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
@@ -36,8 +40,10 @@ export function NotificationDrawer({
   notifications,
   onClose,
   onMarkAllRead,
+  userId,
 }: NotificationDrawerProps) {
-  const unreadCount = notifications.filter(n => !n.read).length
+  const { handleNotificationClick, isClickable } = useNotificationNavigation()
+  const unreadCount = notifications.filter(n => !n.read_by?.includes(userId || '')).length
 
   return (
     <AnimatePresence>
@@ -209,6 +215,8 @@ export function NotificationDrawer({
                   {notifications.map((notification, index) => {
                     const config = typeConfig[notification.type]
                     const Icon = config.icon
+                    const clickable = isClickable(notification)
+                    const isRead = notification.read_by?.includes(userId || '')
 
                     return (
                       <motion.div
@@ -216,14 +224,28 @@ export function NotificationDrawer({
                         initial={{ x: 20, opacity: 0 }}
                         animate={{ x: 0, opacity: 1 }}
                         transition={{ delay: index * 0.05 }}
+                        onClick={() => {
+                          if (clickable) {
+                            handleNotificationClick(notification)
+                            onClose() // Fechar drawer após click
+                          }
+                        }}
+                        whileHover={
+                          clickable
+                            ? { scale: 1.02, backgroundColor: 'rgba(15, 17, 21, 0.95)' }
+                            : {}
+                        }
+                        whileTap={clickable ? { scale: 0.98 } : {}}
                         style={{
                           padding: '14px',
-                          background: notification.read
+                          background: isRead
                             ? 'rgba(15, 17, 21, 0.5)'
                             : 'rgba(15, 17, 21, 0.8)',
-                          border: `1px solid ${notification.read ? 'rgba(100, 116, 139, 0.15)' : 'rgba(100, 116, 139, 0.3)'}`,
+                          border: `1px solid ${isRead ? 'rgba(100, 116, 139, 0.15)' : 'rgba(100, 116, 139, 0.3)'}`,
                           borderRadius: '12px',
-                          opacity: notification.read ? 0.7 : 1,
+                          opacity: isRead ? 0.7 : 1,
+                          cursor: clickable ? 'pointer' : 'default',
+                          position: 'relative',
                         }}
                       >
                         <div style={{ display: 'flex', gap: '12px' }}>
@@ -282,6 +304,31 @@ export function NotificationDrawer({
                             >
                               {notification.message}
                             </p>
+                            {clickable && (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  marginTop: '8px',
+                                  fontSize: '10px',
+                                  color: config.color,
+                                  fontWeight: theme.typography.fontWeight.semibold,
+                                }}
+                              >
+                                {notification.action_type === 'external' ? (
+                                  <>
+                                    <ExternalLink size={12} />
+                                    <span>Abrir link</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronRight size={12} />
+                                    <span>Acessar</span>
+                                  </>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </motion.div>

@@ -18,6 +18,12 @@ export interface Notification {
   message: string
   created_at: string
   read_by: string[]
+
+  // Campos de navegação (Avisos Clickables)
+  action_type?: 'internal' | 'external' | 'none'
+  target_page?: string      // 'pre-evento' | 'ao-vivo' | 'pos-evento' | 'plano-7-dias' | 'impact-offer' | 'nps'
+  target_section?: string   // ID da seção para scroll (ex: 'action-plan', 'radar-chart')
+  external_url?: string     // URL externa completa
 }
 
 export function useNotifications() {
@@ -172,7 +178,13 @@ export function useNotifications() {
   const createNotification = async (
     type: NotificationType,
     title: string,
-    message: string
+    message: string,
+    navigationConfig?: {
+      action_type?: 'internal' | 'external' | 'none'
+      target_page?: string
+      target_section?: string
+      external_url?: string
+    }
   ) => {
     if (!user) return { error: new Error('User not authenticated') }
 
@@ -184,6 +196,7 @@ export function useNotifications() {
           title,
           message,
           read_by: [],
+          ...navigationConfig,
         })
         .select()
         .single()

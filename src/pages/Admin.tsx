@@ -42,10 +42,12 @@ import {
 } from 'lucide-react'
 import { EVENT_MODULES, TOTAL_MODULES, getCurrentDay } from '../data/modules'
 import { NotificationToast } from '../components/ui'
-import type { Notification, NotificationType } from '../components/ui'
+import type { Notification as LocalNotification } from '../components/ui'
 import { theme } from '../styles/theme'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/supabase'
+import { useNotifications } from '../hooks/useNotifications'
+import type { Notification, NotificationType } from '../hooks/useNotifications'
 
 // Estado do evento
 type EventStatus = 'offline' | 'live' | 'paused' | 'activity' | 'lunch'
@@ -149,6 +151,9 @@ const notificationTemplates = [
 ]
 
 export function Admin() {
+  // Hooks
+  const { createNotification } = useNotifications()
+
   // Event State
   const [eventState, setEventState] = useState<EventState>({
     status: 'offline',
@@ -202,6 +207,12 @@ export function Admin() {
   const [notifAction, setNotifAction] = useState('')
   const [sentNotifications, setSentNotifications] = useState<Notification[]>([])
 
+  // Navigation Config (Avisos Clickables)
+  const [actionType, setActionType] = useState<'none' | 'internal' | 'external'>('none')
+  const [targetPage, setTargetPage] = useState('')
+  const [targetSection, setTargetSection] = useState('')
+  const [externalUrl, setExternalUrl] = useState('')
+
   // Preview notification
   const [previewNotification, setPreviewNotification] = useState<Notification | null>(null)
   const [lunchMinutesRemaining, setLunchMinutesRemaining] = useState<number>(0)
@@ -212,6 +223,19 @@ export function Admin() {
   const [loadingParticipants, setLoadingParticipants] = useState(true)
   const [participantSearch, setParticipantSearch] = useState('')
   const [moduleDropdownOpen, setModuleDropdownOpen] = useState(false)
+
+  // Access requests state
+  const [accessRequests, setAccessRequests] = useState<any[]>([])
+  const [loadingRequests, setLoadingRequests] = useState(true)
+
+  // Users modal state
+  const [showUsersModal, setShowUsersModal] = useState(false)
+  const [allUsers, setAllUsers] = useState<any[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+  const [userSearch, setUserSearch] = useState('')
+  const [selectedUser, setSelectedUser] = useState<any | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [usersTab, setUsersTab] = useState<'all' | 'pending'>('all')
 
   // Calculate minutes remaining until lunch return
   const calculateLunchMinutes = () => {
@@ -279,6 +303,65 @@ export function Admin() {
     const interval = setInterval(fetchParticipants, 30000)
     return () => clearInterval(interval)
   }, [])
+
+  // Fetch access requests
+  useEffect(() => {
+    const fetchAccessRequests = async () => {
+      try {
+        setLoadingRequests(true)
+
+        const { data, error } = await supabase
+          .from('access_requests')
+          .select('*')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        setAccessRequests(data || [])
+        console.log(`📋 ${(data || []).length} solicitações de acesso pendentes`)
+      } catch (error) {
+        console.error('❌ Erro ao carregar solicitações:', error)
+        setAccessRequests([])
+      } finally {
+        setLoadingRequests(false)
+      }
+    }
+
+    fetchAccessRequests()
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchAccessRequests, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Fetch all users when modal opens
+  useEffect(() => {
+    if (!showUsersModal) return
+
+    const fetchAllUsers = async () => {
+      try {
+        setLoadingUsers(true)
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, email, name, phone, company, role, xp, created_at, updated_at')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        setAllUsers(data || [])
+        console.log(`👥 ${(data || []).length} usuários carregados`)
+      } catch (error) {
+        console.error('❌ Erro ao carregar usuários:', error)
+        setAllUsers([])
+      } finally {
+        setLoadingUsers(false)
+      }
+    }
+
+    fetchAllUsers()
+  }, [showUsersModal])
 
   // Filter participants by search and sort by XP (highest first)
   const filteredParticipants = participants
@@ -377,10 +460,33 @@ export function Admin() {
     setEventState(prev => ({ ...prev, aiEnabled: !prev.aiEnabled }))
   }
 
-  const handleSendNotification = () => {
+  const handleSendNotification = async () => {
     if (!notifTitle.trim() || !notifMessage.trim()) return
 
-    const notification: Notification = {
+    // Construir config de navegação (se houver)
+    const navigationConfig = actionType !== 'none' ? {
+      action_type: actionType,
+      target_page: actionType === 'internal' ? targetPage : undefined,
+      target_section: actionType === 'internal' ? targetSection : undefined,
+      external_url: actionType === 'external' ? externalUrl : undefined,
+    } : undefined
+
+    // Criar notificação no banco
+    const { error, data } = await createNotification(
+      notifType,
+      notifTitle,
+      notifMessage,
+      navigationConfig
+    )
+
+    if (error) {
+      console.error('Erro ao enviar notificação:', error)
+      alert('Erro ao enviar notificação. Veja o console.')
+      return
+    }
+
+    // Preview local
+    const localNotif: LocalNotification = {
       id: Date.now().toString(),
       type: notifType,
       title: notifTitle,
@@ -390,13 +496,19 @@ export function Admin() {
       read: false,
     }
 
-    setSentNotifications(prev => [notification, ...prev])
-    setPreviewNotification(notification)
+    setSentNotifications(prev => [localNotif, ...prev])
+    setPreviewNotification(localNotif)
 
     // Clear form
     setNotifTitle('')
     setNotifMessage('')
     setNotifAction('')
+    setActionType('none')
+    setTargetPage('')
+    setTargetSection('')
+    setExternalUrl('')
+
+    console.log('✅ Notificação enviada:', data)
 
     // Auto-hide preview
     setTimeout(() => setPreviewNotification(null), 5000)
@@ -469,26 +581,49 @@ export function Admin() {
               Imersão Diagnóstico de Vendas - {eventData.edition}
             </p>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowEventSettings(!showEventSettings)}
-            style={{
-              padding: '10px',
-              background: 'rgba(100, 116, 139, 0.2)',
-              border: '1px solid rgba(100, 116, 139, 0.3)',
-              borderRadius: '10px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: theme.colors.text.secondary,
-              fontSize: '12px',
-            }}
-          >
-            <Settings size={16} />
-            Configurações
-          </motion.button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowUsersModal(true)}
+              style={{
+                padding: '10px 14px',
+                background: 'rgba(168, 85, 247, 0.2)',
+                border: '1px solid rgba(168, 85, 247, 0.4)',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: theme.colors.accent.purple.DEFAULT,
+                fontSize: '12px',
+                fontWeight: '600',
+              }}
+            >
+              <Users size={16} />
+              Usuários
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowEventSettings(!showEventSettings)}
+              style={{
+                padding: '10px 14px',
+                background: 'rgba(100, 116, 139, 0.2)',
+                border: '1px solid rgba(100, 116, 139, 0.3)',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: theme.colors.text.secondary,
+                fontSize: '12px',
+              }}
+            >
+              <Settings size={16} />
+              Configurações
+            </motion.button>
+          </div>
         </div>
 
         {/* ==================== EVENT SETTINGS (Collapsible) ==================== */}
@@ -2003,6 +2138,98 @@ export function Admin() {
                 outline: 'none',
               }}
             />
+
+            {/* Navigation Config */}
+            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(100, 116, 139, 0.2)' }}>
+              <p style={{ fontSize: '11px', color: theme.colors.text.muted, marginBottom: '8px' }}>
+                Ação ao clicar (opcional):
+              </p>
+              <select
+                value={actionType}
+                onChange={(e) => setActionType(e.target.value as 'none' | 'internal' | 'external')}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  background: 'rgba(10, 12, 18, 0.8)',
+                  border: '1px solid rgba(100, 116, 139, 0.3)',
+                  borderRadius: '8px',
+                  color: theme.colors.text.primary,
+                  fontSize: '14px',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  marginBottom: '12px',
+                }}
+              >
+                <option value="none">Sem ação (apenas leitura)</option>
+                <option value="internal">Link interno (navegar no app)</option>
+                <option value="external">Link externo (abrir URL)</option>
+              </select>
+
+              {actionType === 'internal' && (
+                <>
+                  <select
+                    value={targetPage}
+                    onChange={(e) => setTargetPage(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      background: 'rgba(10, 12, 18, 0.8)',
+                      border: '1px solid rgba(100, 116, 139, 0.3)',
+                      borderRadius: '8px',
+                      color: theme.colors.text.primary,
+                      fontSize: '14px',
+                      outline: 'none',
+                      cursor: 'pointer',
+                      marginBottom: '12px',
+                    }}
+                  >
+                    <option value="">Selecione a página</option>
+                    <option value="plano-7-dias">Plano 7 Dias (PosEvento)</option>
+                    <option value="impact-offer">Oferta IMPACT (PosEvento)</option>
+                    <option value="scenario-projection">Projeção de Cenário (PosEvento)</option>
+                    <option value="final-report">Relatório Final (PosEvento)</option>
+                    <option value="diagnostico">Diagnóstico (AoVivo)</option>
+                    <option value="protocolo">Protocolo (PreEvento)</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={targetSection}
+                    onChange={(e) => setTargetSection(e.target.value)}
+                    placeholder="ID da seção (ex: action-plan, radar-chart)"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      background: 'rgba(10, 12, 18, 0.8)',
+                      border: '1px solid rgba(100, 116, 139, 0.3)',
+                      borderRadius: '8px',
+                      color: theme.colors.text.primary,
+                      fontSize: '14px',
+                      outline: 'none',
+                    }}
+                  />
+                </>
+              )}
+
+              {actionType === 'external' && (
+                <input
+                  type="url"
+                  value={externalUrl}
+                  onChange={(e) => setExternalUrl(e.target.value)}
+                  placeholder="URL completa (https://...)"
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    background: 'rgba(10, 12, 18, 0.8)',
+                    border: '1px solid rgba(100, 116, 139, 0.3)',
+                    borderRadius: '8px',
+                    color: theme.colors.text.primary,
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}
+                />
+              )}
+            </div>
+
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -2837,6 +3064,478 @@ export function Admin() {
                   </p>
                 )}
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ==================== USERS MODAL ==================== */}
+      <AnimatePresence>
+        {showUsersModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+            }}
+            onClick={() => {
+              setShowUsersModal(false)
+              setSelectedUser(null)
+              setNewPassword('')
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.98) 0%, rgba(10, 12, 18, 0.98) 100%)',
+                border: '1px solid rgba(168, 85, 247, 0.4)',
+                borderRadius: '20px',
+                padding: '24px',
+                width: '900px',
+                maxHeight: '85vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '44px',
+                      height: '44px',
+                      borderRadius: '12px',
+                      background: 'rgba(168, 85, 247, 0.2)',
+                      border: '1px solid rgba(168, 85, 247, 0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Users size={22} color={theme.colors.accent.purple.DEFAULT} />
+                  </div>
+                  <div>
+                    <h3
+                      style={{
+                        fontFamily: theme.typography.fontFamily.orbitron,
+                        fontSize: '16px',
+                        fontWeight: 'bold',
+                        color: theme.colors.accent.purple.DEFAULT,
+                        margin: 0,
+                      }}
+                    >
+                      GERENCIAR USUÁRIOS
+                    </h3>
+                    <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: '2px 0 0 0' }}>
+                      {usersTab === 'all' ? `${allUsers.length} usuários cadastrados` : `${accessRequests.length} solicitações pendentes`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowUsersModal(false)
+                    setSelectedUser(null)
+                    setNewPassword('')
+                  }}
+                  style={{
+                    background: 'rgba(100, 116, 139, 0.2)',
+                    border: '1px solid rgba(100, 116, 139, 0.3)',
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    padding: '10px',
+                  }}
+                >
+                  <X size={20} color={theme.colors.text.muted} />
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setUsersTab('all')
+                    setSelectedUser(null)
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: usersTab === 'all' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(100, 116, 139, 0.1)',
+                    border: `1px solid ${usersTab === 'all' ? 'rgba(168, 85, 247, 0.4)' : 'rgba(100, 116, 139, 0.2)'}`,
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    color: usersTab === 'all' ? theme.colors.accent.purple.DEFAULT : theme.colors.text.muted,
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Users size={16} />
+                  Todos os Usuários
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setUsersTab('pending')
+                    setSelectedUser(null)
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: usersTab === 'pending' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(100, 116, 139, 0.1)',
+                    border: `1px solid ${usersTab === 'pending' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(100, 116, 139, 0.2)'}`,
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    color: usersTab === 'pending' ? theme.colors.status.danger : theme.colors.text.muted,
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <AlertTriangle size={16} />
+                  Solicitações Pendentes
+                  {accessRequests.length > 0 && (
+                    <span
+                      style={{
+                        background: theme.colors.status.danger,
+                        color: '#FFF',
+                        borderRadius: '12px',
+                        padding: '2px 8px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      {accessRequests.length}
+                    </span>
+                  )}
+                </motion.button>
+              </div>
+
+              {/* Search (only for all users tab) */}
+              {usersTab === 'all' && (
+                <div style={{ marginBottom: '16px' }}>
+                  <input
+                    type="text"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder="Buscar por nome ou email..."
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      background: 'rgba(10, 12, 18, 0.8)',
+                      border: '1px solid rgba(100, 116, 139, 0.3)',
+                      borderRadius: '10px',
+                      color: theme.colors.text.primary,
+                      fontSize: '14px',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Content */}
+              <div style={{ flex: 1, overflowY: 'auto', marginBottom: '16px' }}>
+                {usersTab === 'all' ? (
+                  // ALL USERS TAB
+                  loadingUsers ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: theme.colors.text.muted }}>
+                      Carregando usuários...
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {allUsers
+                        .filter(u =>
+                          u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
+                          (u.name || '').toLowerCase().includes(userSearch.toLowerCase())
+                        )
+                        .slice(0, 50)
+                        .map((user) => (
+                          <motion.div
+                            key={user.id}
+                            whileHover={{ scale: 1.01 }}
+                            onClick={() => setSelectedUser(user)}
+                            style={{
+                              padding: '12px 16px',
+                              background: selectedUser?.id === user.id ? 'rgba(168, 85, 247, 0.15)' : 'rgba(10, 12, 18, 0.8)',
+                              border: `1px solid ${selectedUser?.id === user.id ? 'rgba(168, 85, 247, 0.4)' : 'rgba(100, 116, 139, 0.2)'}`,
+                              borderRadius: '10px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '12px',
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ fontSize: '14px', fontWeight: 'bold', color: theme.colors.text.primary, margin: '0 0 2px 0' }}>
+                                {user.name || 'Sem nome'}
+                              </p>
+                              <p
+                                style={{
+                                  fontSize: '11px',
+                                  color: theme.colors.text.muted,
+                                  margin: 0,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {user.email}
+                              </p>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div
+                                style={{
+                                  padding: '4px 8px',
+                                  background: 'rgba(245, 158, 11, 0.15)',
+                                  borderRadius: '6px',
+                                }}
+                              >
+                                <span style={{ fontSize: '11px', fontWeight: 'bold', color: theme.colors.gold.DEFAULT }}>
+                                  {user.xp || 0} XP
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '10px', color: theme.colors.text.muted }}>
+                                {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                          </motion.div>
+                        ))}
+                    </div>
+                  )
+                ) : (
+                  // PENDING REQUESTS TAB
+                  loadingRequests ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: theme.colors.text.muted }}>
+                      Carregando solicitações...
+                    </div>
+                  ) : accessRequests.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '40px',
+                        textAlign: 'center',
+                        background: 'rgba(34, 197, 94, 0.1)',
+                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                        borderRadius: '12px',
+                        color: theme.colors.text.secondary,
+                      }}
+                    >
+                      ✅ Nenhuma solicitação pendente
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {accessRequests.map((request) => (
+                        <div
+                          key={request.id}
+                          style={{
+                            padding: '16px',
+                            background: 'rgba(10, 12, 18, 0.8)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '12px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                            <div style={{ flex: 1 }}>
+                              <p style={{ fontSize: '14px', fontWeight: 'bold', color: theme.colors.accent.cyan.DEFAULT, margin: '0 0 4px 0' }}>
+                                {request.email}
+                              </p>
+                              {request.transaction_id && (
+                                <p style={{ fontSize: '11px', color: theme.colors.text.muted, margin: '0 0 4px 0' }}>
+                                  Transaction: {request.transaction_id}
+                                </p>
+                              )}
+                              <p style={{ fontSize: '11px', color: theme.colors.text.secondary, margin: 0 }}>
+                                Motivo: {
+                                  request.reason === 'purchase_not_found' ? 'Compra não encontrada' :
+                                  request.reason === 'status_not_approved' ? 'Status não aprovado' :
+                                  request.reason === 'purchase_refunded' ? 'Compra reembolsada' :
+                                  request.reason === 'wrong_product' ? 'Produto incorreto' :
+                                  request.reason
+                                }
+                              </p>
+                              <p style={{ fontSize: '10px', color: theme.colors.text.muted, margin: '4px 0 0 0' }}>
+                                {new Date(request.requested_at).toLocaleString('pt-BR')}
+                              </p>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={async () => {
+                                if (!confirm(`Aprovar acesso para ${request.email}?`)) return
+
+                                const { error } = await supabase
+                                  .from('access_requests')
+                                  .update({
+                                    status: 'approved',
+                                    reviewed_at: new Date().toISOString(),
+                                    reviewed_by: user?.id,
+                                  })
+                                  .eq('id', request.id)
+
+                                if (error) {
+                                  alert('Erro ao aprovar: ' + error.message)
+                                  return
+                                }
+
+                                setAccessRequests(prev => prev.filter(r => r.id !== request.id))
+                                alert('✅ Acesso aprovado!')
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '10px',
+                                background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(22, 163, 74, 0.2) 100%)',
+                                border: '1px solid rgba(34, 197, 94, 0.5)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                color: '#22C55E',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              ✓ APROVAR
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={async () => {
+                                if (!confirm(`Rejeitar acesso para ${request.email}?`)) return
+
+                                const { error } = await supabase
+                                  .from('access_requests')
+                                  .update({
+                                    status: 'rejected',
+                                    reviewed_at: new Date().toISOString(),
+                                    reviewed_by: user?.id,
+                                  })
+                                  .eq('id', request.id)
+
+                                if (error) {
+                                  alert('Erro ao rejeitar: ' + error.message)
+                                  return
+                                }
+
+                                setAccessRequests(prev => prev.filter(r => r.id !== request.id))
+                                alert('❌ Acesso rejeitado.')
+                              }}
+                              style={{
+                                flex: 1,
+                                padding: '10px',
+                                background: 'rgba(239, 68, 68, 0.2)',
+                                border: '1px solid rgba(239, 68, 68, 0.4)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                color: theme.colors.status.danger,
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              ✗ REJEITAR
+                            </motion.button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* Footer - Password Reset (only when user is selected in all users tab) */}
+              {selectedUser && usersTab === 'all' && (
+                <div
+                  style={{
+                    padding: '16px',
+                    background: 'rgba(168, 85, 247, 0.1)',
+                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                    borderRadius: '12px',
+                  }}
+                >
+                  <p style={{ fontSize: '12px', color: theme.colors.text.primary, margin: '0 0 12px 0', fontWeight: '600' }}>
+                    Trocar senha de: <span style={{ color: theme.colors.accent.purple.DEFAULT }}>{selectedUser.email}</span>
+                  </p>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input
+                      type="text"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Nova senha (mín. 6 caracteres)"
+                      style={{
+                        flex: 1,
+                        padding: '10px 12px',
+                        background: 'rgba(10, 12, 18, 0.8)',
+                        border: '1px solid rgba(100, 116, 139, 0.3)',
+                        borderRadius: '8px',
+                        color: theme.colors.text.primary,
+                        fontSize: '13px',
+                        outline: 'none',
+                      }}
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={async () => {
+                        if (!newPassword || newPassword.length < 6) {
+                          alert('Senha deve ter no mínimo 6 caracteres')
+                          return
+                        }
+
+                        if (!confirm(`Trocar senha do usuário ${selectedUser.email}?`)) return
+
+                        try {
+                          const { error } = await supabase.auth.admin.updateUserById(selectedUser.id, {
+                            password: newPassword,
+                          })
+
+                          if (error) {
+                            alert('❌ Erro ao trocar senha: ' + error.message)
+                            return
+                          }
+
+                          alert(`✅ Senha alterada com sucesso!\n\nEmail: ${selectedUser.email}\nNova senha: ${newPassword}\n\nInforme ao usuário por WhatsApp.`)
+                          setNewPassword('')
+                          setSelectedUser(null)
+                        } catch (err: any) {
+                          alert('❌ Erro: ' + err.message)
+                        }
+                      }}
+                      style={{
+                        padding: '10px 20px',
+                        background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
+                        border: '1px solid rgba(168, 85, 247, 0.5)',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        color: theme.colors.accent.purple.light,
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      TROCAR SENHA
+                    </motion.button>
+                  </div>
+                  <p style={{ fontSize: '10px', color: theme.colors.text.muted, margin: '8px 0 0 0' }}>
+                    ⚠️ Informe a nova senha ao usuário por WhatsApp
+                  </p>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}

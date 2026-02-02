@@ -5,7 +5,8 @@
  * alertas de gargalo, módulos em scroll horizontal e oferta bloqueada.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Rocket,
@@ -98,9 +99,13 @@ const impactToScores = (impact: IMPACTData): DiagnosticScores => {
 }
 
 export function AoVivo() {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const { getDiagnosticByDay, saveDiagnostic, loading: diagnosticLoading } = useDiagnostic()
   const { completeStep } = useUserProgress()
+  const location = useLocation()
+
+  // Refs para scroll to section (avisos clickables)
+  const diagnosticSlidersRef = useRef<HTMLDivElement>(null)
 
   const [activeNav, setActiveNav] = useState('aovivo')
   const [selectedDay, setSelectedDay] = useState<1 | 2>(1)
@@ -153,6 +158,37 @@ export function AoVivo() {
     conversao: 0,
     transformacao: 0,
   })
+
+  // Scroll to section (avisos clickables)
+  useEffect(() => {
+    const state = location.state as { scrollTo?: string; highlight?: boolean } | undefined
+    if (!state?.scrollTo) return
+
+    // Mapear target_section para ref
+    const sectionRefs: Record<string, React.RefObject<HTMLDivElement>> = {
+      'diagnostico': diagnosticSlidersRef,
+      'diagnostic-sliders': diagnosticSlidersRef,
+    }
+
+    const targetRef = sectionRefs[state.scrollTo]
+    if (!targetRef?.current) return
+
+    // Aguardar animações carregarem
+    setTimeout(() => {
+      targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+      // Highlight opcional
+      if (state.highlight && targetRef.current) {
+        const element = targetRef.current
+        element.style.animation = 'pulse 1s ease-in-out 2'
+
+        // Remover animation após terminar
+        setTimeout(() => {
+          element.style.animation = ''
+        }, 2000)
+      }
+    }, 500) // Delay para garantir que componentes renderizaram
+  }, [location])
 
   // Carregar diagnósticos do banco quando disponíveis
   useEffect(() => {
@@ -817,6 +853,7 @@ export function AoVivo() {
             {/* Sliders */}
             {showSliders && (
               <motion.div
+                ref={diagnosticSlidersRef}
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
@@ -1043,6 +1080,7 @@ export function AoVivo() {
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
         onMarkAllRead={() => console.log('Mark all as read')}
+        userId={user?.id}
       />
 
       {/* ==================== AI CHAT MODAL ==================== */}
