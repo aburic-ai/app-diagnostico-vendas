@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, Mail } from 'lucide-react'
 
@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase'
 
 export function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,14 +30,23 @@ export function Login() {
 
   // Detectar token de recovery na URL e redirecionar para /reset-password
   useEffect(() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    // Suporta tanto window.location.hash quanto location.hash
+    const hash = window.location.hash || location.hash
+
+    if (!hash) return
+
+    const hashParams = new URLSearchParams(hash.substring(1))
     const type = hashParams.get('type')
 
+    console.log('[Login] Hash detectado:', hash)
+    console.log('[Login] Type:', type)
+
     if (type === 'recovery') {
+      console.log('[Login] Redirecionando para /reset-password')
       // Redirecionar para a página de reset mantendo o hash
-      navigate('/reset-password' + window.location.hash, { replace: true })
+      navigate('/reset-password' + hash, { replace: true })
     }
-  }, [navigate])
+  }, [navigate, location])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
