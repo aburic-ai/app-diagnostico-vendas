@@ -174,33 +174,47 @@ export function PreEvento() {
   ]
 
   // Steps depend on profile completion
-  const getSteps = (): JourneyStep[] => [
-    {
-      id: STEP_IDS.PROTOCOL_SURVEY,
-      title: 'Protocolo de Iniciação',
-      subtitle: 'Calibre seus dados para o seu sistema ser personalizado para o seu negócio',
-      icon: <Network size={28} />,
-      status: isStepCompleted(STEP_IDS.PROTOCOL_SURVEY) ? 'completed' : 'current',
-      xp: XP_CONFIG.PRE_EVENT.PROTOCOL_SURVEY,
-    },
-    {
-      id: STEP_IDS.COMPLETE_PROFILE,
-      title: 'Complete seu Perfil',
-      subtitle: 'Adicione sua foto e informações para personalizar sua experiência',
-      icon: <User size={28} />,
-      status: isProfileComplete ? 'completed' : 'current',
-      progress: isProfileComplete ? undefined : profileProgress,
-      xp: XP_CONFIG.PRE_EVENT.COMPLETE_PROFILE,
-    },
-    {
-      id: STEP_IDS.WATCH_BONUS_LESSONS,
-      title: 'Assistir Aulas Bônus',
-      subtitle: 'Clique abaixo para assistir as aulas bônus e chegar preparado para o evento',
-      icon: <Play size={28} />,
-      status: 'current',
-      progress: 0,
-      xp: XP_CONFIG.PRE_EVENT.WATCH_BONUS_LESSONS,
-    },
+  const getSteps = (): JourneyStep[] => {
+    // Calcular progresso das aulas
+    const watchedCount = lessons.filter(l => l.watched).length
+    const totalLessons = lessons.length
+    const lessonsProgress = Math.round((watchedCount / totalLessons) * 100)
+    const allLessonsWatched = watchedCount === totalLessons
+    const xpPerLesson = 20
+    const earnedLessonsXP = watchedCount * xpPerLesson
+    const remainingLessonsXP = XP_CONFIG.PRE_EVENT.WATCH_BONUS_LESSONS - earnedLessonsXP
+
+    return [
+      {
+        id: STEP_IDS.PROTOCOL_SURVEY,
+        title: 'Protocolo de Iniciação',
+        subtitle: 'Calibre seus dados para o seu sistema ser personalizado para o seu negócio',
+        icon: <Network size={28} />,
+        status: isStepCompleted(STEP_IDS.PROTOCOL_SURVEY) ? 'completed' : 'current',
+        xp: XP_CONFIG.PRE_EVENT.PROTOCOL_SURVEY,
+      },
+      {
+        id: STEP_IDS.COMPLETE_PROFILE,
+        title: 'Complete seu Perfil',
+        subtitle: 'Adicione sua foto e informações para personalizar sua experiência',
+        icon: <User size={28} />,
+        status: isProfileComplete ? 'completed' : 'current',
+        progress: isProfileComplete ? undefined : profileProgress,
+        xp: XP_CONFIG.PRE_EVENT.COMPLETE_PROFILE,
+      },
+      {
+        id: STEP_IDS.WATCH_BONUS_LESSONS,
+        title: 'Assistir Aulas Bônus',
+        subtitle: allLessonsWatched
+          ? 'Todas as aulas foram assistidas!'
+          : `${watchedCount}/${totalLessons} aulas assistidas • Clique para assistir`,
+        icon: <Play size={28} />,
+        status: allLessonsWatched ? 'completed' : 'current',
+        progress: allLessonsWatched ? undefined : lessonsProgress,
+        xp: remainingLessonsXP, // XP restante, não total
+      },
+    ]
+  }
     {
       id: STEP_IDS.PURCHASE_PDF_DIAGNOSIS,
       title: 'Dossiê do Negócio (PDF)',
@@ -1013,33 +1027,70 @@ export function PreEvento() {
                         gap: '2px',
                       }}
                     >
-                      {/* XP Value - sempre mostrar se tiver xp */}
-                      {step.xp && (
+                      {/* XP Value - mostrar diferente baseado no status */}
+                      {step.status === 'completed' ? (
+                        // Completo: Mostrar checkmark e "Ganho"
+                        <>
+                          <div
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '50%',
+                              background: 'rgba(34, 211, 238, 0.15)',
+                              border: '1.5px solid rgba(34, 211, 238, 0.4)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Check size={18} color={theme.colors.accent.cyan.DEFAULT} strokeWidth={3} />
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '9px',
+                              color: theme.colors.accent.cyan.DEFAULT,
+                              fontWeight: theme.typography.fontWeight.semibold,
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            Ganho
+                          </span>
+                        </>
+                      ) : step.xp && step.xp > 0 ? (
+                        // Disponível ou em progresso: Mostrar +XP
                         <>
                           <span
                             style={{
-                              fontSize: '14px',
+                              fontSize: '18px',
                               fontWeight: theme.typography.fontWeight.bold,
-                              color: step.status === 'completed'
-                                ? theme.colors.gold.DEFAULT
+                              color: step.status === 'locked'
+                                ? theme.colors.text.muted
                                 : step.isPurchase
                                 ? theme.colors.gold.light
-                                : theme.colors.text.muted,
+                                : theme.colors.gold.DEFAULT,
+                              textShadow: step.status !== 'locked'
+                                ? `0 0 12px ${step.isPurchase ? theme.colors.gold.light : theme.colors.gold.DEFAULT}66`
+                                : 'none',
                             }}
                           >
                             +{step.xp}
                           </span>
                           <span
                             style={{
-                              fontSize: '8px',
-                              color: step.isPurchase ? theme.colors.gold.light : theme.colors.text.muted,
+                              fontSize: '9px',
+                              color: step.status === 'locked'
+                                ? theme.colors.text.muted
+                                : step.isPurchase
+                                ? theme.colors.gold.light
+                                : theme.colors.gold.DEFAULT,
                               textTransform: 'uppercase',
+                              fontWeight: theme.typography.fontWeight.semibold,
                             }}
                           >
                             XP
                           </span>
                         </>
-                      )}
+                      ) : null}
                       {/* Indicador de Compra */}
                       {step.isPurchase && (
                         <div
