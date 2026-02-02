@@ -417,10 +417,18 @@ export function PreEvento() {
   }
 
   // Mark lesson as watched
-  const handleMarkLessonWatched = (lessonId: number) => {
+  const handleMarkLessonWatched = async (lessonId: number) => {
+    // Cada aula vale 20 XP (60 XP total ÷ 3 aulas)
+    const XP_PER_LESSON = 20
+    const stepId = `watch-lesson-${lessonId}`
+
+    // Atualizar visualmente
     setLessons(prev => prev.map(l =>
       l.id === lessonId ? { ...l, watched: true } : l
     ))
+
+    // Dar XP e salvar no banco
+    await completeStep(stepId, XP_PER_LESSON)
   }
 
   const getStatusColor = (status: JourneyStep['status']) => {
@@ -1845,8 +1853,8 @@ export function PreEvento() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  handleMarkLessonWatched(selectedLesson.id)
+                onClick={async () => {
+                  await handleMarkLessonWatched(selectedLesson.id)
                   setSelectedLesson({ ...selectedLesson, watched: true })
                 }}
                 style={{
@@ -1885,7 +1893,7 @@ export function PreEvento() {
                 >
                   <Zap size={12} color={theme.colors.gold.DEFAULT} />
                   <span style={{ fontSize: '11px', color: theme.colors.gold.DEFAULT, fontWeight: 'bold' }}>
-                    +15 XP
+                    +20 XP
                   </span>
                 </div>
               </motion.button>
