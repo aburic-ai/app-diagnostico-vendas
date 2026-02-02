@@ -8,12 +8,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Mail } from 'lucide-react'
 
 // Componentes centralizados
 import { PageWrapper, Input, Button } from '../components/ui'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
+import { supabase } from '../lib/supabase'
 
 export function Login() {
   const navigate = useNavigate()
@@ -23,6 +24,7 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [magicLinkSent, setMagicLinkSent] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,6 +50,35 @@ export function Login() {
     } else {
       // AuthContext vai redirecionar automaticamente via ProtectedRoute
       navigate('/pre-evento')
+    }
+  }
+
+  const handleMagicLink = async () => {
+    if (!email || !email.includes('@')) {
+      setError('Digite um email válido primeiro')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/pre-evento`,
+        },
+      })
+
+      if (error) throw error
+
+      setMagicLinkSent(true)
+      setError('')
+    } catch (err: any) {
+      setError('Erro ao enviar link. Tente novamente.')
+      console.error('Magic link error:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -128,10 +159,54 @@ export function Login() {
             </div>
           )}
 
+          {/* Magic Link Success Message */}
+          {magicLinkSent && (
+            <div style={{
+              marginBottom: theme.spacing.md,
+              padding: theme.spacing.sm,
+              background: 'rgba(34, 211, 238, 0.1)',
+              border: '1px solid rgba(34, 211, 238, 0.3)',
+              borderRadius: '8px',
+              color: '#22D3EE',
+              fontSize: '14px',
+              textAlign: 'center',
+            }}>
+              ✓ Link enviado! Verifique seu email {email}
+            </div>
+          )}
+
           {/* Submit Button */}
-          <Button type="submit" variant="primary" withBeam disabled={loading}>
+          <Button type="submit" variant="primary" withBeam disabled={loading || magicLinkSent}>
             {loading ? 'ENTRANDO...' : 'ACESSAR COCKPIT'}
           </Button>
+
+          {/* Magic Link Button */}
+          <button
+            type="button"
+            onClick={handleMagicLink}
+            disabled={loading || magicLinkSent}
+            style={{
+              width: '100%',
+              marginTop: theme.spacing.md,
+              padding: '14px',
+              background: 'rgba(34, 211, 238, 0.1)',
+              border: '1px solid rgba(34, 211, 238, 0.3)',
+              borderRadius: '12px',
+              color: '#22D3EE',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: loading || magicLinkSent ? 'not-allowed' : 'pointer',
+              opacity: loading || magicLinkSent ? 0.5 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              transition: 'all 0.2s',
+            }}
+          >
+            <Mail size={18} />
+            {magicLinkSent ? 'LINK ENVIADO' : 'ENTRAR SEM SENHA'}
+          </button>
         </motion.form>
 
         {/* Decoração inferior */}
