@@ -7,7 +7,7 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Bell, AlertTriangle, Gift, Star, Check, ExternalLink, ChevronRight } from 'lucide-react'
+import { X, Bell, AlertTriangle, Star, Check, ExternalLink, ChevronRight } from 'lucide-react'
 import { theme } from '../../styles/theme'
 import type { Notification, NotificationType } from '../../hooks/useNotifications'
 import { useNotificationNavigation } from '../../hooks/useNotificationNavigation'
@@ -291,7 +291,7 @@ export function NotificationDrawer({
                                   flexShrink: 0,
                                 }}
                               >
-                                {formatTime(notification.timestamp)}
+                                {formatTime(notification.created_at)}
                               </span>
                             </div>
                             <p
