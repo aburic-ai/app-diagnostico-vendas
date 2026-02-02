@@ -236,10 +236,10 @@ export function PreEvento() {
 
   const [steps, setSteps] = useState<JourneyStep[]>(getSteps())
 
-  // Update steps when profile or completed steps changes
+  // Update steps when profile, completed steps, or lessons change
   useEffect(() => {
     setSteps(getSteps())
-  }, [userProfile, completedSteps])
+  }, [userProfile, completedSteps, lessons])
 
   // Update steps when profile changes
   const updateStepsWithProfile = () => {
