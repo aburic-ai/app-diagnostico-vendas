@@ -25,6 +25,7 @@ export function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [magicLinkSent, setMagicLinkSent] = useState(false)
+  const [showMagicLinkOption, setShowMagicLinkOption] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,6 +47,7 @@ export function Login() {
       }
 
       setError(friendlyMessage)
+      setShowMagicLinkOption(true) // Mostrar opção de magic link após erro
       setLoading(false)
     } else {
       // AuthContext vai redirecionar automaticamente via ProtectedRoute
@@ -180,33 +182,35 @@ export function Login() {
             {loading ? 'ENTRANDO...' : 'ACESSAR COCKPIT'}
           </Button>
 
-          {/* Magic Link Button */}
-          <button
-            type="button"
-            onClick={handleMagicLink}
-            disabled={loading || magicLinkSent}
-            style={{
-              width: '100%',
-              marginTop: theme.spacing.md,
-              padding: '14px',
-              background: 'rgba(34, 211, 238, 0.1)',
-              border: '1px solid rgba(34, 211, 238, 0.3)',
-              borderRadius: '12px',
-              color: '#22D3EE',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: loading || magicLinkSent ? 'not-allowed' : 'pointer',
-              opacity: loading || magicLinkSent ? 0.5 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              transition: 'all 0.2s',
-            }}
-          >
-            <Mail size={18} />
-            {magicLinkSent ? 'LINK ENVIADO' : 'ENTRAR SEM SENHA'}
-          </button>
+          {/* Magic Link Button - só aparece após erro de login */}
+          {showMagicLinkOption && (
+            <button
+              type="button"
+              onClick={handleMagicLink}
+              disabled={loading || magicLinkSent}
+              style={{
+                width: '100%',
+                marginTop: theme.spacing.md,
+                padding: '14px',
+                background: 'rgba(34, 211, 238, 0.1)',
+                border: '1px solid rgba(34, 211, 238, 0.3)',
+                borderRadius: '12px',
+                color: '#22D3EE',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: loading || magicLinkSent ? 'not-allowed' : 'pointer',
+                opacity: loading || magicLinkSent ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s',
+              }}
+            >
+              <Mail size={18} />
+              {magicLinkSent ? 'LINK ENVIADO' : 'RECEBER LINK DE ACESSO VIA EMAIL'}
+            </button>
+          )}
         </motion.form>
 
         {/* Decoração inferior */}
