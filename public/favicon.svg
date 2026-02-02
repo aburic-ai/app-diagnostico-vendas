@@ -1,0 +1,48 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#0A0C12" stroke="url(#gradient)" stroke-width="2"/>
+
+  <!-- Radar/diagnostic pattern -->
+  <circle cx="32" cy="32" r="22" stroke="#22D3EE" stroke-width="1.5" opacity="0.3" fill="none"/>
+  <circle cx="32" cy="32" r="16" stroke="#22D3EE" stroke-width="1.5" opacity="0.5" fill="none"/>
+  <circle cx="32" cy="32" r="10" stroke="#22D3EE" stroke-width="2" opacity="0.7" fill="none"/>
+
+  <!-- Central pulse dot -->
+  <circle cx="32" cy="32" r="3" fill="#22D3EE">
+    <animate attributeName="r" values="3;4;3" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Radar sweep line -->
+  <line x1="32" y1="32" x2="32" y2="10" stroke="url(#lineGradient)" stroke-width="2" stroke-linecap="round">
+    <animateTransform
+      attributeName="transform"
+      attributeType="XML"
+      type="rotate"
+      from="0 32 32"
+      to="360 32 32"
+      dur="4s"
+      repeatCount="indefinite"/>
+  </line>
+
+  <!-- IMPACT letters arranged in hexagon -->
+  <text x="32" y="18" font-family="Orbitron, monospace" font-size="5" font-weight="bold" fill="#22D3EE" text-anchor="middle" opacity="0.9">I</text>
+  <text x="44" y="24" font-family="Orbitron, monospace" font-size="5" font-weight="bold" fill="#22D3EE" text-anchor="middle" opacity="0.9">M</text>
+  <text x="44" y="40" font-family="Orbitron, monospace" font-size="5" font-weight="bold" fill="#A855F7" text-anchor="middle" opacity="0.9">P</text>
+  <text x="32" y="46" font-family="Orbitron, monospace" font-size="5" font-weight="bold" fill="#A855F7" text-anchor="middle" opacity="0.9">A</text>
+  <text x="20" y="40" font-family="Orbitron, monospace" font-size="5" font-weight="bold" fill="#A855F7" text-anchor="middle" opacity="0.9">C</text>
+  <text x="20" y="24" font-family="Orbitron, monospace" font-size="5" font-weight="bold" fill="#22D3EE" text-anchor="middle" opacity="0.9">T</text>
+
+  <!-- Gradients -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22D3EE;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#A855F7;stop-opacity:0.8" />
+    </linearGradient>
+
+    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#22D3EE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#22D3EE;stop-opacity:0" />
+    </linearGradient>
+  </defs>
+</svg>
