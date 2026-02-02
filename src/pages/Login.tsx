@@ -5,7 +5,7 @@
  * Todas as outras páginas devem seguir esta estrutura.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, Mail } from 'lucide-react'
@@ -26,6 +26,17 @@ export function Login() {
   const [error, setError] = useState('')
   const [magicLinkSent, setMagicLinkSent] = useState(false)
   const [showMagicLinkOption, setShowMagicLinkOption] = useState(false)
+
+  // Detectar token de recovery na URL e redirecionar para /reset-password
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    const type = hashParams.get('type')
+
+    if (type === 'recovery') {
+      // Redirecionar para a página de reset mantendo o hash
+      navigate('/reset-password' + window.location.hash, { replace: true })
+    }
+  }, [navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
