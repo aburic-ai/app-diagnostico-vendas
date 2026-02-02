@@ -43,7 +43,7 @@ import type { Notification } from '../hooks/useNotifications'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
 import { useUserProgress } from '../hooks/useUserProgress'
-import { XP_CONFIG, STEP_IDS } from '../config/xp-system'
+import { XP_CONFIG } from '../config/xp-system'
 
 // Dados do perfil
 interface ProfileData {
@@ -72,7 +72,7 @@ const buildOfferUrl = (baseUrl: string, utmContent?: string): string => {
 
 export function PosEvento() {
   const { profile: userProfile, user } = useAuth()
-  const { completeStep, isStepCompleted } = useUserProgress()
+  const { completeStep } = useUserProgress()
   const location = useLocation()
 
   // Refs para scroll to section (avisos clickables)
@@ -102,33 +102,8 @@ export function PosEvento() {
   const profileProgress = Math.round((completedFields / profileFields.length) * 100)
   const isProfileComplete = profileProgress === 100
 
-  // Notificações de exemplo
-  const [notifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'offer',
-      title: 'Imersão IMPACT Liberada!',
-      message: 'Seu diagnóstico foi concluído. Garanta sua vaga na imersão presencial.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-      read: false,
-    },
-    {
-      id: '2',
-      type: 'info',
-      title: 'Plano de 7 dias ativo',
-      message: 'Complete as tarefas diárias para consolidar seu diagnóstico.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      read: false,
-    },
-    {
-      id: '3',
-      type: 'nps',
-      title: 'Avalie sua experiência',
-      message: 'Sua opinião é importante para nós.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-      read: true,
-    },
-  ])
+  // Notificações de exemplo (vazias - usar useNotifications para notificações reais)
+  const [notifications] = useState<Notification[]>([])
 
   // Handle photo upload simulation
   const handlePhotoUpload = () => {
@@ -241,7 +216,7 @@ export function PosEvento() {
     if (!state?.scrollTo) return
 
     // Mapear target_section para ref
-    const sectionRefs = {
+    const sectionRefs: Record<string, React.RefObject<HTMLDivElement | null>> = {
       'final-report': finalReportRef,
       'scenario-projection': scenarioProjectionRef,
       'impact-offer': impactOfferRef,
@@ -413,7 +388,7 @@ export function PosEvento() {
               }}
             >
               <Bell size={18} color={theme.colors.text.secondary} />
-              {notifications.filter(n => !n.read).length > 0 && (
+              {notifications.filter(n => !n.read_by?.includes(user?.id || '')).length > 0 && (
                 <div
                   style={{
                     position: 'absolute',
@@ -432,7 +407,7 @@ export function PosEvento() {
                     color: '#fff',
                   }}
                 >
-                  {notifications.filter(n => !n.read).length}
+                  {notifications.filter(n => !n.read_by?.includes(user?.id || '')).length}
                 </div>
               )}
             </motion.button>

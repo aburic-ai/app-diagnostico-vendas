@@ -5,7 +5,7 @@
  * Usado por: PreEvento, AoVivo, PosEvento
  */
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 

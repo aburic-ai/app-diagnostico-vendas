@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 
 import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } from '../components/ui'
-import type { ToastNotification } from '../components/ui'
+import type { Notification } from '../hooks/useNotifications'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
 import { useUserProgress } from '../hooks/useUserProgress'
@@ -161,25 +161,8 @@ export function PreEvento() {
   const profileProgress = Math.round((completedFields / profileFields.length) * 100)
   const isProfileComplete = profileProgress === 100
 
-  // Notificações de exemplo
-  const [notifications] = useState<ToastNotification[]>([
-    {
-      id: '1',
-      type: 'info',
-      title: 'Bem-vindo à Imersão!',
-      message: 'Complete seu perfil e as aulas preparatórias para ganhar XP.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60),
-      read: false,
-    },
-    {
-      id: '2',
-      type: 'info',
-      title: 'Aulas Bônus Disponíveis',
-      message: 'Assista as aulas preparatórias para chegar pronto no evento.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-      read: true,
-    },
-  ])
+  // Notificações de exemplo (vazias - usar useNotifications para notificações reais)
+  const [notifications] = useState<Notification[]>([])
 
   // Data do evento: 28/02/2026 às 9h30
   const eventDate = new Date('2026-02-28T09:30:00')
@@ -560,7 +543,7 @@ export function PreEvento() {
                   }}
                 >
                   <Bell size={18} color={theme.colors.text.secondary} />
-                  {notifications.filter(n => !n.read).length > 0 && (
+                  {notifications.filter(n => !n.read_by?.includes(user?.id || '')).length > 0 && (
                     <div
                       style={{
                         position: 'absolute',
@@ -579,7 +562,7 @@ export function PreEvento() {
                         color: '#fff',
                       }}
                     >
-                      {notifications.filter(n => !n.read).length}
+                      {notifications.filter(n => !n.read_by?.includes(user?.id || '')).length}
                     </div>
                   )}
                 </motion.button>

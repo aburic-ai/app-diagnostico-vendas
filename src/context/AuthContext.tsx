@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign in
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -120,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign up
   const signUp = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
       })

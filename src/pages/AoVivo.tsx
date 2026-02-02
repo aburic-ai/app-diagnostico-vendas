@@ -119,27 +119,10 @@ export function AoVivo() {
   const [isOfferUnlocked] = useState(false) // Libera no módulo 11
   const [confirmedModules, setConfirmedModules] = useState<number[]>([0, 1, 2, 3, 4]) // Módulos já confirmados
 
-  // Notificações de exemplo
-  const [notifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'info',
-      title: 'Intervalo de 15 minutos',
-      message: 'Aproveite para preencher seu diagnóstico',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-      read: true,
-    },
-    {
-      id: '2',
-      type: 'alert',
-      title: 'Voltamos ao vivo!',
-      message: 'Módulo 5 começando agora',
-      timestamp: new Date(Date.now() - 1000 * 60 * 5),
-      read: false,
-    },
-  ])
+  // Notificações de exemplo (vazias - usar useNotifications para notificações reais)
+  const [notifications] = useState<Notification[]>([])
 
-  const unreadCount = notifications.filter(n => !n.read).length
+  const unreadCount = notifications.filter(n => !n.read_by?.includes(user?.id || '')).length
 
   // Dados do diagnóstico - inicializados vazios, carregados do banco via useEffect
   const [day1Data, setDay1Data] = useState<IMPACTData>({
@@ -166,7 +149,7 @@ export function AoVivo() {
     if (!state?.scrollTo) return
 
     // Mapear target_section para ref
-    const sectionRefs: Record<string, React.RefObject<HTMLDivElement>> = {
+    const sectionRefs: Record<string, React.RefObject<HTMLDivElement | null>> = {
       'diagnostico': diagnosticSlidersRef,
       'diagnostic-sliders': diagnosticSlidersRef,
     }

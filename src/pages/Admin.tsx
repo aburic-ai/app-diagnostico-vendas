@@ -40,14 +40,15 @@ import {
   Activity,
   FileText,
 } from 'lucide-react'
-import { EVENT_MODULES, TOTAL_MODULES, getCurrentDay } from '../data/modules'
+import { EVENT_MODULES, TOTAL_MODULES } from '../data/modules'
 import { NotificationToast } from '../components/ui'
-import type { Notification as LocalNotification } from '../components/ui'
+import type { ToastNotification } from '../components/ui'
 import { theme } from '../styles/theme'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 import { useNotifications } from '../hooks/useNotifications'
-import type { Notification, NotificationType } from '../hooks/useNotifications'
+import type { NotificationType } from '../hooks/useNotifications'
 
 // Estado do evento
 type EventStatus = 'offline' | 'live' | 'paused' | 'activity' | 'lunch'
@@ -123,12 +124,12 @@ interface OfferLinks {
   utmContent: string
 }
 
-// Tipos de aviso
+// Tipos de aviso (mapped to NotificationType)
 const notificationTypes: { type: NotificationType; label: string; icon: typeof Bell; color: string }[] = [
   { type: 'info', label: 'Info', icon: Bell, color: '#22D3EE' },
-  { type: 'alert', label: 'Alerta', icon: AlertTriangle, color: '#EF4444' },
-  { type: 'offer', label: 'Oferta', icon: Gift, color: '#F59E0B' },
-  { type: 'nps', label: 'NPS', icon: Star, color: '#A855F7' },
+  { type: 'warning', label: 'Alerta', icon: AlertTriangle, color: '#EF4444' },
+  { type: 'success', label: 'Oferta', icon: Gift, color: '#F59E0B' },
+  { type: 'error', label: 'NPS', icon: Star, color: '#A855F7' },
 ]
 
 // Helper to format time ago
@@ -152,6 +153,7 @@ const notificationTemplates = [
 
 export function Admin() {
   // Hooks
+  const { user } = useAuth()
   const { createNotification } = useNotifications()
 
   // Event State
@@ -205,7 +207,7 @@ export function Admin() {
   const [notifTitle, setNotifTitle] = useState('')
   const [notifMessage, setNotifMessage] = useState('')
   const [notifAction, setNotifAction] = useState('')
-  const [sentNotifications, setSentNotifications] = useState<Notification[]>([])
+  const [sentNotifications, setSentNotifications] = useState<ToastNotification[]>([])
 
   // Navigation Config (Avisos Clickables)
   const [actionType, setActionType] = useState<'none' | 'internal' | 'external'>('none')
@@ -213,14 +215,13 @@ export function Admin() {
   const [targetSection, setTargetSection] = useState('')
   const [externalUrl, setExternalUrl] = useState('')
 
-  // Preview notification
-  const [previewNotification, setPreviewNotification] = useState<Notification | null>(null)
+  // Preview notification (for toast display)
+  const [previewNotification, setPreviewNotification] = useState<ToastNotification | null>(null)
   const [lunchMinutesRemaining, setLunchMinutesRemaining] = useState<number>(0)
 
   // Participants modal
   const [showParticipants, setShowParticipants] = useState(false)
   const [participants, setParticipants] = useState<OnlineParticipant[]>([])
-  const [loadingParticipants, setLoadingParticipants] = useState(true)
   const [participantSearch, setParticipantSearch] = useState('')
   const [moduleDropdownOpen, setModuleDropdownOpen] = useState(false)
 
@@ -264,8 +265,6 @@ export function Admin() {
   useEffect(() => {
     const fetchParticipants = async () => {
       try {
-        setLoadingParticipants(true)
-
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
@@ -292,8 +291,6 @@ export function Admin() {
         console.error('❌ Erro ao carregar participantes:', error)
         // Fallback to mock data if error
         setParticipants(generateMockParticipants(50))
-      } finally {
-        setLoadingParticipants(false)
       }
     }
 
@@ -485,10 +482,10 @@ export function Admin() {
       return
     }
 
-    // Preview local
-    const localNotif: LocalNotification = {
+    // Preview local (for toast display only)
+    const localNotif: ToastNotification = {
       id: Date.now().toString(),
-      type: notifType,
+      type: notifType as any, // NotificationType maps to ToastNotificationType
       title: notifTitle,
       message: notifMessage,
       actionLabel: notifAction.trim() || undefined,
@@ -496,7 +493,7 @@ export function Admin() {
       read: false,
     }
 
-    setSentNotifications(prev => [localNotif, ...prev])
+    setSentNotifications(prev => [localNotif as any, ...prev])
     setPreviewNotification(localNotif)
 
     // Clear form
@@ -1933,7 +1930,7 @@ export function Admin() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
-                const notification: Notification = {
+                const notification: ToastNotification = {
                   id: Date.now().toString(),
                   type: 'nps',
                   title: 'Avalie o Dia 1',
@@ -1942,7 +1939,7 @@ export function Admin() {
                   timestamp: new Date(),
                   read: false,
                 }
-                setSentNotifications(prev => [notification, ...prev])
+                setSentNotifications(prev => [notification as any, ...prev])
                 setPreviewNotification(notification)
                 setTimeout(() => setPreviewNotification(null), 5000)
               }}
@@ -1971,7 +1968,7 @@ export function Admin() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
-                const notification: Notification = {
+                const notification: ToastNotification = {
                   id: Date.now().toString(),
                   type: 'nps',
                   title: 'Avalie a Imersão',
@@ -1980,7 +1977,7 @@ export function Admin() {
                   timestamp: new Date(),
                   read: false,
                 }
-                setSentNotifications(prev => [notification, ...prev])
+                setSentNotifications(prev => [notification as any, ...prev])
                 setPreviewNotification(notification)
                 setTimeout(() => setPreviewNotification(null), 5000)
               }}

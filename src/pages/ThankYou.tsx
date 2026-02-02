@@ -243,7 +243,7 @@ const validatePurchase = async (
 
 export function ThankYou() {
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
+  // const navigate = useNavigate() // TODO: Use for navigation after success
 
   // State
   const [step, setStep] = useState<Step>('verification')
