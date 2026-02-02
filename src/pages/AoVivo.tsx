@@ -695,7 +695,7 @@ export function AoVivo() {
                           textTransform: 'uppercase',
                         }}
                       >
-                        PRESENÇA CONFIRMADA
+                        CHECK-IN CONFIRMADO
                       </span>
                     </div>
                   )}
