@@ -520,20 +520,25 @@ export function ThankYou() {
         console.warn('[ThankYou] ⚠️ Erro ao notificar GHL:', ghlError)
       }
 
-      // 2. Criar conta
-      console.log('[ThankYou] Criando conta...')
+      // 2. Criar conta no Auth (SEMPRE tentar, independente de userFound)
+      console.log('[ThankYou] Criando conta no Auth...')
       let newUserCreated = false
-      if (!userFound) {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: email || '',
-          password,
-        })
 
-        if (signUpError) throw signUpError
-        console.log('[ThankYou] ✅ Conta criada!')
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: email || '',
+        password,
+      })
+
+      // Se erro for "User already registered", é OK - usuário já tem conta
+      if (signUpError && !signUpError.message.includes('already registered')) {
+        throw signUpError
+      }
+
+      if (!signUpError) {
+        console.log('[ThankYou] ✅ Conta criada no Auth!')
         newUserCreated = true
       } else {
-        console.log('[ThankYou] ✅ Usuário já existe')
+        console.log('[ThankYou] ℹ️ Conta já existe no Auth (OK)')
       }
 
       // 3. Dar XP do protocolo de iniciação (+30 XP)
@@ -673,6 +678,63 @@ export function ThankYou() {
                   />
                 </div>
               </div>
+
+              {/* COMPRA IDENTIFICADA - Show at top when found */}
+              {verificationStatus === 'found' && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Card variant="cyan">
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '16px',
+                        padding: '20px 16px',
+                      }}
+                    >
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                      >
+                        <CheckCircle size={48} color={theme.colors.accent.cyan.DEFAULT} />
+                      </motion.div>
+                      <div style={{ textAlign: 'center' }}>
+                        <p
+                          style={{
+                            fontFamily: theme.typography.fontFamily.orbitron,
+                            fontSize: '20px',
+                            fontWeight: 'bold',
+                            color: theme.colors.accent.cyan.DEFAULT,
+                            marginBottom: '8px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.12em',
+                          }}
+                        >
+                          COMPRA IDENTIFICADA!
+                        </p>
+                        <p
+                          style={{
+                            fontSize: '13px',
+                            color: theme.colors.text.secondary,
+                            marginBottom: '16px',
+                          }}
+                        >
+                          Seu acesso foi confirmado. Clique abaixo para iniciar a calibragem.
+                        </p>
+                      </div>
+                      <Button onClick={() => setStep('survey')}>
+                        INICIAR CALIBRAGEM
+                        <ChevronRight size={18} />
+                      </Button>
+                    </div>
+                  </Card>
+                </motion.div>
+              )}
 
               {/* Title with Mini Radar */}
               <div
@@ -939,63 +1001,6 @@ export function ThankYou() {
                             Aguarde enquanto localizamos seus dados
                           </p>
                         </div>
-                      </div>
-                    </Card>
-                  </motion.div>
-                )}
-
-                {verificationStatus === 'found' && (
-                  <motion.div
-                    key="found"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <Card variant="cyan">
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: '24px',
-                          padding: '32px 0 8px 0',
-                          minHeight: '300px',
-                        }}
-                      >
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                        >
-                          <CheckCircle size={40} color={theme.colors.accent.cyan.DEFAULT} />
-                        </motion.div>
-                        <div style={{ textAlign: 'center' }}>
-                          <p
-                            style={{
-                              fontFamily: theme.typography.fontFamily.orbitron,
-                              fontSize: '18px',
-                              fontWeight: 'bold',
-                              color: theme.colors.accent.cyan.DEFAULT,
-                              marginBottom: '8px',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.1em',
-                            }}
-                          >
-                            COMPRA IDENTIFICADA!
-                          </p>
-                          <p
-                            style={{
-                              fontSize: '11px',
-                              color: theme.colors.text.secondary,
-                            }}
-                          >
-                            Seu acesso foi confirmado. Clique abaixo para iniciar a calibragem.
-                          </p>
-                        </div>
-                        <Button onClick={() => setStep('survey')}>
-                          INICIAR CALIBRAGEM
-                          <ChevronRight size={18} />
-                        </Button>
                       </div>
                     </Card>
                   </motion.div>
