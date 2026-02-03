@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import {
   Rocket,
   Radio,
@@ -30,6 +31,7 @@ import {
   ArrowLeft,
   Download,
   Clock,
+  Shield,
 } from 'lucide-react'
 
 import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } from '../components/ui'
@@ -104,6 +106,7 @@ const LESSONS: LessonData[] = [
 ]
 
 export function PreEvento() {
+  const navigate = useNavigate()
   const { user, profile: userProfile, refreshProfile } = useAuth()
   const { xp, completedSteps, completeStep, isStepCompleted } = useUserProgress()
   const { isPreEventoAccessible, isAoVivoAccessible, isPosEventoAccessible, isAdmin } = useEventState()
@@ -628,11 +631,48 @@ export function PreEvento() {
                 </motion.button>
 
                 {/* Avatar */}
-                <AvatarButton
-                  name={profile.name}
-                  photoUrl={profile.photoUrl || undefined}
-                  onClick={() => setShowProfileModal(true)}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <AvatarButton
+                    name={profile.name}
+                    photoUrl={profile.photoUrl || undefined}
+                    onClick={() => setShowProfileModal(true)}
+                  />
+
+                  {/* Admin Badge */}
+                  {isAdmin && (
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => navigate('/admin')}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 8px',
+                        background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
+                        border: '1px solid rgba(147, 51, 234, 0.4)',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      title="Acessar painel de administração"
+                    >
+                      <Shield size={12} color={theme.colors.accent.purple.light} />
+                      <span
+                        style={{
+                          fontFamily: theme.typography.fontFamily.orbitron,
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          color: theme.colors.accent.purple.light,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        Admin
+                      </span>
+                    </motion.button>
+                  )}
+                </div>
               </div>
             </div>
 
