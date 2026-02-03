@@ -957,8 +957,9 @@ export function ThankYou() {
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
-                          gap: '16px',
-                          padding: '8px 0',
+                          gap: '24px',
+                          padding: '32px 0 8px 0',
+                          minHeight: '300px',
                         }}
                       >
                         <motion.div
@@ -972,9 +973,10 @@ export function ThankYou() {
                           <p
                             style={{
                               fontFamily: theme.typography.fontFamily.orbitron,
-                              fontSize: '14px',
+                              fontSize: '18px',
+                              fontWeight: 'bold',
                               color: theme.colors.accent.cyan.DEFAULT,
-                              marginBottom: '4px',
+                              marginBottom: '8px',
                               textTransform: 'uppercase',
                               letterSpacing: '0.1em',
                             }}
