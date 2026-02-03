@@ -528,17 +528,33 @@ export function ThankYou() {
         password,
       })
 
-      // Se erro for "User already registered", tentar fazer login
+      // Se erro for "User already registered", resetar senha e fazer login
       if (signUpError && signUpError.message.includes('already registered')) {
-        console.log('[ThankYou] Conta já existe, fazendo login...')
+        console.log('[ThankYou] Conta já existe, resetando senha...')
 
+        // Chamar Edge Function para resetar a senha
+        const { error: resetError } = await supabase.functions.invoke('reset-user-password', {
+          body: {
+            email: email || '',
+            newPassword: password,
+          },
+        })
+
+        if (resetError) {
+          console.error('[ThankYou] Erro ao resetar senha:', resetError)
+          throw new Error('Erro ao atualizar senha. Tente novamente.')
+        }
+
+        console.log('[ThankYou] ✅ Senha atualizada! Fazendo login...')
+
+        // Fazer login com a nova senha
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: email || '',
           password,
         })
 
         if (signInError) {
-          throw new Error('Você já tem uma conta. Senha incorreta. Tente novamente ou use "Esqueci minha senha".')
+          throw new Error('Erro ao fazer login. Tente novamente.')
         }
 
         console.log('[ThankYou] ✅ Login realizado com sucesso!')

@@ -128,36 +128,27 @@ async function handlePurchaseComplete(supabase: any, data: any) {
     .single()
 
   if (!profile) {
-    console.log(`👤 Creating new user: ${email}`)
+    console.log(`👤 Creating new profile (without auth): ${email}`)
 
-    // Criar usuário via auth.admin com senha padrão = CPF/CNPJ
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email,
-      password: cpfCnpj,  // Senha padrão = CPF/CNPJ (sem pontos)
-      email_confirm: true, // Auto-confirmar email
-    })
-
-    if (authError) {
-      console.error(`❌ Error creating auth user: ${authError.message}`)
-      throw new Error(`Failed to create user: ${authError.message}`)
-    }
-
-    // Aguardar trigger criar profile (pode demorar alguns ms)
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    // Buscar profile criado
-    const { data: newProfile, error: newProfileError } = await supabase
+    // Criar apenas o profile (auth será criado pelo usuário no Thank You Page)
+    const { data: newProfile, error: createError } = await supabase
       .from('profiles')
-      .select('*')
-      .eq('email', email)
+      .insert({
+        email,
+        name: buyerName,
+        xp: 0,
+        completed_steps: [],
+      })
+      .select()
       .single()
 
-    if (newProfileError || !newProfile) {
-      console.error(`❌ Profile not created: ${newProfileError?.message}`)
-      throw new Error('Profile creation failed')
+    if (createError || !newProfile) {
+      console.error(`❌ Error creating profile: ${createError?.message}`)
+      throw new Error(`Profile creation failed: ${createError?.message}`)
     }
 
     profile = newProfile
+    console.log(`✓ Profile created: ${profile.id}`)
   }
 
   // 4. Atualizar nome no perfil (sempre atualizar com dados da Hotmart)
