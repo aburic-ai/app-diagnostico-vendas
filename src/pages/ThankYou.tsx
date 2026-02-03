@@ -528,16 +528,26 @@ export function ThankYou() {
         password,
       })
 
-      // Se erro for "User already registered", é OK - usuário já tem conta
-      if (signUpError && !signUpError.message.includes('already registered')) {
-        throw signUpError
-      }
+      // Se erro for "User already registered", tentar fazer login
+      if (signUpError && signUpError.message.includes('already registered')) {
+        console.log('[ThankYou] Conta já existe, fazendo login...')
 
-      if (!signUpError) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: email || '',
+          password,
+        })
+
+        if (signInError) {
+          throw new Error('Você já tem uma conta. Senha incorreta. Tente novamente ou use "Esqueci minha senha".')
+        }
+
+        console.log('[ThankYou] ✅ Login realizado com sucesso!')
+        newUserCreated = false
+      } else if (signUpError) {
+        throw signUpError
+      } else {
         console.log('[ThankYou] ✅ Conta criada no Auth!')
         newUserCreated = true
-      } else {
-        console.log('[ThankYou] ℹ️ Conta já existe no Auth (OK)')
       }
 
       // 3. Dar XP do protocolo de iniciação (+30 XP)
@@ -711,8 +721,8 @@ export function ThankYou() {
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
-                        gap: '16px',
-                        padding: '20px 16px',
+                        gap: '10px',
+                        padding: '16px',
                       }}
                     >
                       <motion.div
@@ -720,16 +730,16 @@ export function ThankYou() {
                         animate={{ scale: 1 }}
                         transition={{ type: 'spring', stiffness: 200, damping: 15 }}
                       >
-                        <CheckCircle size={48} color={theme.colors.accent.cyan.DEFAULT} />
+                        <CheckCircle size={36} color={theme.colors.accent.cyan.DEFAULT} />
                       </motion.div>
                       <div style={{ textAlign: 'center' }}>
                         <p
                           style={{
                             fontFamily: theme.typography.fontFamily.orbitron,
-                            fontSize: '20px',
+                            fontSize: '16px',
                             fontWeight: 'bold',
                             color: theme.colors.accent.cyan.DEFAULT,
-                            marginBottom: '8px',
+                            marginBottom: '4px',
                             textTransform: 'uppercase',
                             letterSpacing: '0.12em',
                           }}
@@ -738,21 +748,27 @@ export function ThankYou() {
                         </p>
                         <p
                           style={{
-                            fontSize: '13px',
+                            fontSize: '12px',
                             color: theme.colors.text.secondary,
-                            marginBottom: '16px',
+                            margin: 0,
                           }}
                         >
-                          Seu acesso foi confirmado. Clique abaixo para iniciar a calibragem.
+                          Seu acesso foi confirmado.
                         </p>
                       </div>
-                      <Button onClick={() => setStep('survey')}>
-                        INICIAR CALIBRAGEM
-                        <ChevronRight size={18} />
-                      </Button>
                     </div>
                   </Card>
                 </motion.div>
+              )}
+
+              {/* Button - Show below COMPRA IDENTIFICADA when found */}
+              {verificationStatus === 'found' && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '-8px' }}>
+                  <Button onClick={() => setStep('survey')}>
+                    INICIAR CALIBRAGEM
+                    <ChevronRight size={18} />
+                  </Button>
+                </div>
               )}
 
               {/* Title with Mini Radar */}
