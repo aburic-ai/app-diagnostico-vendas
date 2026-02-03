@@ -367,7 +367,7 @@ export function ThankYou() {
 
     // ✅ Comprador válido - continuar
     setBuyerName(validation.buyerName || '')
-    setUserFound(true)
+    // User found
     setVerificationStatus('found')
   }
 
