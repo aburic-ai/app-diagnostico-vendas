@@ -62,7 +62,7 @@ interface OnlineParticipant {
   xp: number
   currentModule: number
   lastActivity: Date
-  status: 'active' | 'idle'
+  status: 'active' | 'idle' | 'inactive'
 }
 
 // Mock de participantes online
@@ -320,8 +320,15 @@ export function Admin() {
             ? (now.getTime() - lastSeenAt.getTime()) / 1000 / 60
             : Infinity
 
-          // Online se visto nos últimos 2 minutos
-          const status = minutesSinceLastSeen < 2 ? 'active' : 'inactive'
+          // Status: 0-10min = online, 10-30min = away, 30+ = offline
+          let status: 'active' | 'idle' | 'inactive'
+          if (minutesSinceLastSeen < 10) {
+            status = 'active' // Verde - Online
+          } else if (minutesSinceLastSeen < 30) {
+            status = 'idle' // Amarelo - Ausente
+          } else {
+            status = 'inactive' // Cinza - Offline
+          }
 
           return {
             id: profile.id,

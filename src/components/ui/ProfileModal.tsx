@@ -86,9 +86,26 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
       // Recarregar página para atualizar o perfil
       window.location.reload()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading photo:', error)
-      alert('Erro ao fazer upload da foto. Tente novamente.')
+
+      // Mostrar mensagem de erro específica
+      let errorMessage = 'Erro ao fazer upload da foto.'
+
+      if (error?.message) {
+        // Mensagens específicas baseadas no erro
+        if (error.message.includes('permission') || error.message.includes('Policy')) {
+          errorMessage = 'Você não tem permissão para fazer upload de fotos. Contate o administrador.'
+        } else if (error.message.includes('storage')) {
+          errorMessage = 'Erro no servidor de armazenamento. Tente novamente em alguns minutos.'
+        } else if (error.message.includes('size') || error.message.includes('large')) {
+          errorMessage = 'Arquivo muito grande. Máximo 2MB.'
+        } else {
+          errorMessage = `Erro: ${error.message}`
+        }
+      }
+
+      alert(errorMessage + '\n\nSe o problema persistir, contate o suporte.')
     } finally {
       setUploading(false)
     }
