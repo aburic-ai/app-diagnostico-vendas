@@ -267,7 +267,7 @@ export function PreEvento() {
     // Update local state will happen automatically via useEffect
   }
 
-  const handleStepClick = (stepId: string, status: JourneyStep['status']) => {
+  const handleStepClick = async (stepId: string, status: JourneyStep['status']) => {
     if (stepId === STEP_IDS.COMPLETE_PROFILE) {
       setShowProfileModal(true)
     } else if (stepId === STEP_IDS.WATCH_BONUS_LESSONS) {
@@ -275,6 +275,21 @@ export function PreEvento() {
       const lessonsSection = document.getElementById('aulas-bonus-section')
       if (lessonsSection) {
         lessonsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    } else if (stepId === STEP_IDS.PROTOCOL_SURVEY && status === 'current') {
+      // Verificar se usuário já preencheu o protocolo
+      const { data: surveyResponse } = await supabase
+        .from('survey_responses')
+        .select('id')
+        .eq('user_id', user?.id)
+        .single()
+
+      if (surveyResponse) {
+        // Já preencheu → dar XP
+        handleComplete(stepId)
+      } else {
+        // NÃO preencheu → redirecionar para Thank You Page
+        navigate('/obrigado?email=' + encodeURIComponent(user?.email || ''))
       }
     } else if (status === 'current') {
       handleComplete(stepId)
