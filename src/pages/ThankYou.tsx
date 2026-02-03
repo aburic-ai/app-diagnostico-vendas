@@ -259,7 +259,6 @@ export function ThankYou() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [passwordError, setPasswordError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [userFound, setUserFound] = useState(false)
   const [buyerName, setBuyerName] = useState<string>('')  // Nome do comprador
 
   // Get transaction from URL on mount
@@ -301,7 +300,7 @@ export function ThankYou() {
         if (validation.buyerEmail) {
           setEmail(validation.buyerEmail) // Salvar email da compra
         }
-        setUserFound(true)
+        // User found
         setVerificationStatus('found')
         return
       }
@@ -316,7 +315,7 @@ export function ThankYou() {
           setEmail(validation.buyerEmail)
         }
 
-        setUserFound(false)
+        // User not found
         setVerificationStatus('not_found') // Mostra campo de email
         return
       }
@@ -597,6 +596,26 @@ export function ThankYou() {
       showAnimatedBackground={true}
       showOverlay={false}
     >
+      {/* Version Badge - Temporário para debug */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '10px',
+          right: '10px',
+          zIndex: 9999,
+          background: 'rgba(34, 211, 238, 0.9)',
+          color: '#0a0a0f',
+          padding: '6px 12px',
+          borderRadius: '20px',
+          fontSize: '11px',
+          fontWeight: 'bold',
+          fontFamily: theme.typography.fontFamily.orbitron,
+          boxShadow: '0 0 10px rgba(34, 211, 238, 0.5)',
+        }}
+      >
+        v1.0.3
+      </div>
+
       <div
         style={{
           flex: 1,
