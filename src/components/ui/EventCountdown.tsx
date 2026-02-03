@@ -25,7 +25,7 @@ interface TimeLeft {
 export function EventCountdown({
   targetDate,
   eventTitle = 'IMERSÃO DIAGNÓSTICO DE VENDAS',
-  day = 1,
+  day: _day = 1,
 }: EventCountdownProps) {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>(calculateTimeLeft())
 

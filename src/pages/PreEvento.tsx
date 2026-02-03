@@ -35,7 +35,7 @@ import {
 } from 'lucide-react'
 
 import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } from '../components/ui'
-import { useNotifications, type Notification } from '../hooks/useNotifications'
+import { useNotifications } from '../hooks/useNotifications'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
 import { useUserProgress } from '../hooks/useUserProgress'
@@ -109,7 +109,7 @@ export function PreEvento() {
   const navigate = useNavigate()
   const { user, profile: userProfile, refreshProfile } = useAuth()
   const { xp, completedSteps, completeStep, isStepCompleted } = useUserProgress()
-  const { isPreEventoAccessible, isAoVivoAccessible, isPosEventoAccessible, isAdmin } = useEventState()
+  const { isPreEventoAccessible, isAdmin } = useEventState()
   const [activeNav, setActiveNav] = useState('preparacao')
   const [showSchedule, setShowSchedule] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -167,7 +167,7 @@ export function PreEvento() {
   const isProfileComplete = profileProgress === 100
 
   // Notificações em tempo real
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
+  const { notifications, unreadCount, markAllAsRead } = useNotifications()
 
   // Data do evento: 28/02/2026 às 9h30
   const eventDate = new Date('2026-02-28T09:30:00')

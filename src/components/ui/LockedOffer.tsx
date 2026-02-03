@@ -27,7 +27,7 @@ export function LockedOffer({
   title = 'PROTOCOLO IMPACT',
   subtitle = 'Imersão Presencial',
   isUnlocked = false,
-  unlockTime = '16:30',
+  unlockTime: _unlockTime = '16:30',
   lockedMessage = 'Essa etapa exige algo que não acontece sozinho.',
   onClick,
 }: LockedOfferProps) {

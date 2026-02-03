@@ -51,7 +51,6 @@ import {
   EventFinishedView,
 } from '../components/ui'
 import type { IMPACTData } from '../components/ui'
-import type { Notification } from '../hooks/useNotifications'
 import { theme } from '../styles/theme'
 import { getModuleById, EVENT_MODULES } from '../data/modules'
 import { useDiagnostic, useAuth, useUserProgress } from '../hooks'
@@ -112,7 +111,7 @@ export function AoVivo() {
   const diagnosticSlidersRef = useRef<HTMLDivElement>(null)
 
   const [activeNav, setActiveNav] = useState('aovivo')
-  const [selectedDay, setSelectedDay] = useState<1 | 2>(eventState?.current_day || 1)
+  const [selectedDay, setSelectedDay] = useState<1 | 2>((eventState?.current_day === 2 ? 2 : 1) as 1 | 2)
   const [showSliders, setShowSliders] = useState(true)
 
   // Get current module and status from database
@@ -154,7 +153,6 @@ export function AoVivo() {
   const {
     notifications,
     unreadCount,
-    markAsRead,
     markAllAsRead,
   } = useNotifications()
 
@@ -327,10 +325,6 @@ export function AoVivo() {
       console.error('❌ Exceção ao salvar diagnóstico:', err)
     }
   }
-
-  // Get current day from module
-  const currentModuleData = getModuleById(currentModule)
-  const currentDay = currentModuleData?.day || 1
 
   // Get viewing module data (for navigation)
   const viewingModuleData = getModuleById(viewingModule)

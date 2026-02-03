@@ -24,7 +24,6 @@ import {
   Play,
   Users,
   Zap,
-  Lock,
   Unlock,
   Check,
   Monitor,
@@ -40,7 +39,6 @@ import {
   UserX,
   Activity,
   FileText,
-  ExternalLink,
   Save,
   Loader,
 } from 'lucide-react'
@@ -56,18 +54,6 @@ import { useEventState } from '../hooks/useEventState'
 import type { NotificationType } from '../hooks/useNotifications'
 
 // Estado do evento
-type EventStatus = 'offline' | 'live' | 'paused' | 'activity' | 'lunch'
-
-interface EventState {
-  status: EventStatus
-  currentDay: 1 | 2
-  currentModule: number
-  offerReleased: boolean
-  aiEnabled: boolean
-  participantsOnline: number
-  lunchReturnTime: string
-}
-
 // Participante online
 interface OnlineParticipant {
   id: string
@@ -134,7 +120,7 @@ const notificationTypes: { type: NotificationType; label: string; icon: typeof B
   { type: 'info', label: 'Info', icon: Bell, color: '#22D3EE' },
   { type: 'warning', label: 'Alerta', icon: AlertTriangle, color: '#EF4444' },
   { type: 'success', label: 'Oferta', icon: Gift, color: '#F59E0B' },
-  { type: 'error', label: 'NPS', icon: Star, color: '#A855F7' },
+  { type: 'info', label: 'NPS', icon: Star, color: '#A855F7' },
 ]
 
 // Helper to format time ago
@@ -162,7 +148,7 @@ export function Admin() {
   const { createNotification } = useNotifications()
   const {
     eventState: dbEventState,
-    loading: loadingEventState,
+    loading: _loadingEventState,
     startEvent,
     pauseEvent,
     resumeEvent,
@@ -172,6 +158,7 @@ export function Admin() {
     unlockOffer,
     closeOffer,
     toggleAI,
+    startLunch,
     toggleLunch,
     toggleActivity,
     updateEventState,
@@ -265,7 +252,7 @@ export function Admin() {
 
   // Preview notification (for toast display)
   const [previewNotification, setPreviewNotification] = useState<ToastNotification | null>(null)
-  const [lunchMinutesRemaining, setLunchMinutesRemaining] = useState<number>(0)
+  const [_lunchMinutesRemaining, setLunchMinutesRemaining] = useState<number>(0)
 
   // Lunch time modal
   const [showLunchTimeModal, setShowLunchTimeModal] = useState(false)
@@ -424,24 +411,34 @@ export function Admin() {
       return { date, time }
     }
 
+    const unlockPrep = formatDateTime(dbEventState.pre_evento_unlock_date)
+    const lockPrep = formatDateTime(dbEventState.pre_evento_lock_date)
+    const unlockAoVivo = formatDateTime(dbEventState.ao_vivo_unlock_date)
+    const lockAoVivo = formatDateTime(dbEventState.ao_vivo_lock_date)
+    const unlockPos = formatDateTime(dbEventState.pos_evento_unlock_date)
+    const lockPos = formatDateTime(dbEventState.pos_evento_lock_date)
+
     setTabRelease({
       preparacao: {
         enabled: dbEventState.pre_evento_enabled ?? true,
-        ...formatDateTime(dbEventState.pre_evento_unlock_date),
-        lockDate: formatDateTime(dbEventState.pre_evento_lock_date).date,
-        lockTime: formatDateTime(dbEventState.pre_evento_lock_date).time,
+        unlockDate: unlockPrep.date,
+        unlockTime: unlockPrep.time,
+        lockDate: lockPrep.date,
+        lockTime: lockPrep.time,
       },
       aoVivo: {
         enabled: dbEventState.ao_vivo_enabled ?? false,
-        ...formatDateTime(dbEventState.ao_vivo_unlock_date),
-        lockDate: formatDateTime(dbEventState.ao_vivo_lock_date).date,
-        lockTime: formatDateTime(dbEventState.ao_vivo_lock_date).time,
+        unlockDate: unlockAoVivo.date,
+        unlockTime: unlockAoVivo.time,
+        lockDate: lockAoVivo.date,
+        lockTime: lockAoVivo.time,
       },
       posEvento: {
         enabled: dbEventState.pos_evento_enabled ?? false,
-        ...formatDateTime(dbEventState.pos_evento_unlock_date),
-        lockDate: formatDateTime(dbEventState.pos_evento_lock_date).date,
-        lockTime: formatDateTime(dbEventState.pos_evento_lock_date).time,
+        unlockDate: unlockPos.date,
+        unlockTime: unlockPos.time,
+        lockDate: lockPos.date,
+        lockTime: lockPos.time,
       },
     })
   }, [dbEventState])
@@ -798,7 +795,7 @@ export function Admin() {
       setAdminToast({ message: '✅ Links salvos com sucesso', type: 'success' })
     } catch (err) {
       console.error('Error saving offer links:', err)
-      setAdminToast({ message: '❌ Erro ao salvar links', type: 'error' })
+      setAdminToast({ message: '❌ Erro ao salvar links', type: 'warning' })
     } finally {
       setSavingLinks(false)
     }

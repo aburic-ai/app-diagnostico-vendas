@@ -17,7 +17,7 @@ interface ProfileModalProps {
 }
 
 export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
-  const { profile, updateProfile } = useAuth()
+  const { profile } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [name, setName] = useState(profile?.name || '')

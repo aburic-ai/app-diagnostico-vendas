@@ -294,16 +294,6 @@ export function NPSModal({ isOpen, type, onSubmit }: NPSModalProps) {
               withBeam
               onClick={handleSubmit}
               disabled={selectedScore === null || isSubmitting}
-              style={{
-                width: '100%',
-                padding: '16px',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
             >
               {isSubmitting ? (
                 'Enviando...'

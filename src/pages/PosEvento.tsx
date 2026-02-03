@@ -17,13 +17,7 @@ import {
   Target,
   Shield,
   Bell,
-  User,
-  Mail,
-  Phone,
-  Building2,
-  Camera,
-  Check,
-  X,
+  Lock,
 } from 'lucide-react'
 
 import {
@@ -40,7 +34,7 @@ import {
   ProfileModal,
 } from '../components/ui'
 import type { IMPACTData, ActionItem } from '../components/ui'
-import { useNotifications, type Notification } from '../hooks/useNotifications'
+import { useNotifications } from '../hooks/useNotifications'
 import { useEventState } from '../hooks/useEventState'
 import { useScenarioProjection } from '../hooks/useScenarioProjection'
 import { useActionPlan } from '../hooks/useActionPlan'
@@ -81,11 +75,11 @@ export function PosEvento() {
   const { completeStep } = useUserProgress()
   const { eventState, isPosEventoAccessible, isAdmin } = useEventState()
   const { getDiagnosticByDay, loading: diagnosticLoading } = useDiagnostic()
-  const { projections, loading: loadingProjections, error: errorProjections, isEventFinished } = useScenarioProjection()
+  const { projections, loading: loadingProjections, error: errorProjections } = useScenarioProjection()
   const location = useLocation()
 
   // State para forçar atualização dos dados
-  const [dataLoaded, setDataLoaded] = useState(false)
+  const [, setDataLoaded] = useState(false)
 
   // Garantir que dados foram carregados
   useEffect(() => {
@@ -134,27 +128,8 @@ export function PosEvento() {
     }
   }, [userProfile])
 
-  // Calculate profile completion
-  const profileFields = [profile.name, profile.email, profile.phone, profile.company, profile.role, profile.photoUrl]
-  const completedFields = profileFields.filter(f => f && f.trim() !== '').length
-  const profileProgress = Math.round((completedFields / profileFields.length) * 100)
-  const isProfileComplete = profileProgress === 100
-
   // Notificações em tempo real
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
-
-  // Handle photo upload simulation
-  const handlePhotoUpload = () => {
-    setProfile(prev => ({
-      ...prev,
-      photoUrl: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(prev.name) + '&background=f59e0b&color=050505&size=200',
-    }))
-  }
-
-  // Handle profile field change
-  const handleProfileChange = (field: keyof ProfileData, value: string) => {
-    setProfile(prev => ({ ...prev, [field]: value }))
-  }
+  const { notifications, markAllAsRead } = useNotifications()
 
   // Buscar dados reais do diagnóstico do banco
   const diagnosticDay1 = getDiagnosticByDay(1)
@@ -869,7 +844,7 @@ export function PosEvento() {
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
-        onMarkAllAsRead={markAllAsRead}
+        onMarkAllRead={markAllAsRead}
         userId={user?.id}
       />
 

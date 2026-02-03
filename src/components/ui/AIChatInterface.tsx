@@ -47,7 +47,7 @@ const suggestedPrompts = [
 ]
 
 export function AIChatInterface({
-  userContext,
+  userContext: _userContext,
   isAvailable = true,
   onBack,
   event_day,
