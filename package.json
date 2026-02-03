@@ -1,7 +1,7 @@
 {
   "name": "app-diagnostico-vendas",
   "private": true,
-  "version": "1.0.5",
+  "version": "1.0.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.93.3",
     "@tailwindcss/vite": "^4.1.18",
+    "browser-image-compression": "^2.0.2",
     "dotenv": "^17.2.3",
     "framer-motion": "^12.29.2",
     "lucide-react": "^0.563.0",

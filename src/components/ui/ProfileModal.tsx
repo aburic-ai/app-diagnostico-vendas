@@ -6,6 +6,7 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, User, Zap, Upload, Check } from 'lucide-react'
+import imageCompression from 'browser-image-compression'
 import { theme } from '../../styles/theme'
 import { useAuth } from '../../hooks/useAuth'
 import { XP_CONFIG } from '../../config/xp-system'
@@ -52,21 +53,34 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       return
     }
 
-    // Validar tamanho (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Imagem muito grande. Máximo 2MB.')
+    // Validar tamanho original (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Imagem muito grande. Máximo 10MB.')
       return
     }
 
     setUploading(true)
 
     try {
-      // Upload para Supabase Storage
-      const fileExt = file.name.split('.').pop()
+      // Comprimir imagem automaticamente
+      console.log('[Upload] Tamanho original:', (file.size / 1024 / 1024).toFixed(2), 'MB')
+
+      const options = {
+        maxSizeMB: 1, // Máximo 1MB após compressão
+        maxWidthOrHeight: 1024, // Max 1024px de largura/altura
+        useWebWorker: true,
+        fileType: 'image/jpeg', // Converter para JPEG (menor)
+      }
+
+      const compressedFile = await imageCompression(file, options)
+      console.log('[Upload] Tamanho comprimido:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB')
+
+      // Upload para Supabase Storage (usando arquivo comprimido)
+      const fileExt = 'jpg' // Sempre JPG após compressão
       const fileName = `${profile.id}-${Date.now()}.${fileExt}`
       const { data, error } = await supabase.storage
         .from('avatars')
-        .upload(fileName, file, {
+        .upload(fileName, compressedFile, {
           cacheControl: '3600',
           upsert: false,
         })
@@ -99,7 +113,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         } else if (error.message.includes('storage')) {
           errorMessage = 'Erro no servidor de armazenamento. Tente novamente em alguns minutos.'
         } else if (error.message.includes('size') || error.message.includes('large')) {
-          errorMessage = 'Arquivo muito grande. Máximo 2MB.'
+          errorMessage = 'Arquivo muito grande. Máximo 10MB.'
         } else {
           errorMessage = `Erro: ${error.message}`
         }
