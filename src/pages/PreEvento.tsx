@@ -4,7 +4,7 @@
  * Exibida após login, antes do evento começar.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -111,7 +111,7 @@ export function PreEvento() {
   const { user, profile: userProfile, refreshProfile } = useAuth()
   useHeartbeat() // Atualiza last_seen_at a cada 30s
   const { xp, completedSteps, completeStep, isStepCompleted } = useUserProgress()
-  const { isPreEventoAccessible, isAdmin } = useEventState()
+  const { eventState, isPreEventoAccessible, isAdmin } = useEventState()
   const [activeNav, setActiveNav] = useState('preparacao')
   const [showSchedule, setShowSchedule] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -171,8 +171,23 @@ export function PreEvento() {
   // Notificações em tempo real
   const { notifications, unreadCount, markAllAsRead } = useNotifications()
 
-  // Data do evento: 28/02/2026 às 9h30
-  const eventDate = new Date('2026-02-28T09:30:00')
+  // Data do próximo evento - vem do banco de dados
+  // Se Pré-Evento não está acessível → countdown para liberação do Pré-Evento
+  // Se Pré-Evento já liberou → countdown para Ao Vivo
+  const eventDate = useMemo(() => {
+    if (!eventState) return new Date('2026-02-28T09:30:00') // Fallback
+
+    const now = new Date()
+    const preEventoUnlock = new Date(eventState.pre_evento_unlock_date)
+
+    // Se ainda não liberou o Pré-Evento, mostrar countdown para ele
+    if (now < preEventoUnlock) {
+      return preEventoUnlock
+    }
+
+    // Se já liberou, mostrar countdown para Ao Vivo
+    return new Date(eventState.ao_vivo_unlock_date)
+  }, [eventState])
 
   const navItems = [
     { id: 'preparacao', label: 'Preparação', icon: <Rocket size={20} />, status: 'Liberado' },

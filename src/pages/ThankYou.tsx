@@ -651,7 +651,7 @@ export function ThankYou() {
           boxShadow: '0 0 10px rgba(34, 211, 238, 0.5)',
         }}
       >
-        v1.0.7
+        v1.0.8
       </div>
 
       <div
