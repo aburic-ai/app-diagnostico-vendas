@@ -312,15 +312,27 @@ export function Admin() {
         if (error) throw error
 
         // Map Profile to OnlineParticipant
-        const mappedParticipants: OnlineParticipant[] = (data || []).map((profile: Profile) => ({
-          id: profile.id,
-          name: profile.name || 'Participante',
-          email: profile.email,
-          xp: profile.xp,
-          currentModule: 0, // TODO: Track current module per user
-          lastActivity: new Date(profile.updated_at),
-          status: 'active' as const, // TODO: Track real activity status
-        }))
+        const now = new Date()
+        const mappedParticipants: OnlineParticipant[] = (data || []).map((profile: Profile) => {
+          // Calcular status baseado em last_seen_at
+          const lastSeenAt = profile.last_seen_at ? new Date(profile.last_seen_at) : null
+          const minutesSinceLastSeen = lastSeenAt
+            ? (now.getTime() - lastSeenAt.getTime()) / 1000 / 60
+            : Infinity
+
+          // Online se visto nos últimos 2 minutos
+          const status = minutesSinceLastSeen < 2 ? 'active' : 'inactive'
+
+          return {
+            id: profile.id,
+            name: profile.name || 'Participante',
+            email: profile.email,
+            xp: profile.xp,
+            currentModule: 0, // TODO: Track current module per user
+            lastActivity: lastSeenAt || new Date(profile.updated_at),
+            status,
+          }
+        })
 
         setParticipants(mappedParticipants)
         // participantsOnline is computed from participants.length

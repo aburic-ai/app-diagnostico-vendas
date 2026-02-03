@@ -54,6 +54,7 @@ import type { IMPACTData } from '../components/ui'
 import { theme } from '../styles/theme'
 import { getModuleById, EVENT_MODULES } from '../data/modules'
 import { useDiagnostic, useAuth, useUserProgress } from '../hooks'
+import { useHeartbeat } from '../hooks/useHeartbeat'
 import { useEventState } from '../hooks/useEventState'
 import { useNotifications } from '../hooks/useNotifications'
 import type { DiagnosticScores } from '../hooks'
@@ -102,6 +103,7 @@ const impactToScores = (impact: IMPACTData): DiagnosticScores => {
 export function AoVivo() {
   const navigate = useNavigate()
   const { profile, user } = useAuth()
+  useHeartbeat() // Atualiza last_seen_at a cada 30s
   const { getDiagnosticByDay, saveDiagnostic, loading: diagnosticLoading } = useDiagnostic()
   const { completeStep } = useUserProgress()
   const { eventState, isAoVivoAccessible, isAdmin } = useEventState()

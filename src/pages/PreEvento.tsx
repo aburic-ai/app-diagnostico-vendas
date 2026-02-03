@@ -38,6 +38,7 @@ import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } f
 import { useNotifications } from '../hooks/useNotifications'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
+import { useHeartbeat } from '../hooks/useHeartbeat'
 import { useUserProgress } from '../hooks/useUserProgress'
 import { useEventState } from '../hooks/useEventState'
 import { XP_CONFIG, STEP_IDS } from '../config/xp-system'
@@ -108,6 +109,7 @@ const LESSONS: LessonData[] = [
 export function PreEvento() {
   const navigate = useNavigate()
   const { user, profile: userProfile, refreshProfile } = useAuth()
+  useHeartbeat() // Atualiza last_seen_at a cada 30s
   const { xp, completedSteps, completeStep, isStepCompleted } = useUserProgress()
   const { isPreEventoAccessible, isAdmin } = useEventState()
   const [activeNav, setActiveNav] = useState('preparacao')

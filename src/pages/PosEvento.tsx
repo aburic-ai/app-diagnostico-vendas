@@ -40,6 +40,7 @@ import { useScenarioProjection } from '../hooks/useScenarioProjection'
 import { useActionPlan } from '../hooks/useActionPlan'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
+import { useHeartbeat } from '../hooks/useHeartbeat'
 import { useUserProgress } from '../hooks/useUserProgress'
 import { useDiagnostic } from '../hooks/useDiagnostic'
 import { XP_CONFIG } from '../config/xp-system'
@@ -72,6 +73,7 @@ const buildOfferUrl = (baseUrl: string, utmContent?: string): string => {
 export function PosEvento() {
   const navigate = useNavigate()
   const { profile: userProfile, user } = useAuth()
+  useHeartbeat() // Atualiza last_seen_at a cada 30s
   const { completeStep } = useUserProgress()
   const { eventState, isPosEventoAccessible, isAdmin } = useEventState()
   const { getDiagnosticByDay, loading: diagnosticLoading } = useDiagnostic()

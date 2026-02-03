@@ -24,6 +24,7 @@ export type Profile = {
   completed_steps: string[]
   created_at: string
   updated_at: string
+  last_seen_at: string | null
 }
 
 export type SurveyResponse = {

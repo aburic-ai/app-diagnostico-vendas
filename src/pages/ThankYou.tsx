@@ -566,29 +566,39 @@ export function ThankYou() {
         newUserCreated = true
       }
 
-      // 3. Dar XP do protocolo de iniciação (+30 XP)
+      // 3. Dar XP do protocolo de iniciação (+30 XP) - SEMPRE quando completar calibragem
+      console.log('[ThankYou] Verificando XP do protocolo...')
+
+      // Aguardar um pouco para garantir que o profile existe (caso seja conta nova)
       if (newUserCreated) {
-        console.log('[ThankYou] Creditando +30 XP do protocolo...')
-
-        // Aguardar um pouco para o trigger do banco criar o profile
         await new Promise(resolve => setTimeout(resolve, 1500))
+      }
 
-        // Buscar o profile criado
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('email', email)
-          .single()
+      // Buscar o profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', email)
+        .single()
 
-        if (profileError) {
-          console.error('[ThankYou] Erro ao buscar profile:', profileError)
-        } else if (profile) {
+      if (profileError) {
+        console.error('[ThankYou] Erro ao buscar profile:', profileError)
+      } else if (profile) {
+        // Verificar se já completou o protocolo (para não duplicar XP)
+        const alreadyCompleted = profile.completed_steps?.includes('protocol-survey')
+
+        if (!alreadyCompleted) {
+          console.log('[ThankYou] Creditando +30 XP do protocolo...')
+
           // Atualizar com XP e step completo
+          const newSteps = [...(profile.completed_steps || []), 'protocol-survey']
+          const newXP = (profile.xp || 0) + 30
+
           const { error: updateError } = await supabase
             .from('profiles')
             .update({
-              completed_steps: ['protocol-survey'],
-              xp: 30,
+              completed_steps: newSteps,
+              xp: newXP,
             })
             .eq('id', profile.id)
 
@@ -597,6 +607,8 @@ export function ThankYou() {
           } else {
             console.log('[ThankYou] ✅ +30 XP creditados! (Protocolo de Iniciação completo)')
           }
+        } else {
+          console.log('[ThankYou] Protocolo já completado anteriormente')
         }
       }
 
@@ -639,7 +651,7 @@ export function ThankYou() {
           boxShadow: '0 0 10px rgba(34, 211, 238, 0.5)',
         }}
       >
-        v1.0.3
+        v1.0.4
       </div>
 
       <div
