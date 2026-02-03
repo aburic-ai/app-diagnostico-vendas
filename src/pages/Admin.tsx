@@ -29,6 +29,7 @@ import {
   Check,
   Monitor,
   X,
+  XCircle,
   Coffee,
   Calendar,
   Clock,
@@ -39,15 +40,19 @@ import {
   UserX,
   Activity,
   FileText,
+  ExternalLink,
+  Save,
+  Loader,
 } from 'lucide-react'
 import { EVENT_MODULES, TOTAL_MODULES } from '../data/modules'
-import { NotificationToast } from '../components/ui'
+import { NotificationToast, ConfirmationModal } from '../components/ui'
 import type { ToastNotification } from '../components/ui'
 import { theme } from '../styles/theme'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useNotifications } from '../hooks/useNotifications'
+import { useEventState } from '../hooks/useEventState'
 import type { NotificationType } from '../hooks/useNotifications'
 
 // Estado do evento
@@ -108,9 +113,9 @@ interface EventData {
 
 // Liberação das abas do app
 interface TabRelease {
-  preparacao: { enabled: boolean; date: string; time: string }
-  aoVivo: { enabled: boolean; date: string; time: string }
-  posEvento: { enabled: boolean; date: string; time: string }
+  preparacao: { enabled: boolean; unlockDate: string; unlockTime: string; lockDate: string; lockTime: string }
+  aoVivo: { enabled: boolean; unlockDate: string; unlockTime: string; lockDate: string; lockTime: string }
+  posEvento: { enabled: boolean; unlockDate: string; unlockTime: string; lockDate: string; lockTime: string }
 }
 
 // Links da oferta
@@ -155,17 +160,37 @@ export function Admin() {
   // Hooks
   const { user } = useAuth()
   const { createNotification } = useNotifications()
+  const {
+    eventState: dbEventState,
+    loading: loadingEventState,
+    startEvent,
+    pauseEvent,
+    resumeEvent,
+    finishEvent,
+    setDay,
+    setModule: setDbModule,
+    unlockOffer,
+    closeOffer,
+    toggleAI,
+    toggleLunch,
+    toggleActivity,
+    updateEventState,
+  } = useEventState()
 
-  // Event State
-  const [eventState, setEventState] = useState<EventState>({
-    status: 'offline',
-    currentDay: 1,
-    currentModule: 0,
-    offerReleased: false,
-    aiEnabled: false,
-    participantsOnline: 0,
-    lunchReturnTime: '14:00',
-  })
+  // Map database event state to UI format
+  const eventState = {
+    status: dbEventState?.lunch_active ? 'lunch' : (dbEventState?.status || 'offline'),
+    currentDay: dbEventState?.current_day || 1,
+    currentModule: dbEventState?.current_module || 0,
+    offerReleased: dbEventState?.offer_unlocked || false,
+    aiEnabled: dbEventState?.ai_enabled || false,
+    lunchActive: dbEventState?.lunch_active || false,
+    participantsOnline: 0, // This could be computed from real data later
+    lunchReturnTime: dbEventState?.lunch_started_at
+      ? new Date(new Date(dbEventState.lunch_started_at).getTime() + (dbEventState.lunch_duration_minutes || 60) * 60000)
+          .toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      : '14:00',
+  }
 
   // Event Data (editável)
   const [eventData, setEventData] = useState<EventData>({
@@ -179,9 +204,27 @@ export function Admin() {
 
   // Tab Release (liberação das abas)
   const [tabRelease, setTabRelease] = useState<TabRelease>({
-    preparacao: { enabled: true, date: '2026-02-01', time: '00:00' },
-    aoVivo: { enabled: false, date: '2026-02-28', time: '09:30' },
-    posEvento: { enabled: false, date: '2026-03-01', time: '18:00' },
+    preparacao: {
+      enabled: true,
+      unlockDate: '2026-02-01',
+      unlockTime: '00:00',
+      lockDate: '2026-02-28',
+      lockTime: '09:30'
+    },
+    aoVivo: {
+      enabled: false,
+      unlockDate: '2026-02-28',
+      unlockTime: '09:30',
+      lockDate: '2026-03-01',
+      lockTime: '18:00'
+    },
+    posEvento: {
+      enabled: false,
+      unlockDate: '2026-03-01',
+      unlockTime: '18:00',
+      lockDate: '',
+      lockTime: ''
+    },
   })
 
   // Offer Links (links da oferta)
@@ -194,6 +237,7 @@ export function Admin() {
     utmCampaign: 'imersao2026',
     utmContent: 'oferta',
   })
+  const [savingLinks, setSavingLinks] = useState(false)
 
   // Confirmation Dialog
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -202,12 +246,16 @@ export function Admin() {
     moduleName: string
   }>({ show: false, targetModule: 0, moduleName: '' })
 
+  // Finish Event Confirmation Modal
+  const [showFinishModal, setShowFinishModal] = useState(false)
+
   // Notification Form
   const [notifType, setNotifType] = useState<NotificationType>('info')
   const [notifTitle, setNotifTitle] = useState('')
   const [notifMessage, setNotifMessage] = useState('')
   const [notifAction, setNotifAction] = useState('')
   const [sentNotifications, setSentNotifications] = useState<ToastNotification[]>([])
+  const [adminToast, setAdminToast] = useState<{ message: string; type: 'info' | 'warning' | 'success' } | null>(null)
 
   // Navigation Config (Avisos Clickables)
   const [actionType, setActionType] = useState<'none' | 'internal' | 'external'>('none')
@@ -218,6 +266,10 @@ export function Admin() {
   // Preview notification (for toast display)
   const [previewNotification, setPreviewNotification] = useState<ToastNotification | null>(null)
   const [lunchMinutesRemaining, setLunchMinutesRemaining] = useState<number>(0)
+
+  // Lunch time modal
+  const [showLunchTimeModal, setShowLunchTimeModal] = useState(false)
+  const [lunchReturnTime, setLunchReturnTime] = useState('')
 
   // Participants modal
   const [showParticipants, setShowParticipants] = useState(false)
@@ -284,7 +336,7 @@ export function Admin() {
         }))
 
         setParticipants(mappedParticipants)
-        setEventState(prev => ({ ...prev, participantsOnline: mappedParticipants.length }))
+        // participantsOnline is computed from participants.length
 
         console.log(`📊 ${mappedParticipants.length} participantes carregados do Supabase`)
       } catch (error) {
@@ -360,6 +412,108 @@ export function Admin() {
     fetchAllUsers()
   }, [showUsersModal])
 
+  // Load tab release settings from event_state
+  useEffect(() => {
+    if (!dbEventState) return
+
+    const formatDateTime = (isoString: string | null) => {
+      if (!isoString) return { date: '', time: '' }
+      const d = new Date(isoString)
+      const date = d.toISOString().split('T')[0]
+      const time = d.toTimeString().slice(0, 5)
+      return { date, time }
+    }
+
+    setTabRelease({
+      preparacao: {
+        enabled: dbEventState.pre_evento_enabled ?? true,
+        ...formatDateTime(dbEventState.pre_evento_unlock_date),
+        lockDate: formatDateTime(dbEventState.pre_evento_lock_date).date,
+        lockTime: formatDateTime(dbEventState.pre_evento_lock_date).time,
+      },
+      aoVivo: {
+        enabled: dbEventState.ao_vivo_enabled ?? false,
+        ...formatDateTime(dbEventState.ao_vivo_unlock_date),
+        lockDate: formatDateTime(dbEventState.ao_vivo_lock_date).date,
+        lockTime: formatDateTime(dbEventState.ao_vivo_lock_date).time,
+      },
+      posEvento: {
+        enabled: dbEventState.pos_evento_enabled ?? false,
+        ...formatDateTime(dbEventState.pos_evento_unlock_date),
+        lockDate: formatDateTime(dbEventState.pos_evento_lock_date).date,
+        lockTime: formatDateTime(dbEventState.pos_evento_lock_date).time,
+      },
+    })
+  }, [dbEventState])
+
+  // Save tab release settings to event_state
+  const saveTabSettings = async () => {
+    const formatToISO = (date: string, time: string): string | null => {
+      if (!date || !time) return null
+      return `${date}T${time}:00-03:00` // Brazil timezone
+    }
+
+    const updates = {
+      pre_evento_enabled: tabRelease.preparacao.enabled,
+      pre_evento_unlock_date: formatToISO(tabRelease.preparacao.unlockDate, tabRelease.preparacao.unlockTime),
+      pre_evento_lock_date: formatToISO(tabRelease.preparacao.lockDate, tabRelease.preparacao.lockTime),
+      ao_vivo_enabled: tabRelease.aoVivo.enabled,
+      ao_vivo_unlock_date: formatToISO(tabRelease.aoVivo.unlockDate, tabRelease.aoVivo.unlockTime),
+      ao_vivo_lock_date: formatToISO(tabRelease.aoVivo.lockDate, tabRelease.aoVivo.lockTime),
+      pos_evento_enabled: tabRelease.posEvento.enabled,
+      pos_evento_unlock_date: formatToISO(tabRelease.posEvento.unlockDate, tabRelease.posEvento.unlockTime),
+      pos_evento_lock_date: formatToISO(tabRelease.posEvento.lockDate, tabRelease.posEvento.lockTime),
+    }
+
+    const { error } = await updateEventState(updates)
+
+    if (error) {
+      console.error('❌ Erro ao salvar configurações de abas:', error)
+      setAdminToast({ message: 'Erro ao salvar configurações', type: 'warning' })
+    } else {
+      console.log('✅ Configurações de abas salvas')
+      setAdminToast({ message: 'Configurações salvas com sucesso', type: 'success' })
+    }
+  }
+
+  // Carregar links salvos ao montar o componente
+  useEffect(() => {
+    const loadOfferLinks = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('event_state')
+          .select('offer_links')
+          .single()
+
+        if (error) throw error
+
+        // Se existirem links salvos, carregá-los
+        if (data?.offer_links) {
+          setOfferLinks(prev => ({
+            ...prev,
+            ...data.offer_links
+          }))
+          console.log('✅ Links da oferta carregados:', data.offer_links)
+        }
+      } catch (err) {
+        console.error('Error loading offer links:', err)
+      }
+    }
+
+    loadOfferLinks()
+  }, [])
+
+  // Auto-dismiss admin toast após 5 segundos
+  useEffect(() => {
+    if (!adminToast) return
+
+    const timer = setTimeout(() => {
+      setAdminToast(null)
+    }, 5000)
+
+    return () => clearTimeout(timer)
+  }, [adminToast])
+
   // Filter participants by search and sort by XP (highest first)
   const filteredParticipants = participants
     .filter(p =>
@@ -371,45 +525,159 @@ export function Admin() {
   const currentModule = EVENT_MODULES[eventState.currentModule]
   const currentDay = eventState.currentDay
 
-  const handleSetDay = (day: 1 | 2) => {
-    setEventState(prev => ({ ...prev, currentDay: day }))
-  }
+  const handleSetDay = async (day: 1 | 2) => {
+    console.log(`🗓️ [Admin] Mudando para dia ${day}...`)
+    const result = await setDay(day)
+    console.log('🗓️ [Admin] Resultado da mudança de dia:', result)
 
-  const handleToggleLive = () => {
-    if (eventState.status === 'offline') {
-      setEventState(prev => ({
-        ...prev,
-        status: 'live',
-        participantsOnline: Math.floor(Math.random() * 100) + 50,
-      }))
+    if (result?.error) {
+      console.error('❌ [Admin] Erro ao mudar dia:', result.error)
+      setAdminToast({
+        message: `Erro ao mudar para Dia ${day}: ${result.error.message}`,
+        type: 'warning'
+      })
+      setTimeout(() => setAdminToast(null), 3000)
     } else {
-      setEventState(prev => ({
-        ...prev,
-        status: 'offline',
-        participantsOnline: 0,
-      }))
+      console.log(`✅ [Admin] Dia alterado para ${day}`)
     }
   }
 
-  const handleTogglePause = () => {
-    setEventState(prev => ({
-      ...prev,
-      status: prev.status === 'paused' ? 'live' : 'paused',
-    }))
+  const handleToggleLive = async () => {
+    if (eventState.status === 'offline' || eventState.status === 'finished') {
+      await startEvent()
+    } else {
+      // Não faz nada - precisa usar PAUSAR ou FINALIZAR
+      setAdminToast({
+        message: 'Use os botões PAUSAR ou FINALIZAR EVENTO para encerrar',
+        type: 'info'
+      })
+      setTimeout(() => setAdminToast(null), 3000)
+    }
   }
 
-  const handleToggleLunch = () => {
-    setEventState(prev => ({
-      ...prev,
-      status: prev.status === 'lunch' ? 'live' : 'lunch',
-    }))
+  const handleTogglePause = async () => {
+    const wasPaused = eventState.status === 'paused'
+
+    if (wasPaused) {
+      await resumeEvent()
+      // Notificação de retorno
+      console.log('📤 [Admin] Criando notificação de retorno...')
+      const result = await createNotification(
+        'info',
+        'Transmissão Retomada',
+        'O evento voltou ao vivo! Não perca o próximo módulo.'
+      )
+      console.log('📤 [Admin] Resultado da notificação:', result)
+    } else {
+      await pauseEvent()
+      // Notificação de pausa
+      console.log('📤 [Admin] Criando notificação de pausa...')
+      const result = await createNotification(
+        'warning',
+        'Evento Pausado',
+        'A transmissão foi pausada temporariamente. Aguarde o retorno.'
+      )
+      console.log('📤 [Admin] Resultado da notificação:', result)
+    }
   }
 
-  const handleToggleActivity = () => {
-    setEventState(prev => ({
-      ...prev,
-      status: prev.status === 'activity' ? 'live' : 'activity',
-    }))
+  const handleFinishEvent = async () => {
+    await finishEvent()
+    console.log('✅ Evento finalizado pelo Admin')
+    setShowFinishModal(false)
+  }
+
+  const handleToggleLunch = async () => {
+    const wasLunchActive = eventState.status === 'lunch'
+
+    if (wasLunchActive) {
+      // Fim do almoço
+      await toggleLunch(60)
+      console.log('📤 [Admin] Criando notificação de fim do almoço...')
+      const result = await createNotification(
+        'info',
+        'Fim do Intervalo',
+        'Voltamos! O evento continua agora. Esteja pronto para o próximo módulo.'
+      )
+      console.log('📤 [Admin] Resultado da notificação:', result)
+    } else {
+      // Início do almoço - abrir modal para pedir hora
+      const now = new Date()
+      const suggestedTime = new Date(now.getTime() + 60 * 60000) // +60 min
+      const suggestedTimeStr = suggestedTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      setLunchReturnTime(suggestedTimeStr)
+      setShowLunchTimeModal(true)
+    }
+  }
+
+  const handleConfirmLunchTime = async () => {
+    const returnTimeInput = lunchReturnTime
+
+    if (!returnTimeInput) {
+      setShowLunchTimeModal(false)
+      return
+    }
+
+    // Validar formato HH:MM
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/
+    if (!timeRegex.test(returnTimeInput)) {
+      setAdminToast({
+        message: 'Formato inválido! Use HH:MM (ex: 14:30)',
+        type: 'warning'
+      })
+      setTimeout(() => setAdminToast(null), 3000)
+      return
+    }
+
+    // Calcular duração em minutos
+    const now = new Date()
+    const [hours, minutes] = returnTimeInput.split(':').map(Number)
+    const returnTime = new Date()
+    returnTime.setHours(hours, minutes, 0, 0)
+    const diffMs = returnTime.getTime() - now.getTime()
+    const durationMinutes = Math.max(1, Math.ceil(diffMs / 60000))
+
+    console.log(`⏰ [Admin] Almoço iniciado - Retorno: ${returnTimeInput} (${durationMinutes} min)`)
+
+    // Iniciar almoço
+    await toggleLunch(durationMinutes)
+
+    // Notificação de início do almoço
+    console.log('📤 [Admin] Criando notificação de início do almoço...')
+    const result = await createNotification(
+      'info',
+      'Intervalo para Almoço',
+      `Estamos em intervalo. Retorno previsto: ${returnTimeInput}. Aproveite para descansar!`
+    )
+    console.log('📤 [Admin] Resultado da notificação:', result)
+
+    setShowLunchTimeModal(false)
+  }
+
+  const handleToggleActivity = async () => {
+    const wasActivity = eventState.status === 'activity'
+
+    if (wasActivity) {
+      await toggleActivity()
+      // Notificação de fim da atividade
+      console.log('📤 [Admin] Criando notificação de fim da atividade...')
+      const result = await createNotification(
+        'success',
+        'Atividade Encerrada',
+        'Atividade finalizada! Vamos retomar a transmissão ao vivo.'
+      )
+      console.log('📤 [Admin] Resultado da notificação:', result)
+    } else {
+      await toggleActivity()
+      // Notificação de início da atividade
+      console.log('📤 [Admin] Criando notificação de início da atividade...')
+      const result = await createNotification(
+        'info',
+        'Momento de Prática',
+        'Atividade liberada! Complete a tarefa proposta pelo instrutor e coloque em prática o que aprendeu.'
+      )
+      console.log('📤 [Admin] Resultado da notificação:', result)
+    }
   }
 
   // Module change with confirmation
@@ -422,8 +690,8 @@ export function Admin() {
     })
   }
 
-  const confirmModuleChange = () => {
-    setEventState(prev => ({ ...prev, currentModule: confirmDialog.targetModule }))
+  const confirmModuleChange = async () => {
+    await setDbModule(confirmDialog.targetModule)
     setConfirmDialog({ show: false, targetModule: 0, moduleName: '' })
   }
 
@@ -449,63 +717,171 @@ export function Admin() {
     }
   }
 
-  const handleReleaseOffer = () => {
-    setEventState(prev => ({ ...prev, offerReleased: !prev.offerReleased }))
+  const handleReleaseOffer = async () => {
+    console.log('🎁 [Admin] Toggling offer...', { offerReleased: eventState.offerReleased })
+
+    if (eventState.offerReleased) {
+      console.log('🎁 [Admin] Encerrando oferta...')
+      await closeOffer()
+
+      // Criar notificação com link clicável para WhatsApp
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          type: 'warning',
+          title: 'Imersão IMPACT Esgotada',
+          message: 'A Imersão IMPACT esgotou. Para ficar na lista de espera em caso de desistência, clique aqui.',
+          read_by: [],
+          action_type: 'external',
+          external_url: 'https://wa.me/5511942230050',
+        })
+
+      if (error) {
+        console.error('Error creating notification:', error)
+      }
+
+      setAdminToast({ message: '⏹️ Oferta encerrada', type: 'info' })
+    } else {
+      console.log('🎁 [Admin] Liberando oferta...')
+      await unlockOffer()
+      await createNotification(
+        'success',
+        'IMERSÃO PRESENCIAL IMPACT Liberada!',
+        'O Protocolo IMPACT de 2 Dias está disponível. Garanta sua vaga na imersão presencial.'
+      )
+      setAdminToast({ message: '🎁 Oferta IMPACT liberada', type: 'success' })
+    }
+
+    console.log('✅ [Admin] Oferta toggled')
   }
 
-  const handleToggleAI = () => {
-    setEventState(prev => ({ ...prev, aiEnabled: !prev.aiEnabled }))
+  const handleToggleAI = async () => {
+    const wasEnabled = eventState.aiEnabled
+
+    await toggleAI()
+
+    if (wasEnabled) {
+      await createNotification(
+        'info',
+        'Assistente IA Desativado',
+        'O simulador de IA foi desabilitado.'
+      )
+      setAdminToast({ message: '🤖 Assistente IA desativado', type: 'info' })
+    } else {
+      await createNotification(
+        'success',
+        'Assistente IA Liberado!',
+        'O simulador está disponível para mapear sua jornada psicológica de vendas.'
+      )
+      setAdminToast({ message: '🤖 Assistente IA liberado', type: 'success' })
+    }
+  }
+
+  // Salvar links da oferta
+  const handleSaveOfferLinks = async () => {
+    setSavingLinks(true)
+    try {
+      // Salvar no event_state como JSONB
+      if (!dbEventState?.id) {
+        throw new Error('Event state não encontrado')
+      }
+
+      const { error } = await supabase
+        .from('event_state')
+        .update({
+          offer_links: offerLinks,
+        })
+        .eq('id', dbEventState.id)
+
+      if (error) throw error
+
+      setAdminToast({ message: '✅ Links salvos com sucesso', type: 'success' })
+    } catch (err) {
+      console.error('Error saving offer links:', err)
+      setAdminToast({ message: '❌ Erro ao salvar links', type: 'error' })
+    } finally {
+      setSavingLinks(false)
+    }
+  }
+
+  const handleLunchReturnTimeChange = async (timeString: string) => {
+    // Parse the time string (HH:MM)
+    const [hours, minutes] = timeString.split(':').map(Number)
+    const now = new Date()
+    const returnTime = new Date()
+    returnTime.setHours(hours, minutes, 0, 0)
+
+    // Calculate duration in minutes
+    const diffMs = returnTime.getTime() - now.getTime()
+    const durationMinutes = Math.max(0, Math.ceil(diffMs / 60000))
+
+    // Start lunch with this duration
+    await startLunch(durationMinutes)
   }
 
   const handleSendNotification = async () => {
-    if (!notifTitle.trim() || !notifMessage.trim()) return
-
-    // Construir config de navegação (se houver)
-    const navigationConfig = actionType !== 'none' ? {
-      action_type: actionType,
-      target_page: actionType === 'internal' ? targetPage : undefined,
-      target_section: actionType === 'internal' ? targetSection : undefined,
-      external_url: actionType === 'external' ? externalUrl : undefined,
-    } : undefined
-
-    // Criar notificação no banco
-    const { error, data } = await createNotification(
-      notifType,
-      notifTitle,
-      notifMessage,
-      navigationConfig
-    )
-
-    if (error) {
-      console.error('Erro ao enviar notificação:', error)
-      alert('Erro ao enviar notificação. Veja o console.')
+    if (!notifTitle.trim() || !notifMessage.trim()) {
+      console.warn('Título ou mensagem vazia')
       return
     }
 
-    // Preview local (for toast display only)
-    const localNotif: ToastNotification = {
-      id: Date.now().toString(),
-      type: notifType as any, // NotificationType maps to ToastNotificationType
-      title: notifTitle,
-      message: notifMessage,
-      actionLabel: notifAction.trim() || undefined,
-      timestamp: new Date(),
-      read: false,
+    try {
+      console.log('📤 [Admin] Enviando notificação...', { notifType, notifTitle, actionType })
+
+      // Construir config de navegação (se houver)
+      const navigationConfig = actionType !== 'none' ? {
+        action_type: actionType,
+        target_page: actionType === 'internal' ? targetPage : undefined,
+        target_section: actionType === 'internal' ? targetSection : undefined,
+        external_url: actionType === 'external' ? externalUrl : undefined,
+      } : undefined
+
+      console.log('📤 [Admin] Navigation config:', navigationConfig)
+
+      // Criar notificação no banco
+      const { error, data } = await createNotification(
+        notifType,
+        notifTitle,
+        notifMessage,
+        navigationConfig
+      )
+
+      if (error) {
+        console.error('❌ [Admin] Erro ao enviar notificação:', error)
+        alert(`Erro ao enviar notificação: ${error.message || 'Erro desconhecido'}`)
+        return
+      }
+
+      console.log('✅ [Admin] Notificação criada no banco:', data)
+
+      // Preview local (for toast display only)
+      const localNotif: ToastNotification = {
+        id: Date.now().toString(),
+        type: notifType as any, // NotificationType maps to ToastNotificationType
+        title: notifTitle,
+        message: notifMessage,
+        actionLabel: notifAction.trim() || undefined,
+        timestamp: new Date(),
+        read: false,
+      }
+
+      setSentNotifications(prev => [localNotif as any, ...prev])
+      setPreviewNotification(localNotif)
+
+      // Clear form
+      setNotifTitle('')
+      setNotifMessage('')
+      setNotifAction('')
+      setActionType('none')
+      setTargetPage('')
+      setTargetSection('')
+      setExternalUrl('')
+
+      console.log('✅ [Admin] Notificação enviada com sucesso!')
+    } catch (err) {
+      console.error('❌ [Admin] Erro inesperado:', err)
+      alert(`Erro inesperado: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
     }
-
-    setSentNotifications(prev => [localNotif as any, ...prev])
-    setPreviewNotification(localNotif)
-
-    // Clear form
-    setNotifTitle('')
-    setNotifMessage('')
-    setNotifAction('')
-    setActionType('none')
-    setTargetPage('')
-    setTargetSection('')
-    setExternalUrl('')
-
-    console.log('✅ Notificação enviada:', data)
 
     // Auto-hide preview
     setTimeout(() => setPreviewNotification(null), 5000)
@@ -832,40 +1208,82 @@ export function Admin() {
                       <span style={{ fontSize: '13px', fontWeight: 'bold', color: theme.colors.text.primary, minWidth: '100px' }}>
                         Preparação
                       </span>
-                      <input
-                        type="date"
-                        value={tabRelease.preparacao.date}
-                        onChange={(e) => setTabRelease(prev => ({
-                          ...prev,
-                          preparacao: { ...prev.preparacao, date: e.target.value }
-                        }))}
-                        style={{
-                          padding: '8px 10px',
-                          background: 'rgba(10, 12, 18, 0.8)',
-                          border: '1px solid rgba(100, 116, 139, 0.3)',
-                          borderRadius: '6px',
-                          color: theme.colors.text.primary,
-                          fontSize: '12px',
-                          outline: 'none',
-                        }}
-                      />
-                      <input
-                        type="time"
-                        value={tabRelease.preparacao.time}
-                        onChange={(e) => setTabRelease(prev => ({
-                          ...prev,
-                          preparacao: { ...prev.preparacao, time: e.target.value }
-                        }))}
-                        style={{
-                          padding: '8px 10px',
-                          background: 'rgba(10, 12, 18, 0.8)',
-                          border: '1px solid rgba(100, 116, 139, 0.3)',
-                          borderRadius: '6px',
-                          color: theme.colors.text.primary,
-                          fontSize: '12px',
-                          outline: 'none',
-                        }}
-                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '10px', color: theme.colors.text.muted, minWidth: '60px' }}>Liberar:</span>
+                          <input
+                            type="date"
+                            value={tabRelease.preparacao.unlockDate}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              preparacao: { ...prev.preparacao, unlockDate: e.target.value }
+                            }))}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                          <input
+                            type="time"
+                            value={tabRelease.preparacao.unlockTime}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              preparacao: { ...prev.preparacao, unlockTime: e.target.value }
+                            }))}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '10px', color: theme.colors.text.muted, minWidth: '60px' }}>Bloquear:</span>
+                          <input
+                            type="date"
+                            value={tabRelease.preparacao.lockDate}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              preparacao: { ...prev.preparacao, lockDate: e.target.value }
+                            }))}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                          <input
+                            type="time"
+                            value={tabRelease.preparacao.lockTime}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              preparacao: { ...prev.preparacao, lockTime: e.target.value }
+                            }))}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                      </div>
                       <span style={{ fontSize: '11px', color: tabRelease.preparacao.enabled ? theme.colors.accent.cyan.DEFAULT : theme.colors.text.muted, marginLeft: 'auto' }}>
                         {tabRelease.preparacao.enabled ? '✓ Liberado' : 'Bloqueado'}
                       </span>
@@ -917,40 +1335,82 @@ export function Admin() {
                       <span style={{ fontSize: '13px', fontWeight: 'bold', color: theme.colors.text.primary, minWidth: '100px' }}>
                         Ao Vivo
                       </span>
-                      <input
-                        type="date"
-                        value={tabRelease.aoVivo.date}
-                        onChange={(e) => setTabRelease(prev => ({
-                          ...prev,
-                          aoVivo: { ...prev.aoVivo, date: e.target.value }
-                        }))}
-                        style={{
-                          padding: '8px 10px',
-                          background: 'rgba(10, 12, 18, 0.8)',
-                          border: '1px solid rgba(100, 116, 139, 0.3)',
-                          borderRadius: '6px',
-                          color: theme.colors.text.primary,
-                          fontSize: '12px',
-                          outline: 'none',
-                        }}
-                      />
-                      <input
-                        type="time"
-                        value={tabRelease.aoVivo.time}
-                        onChange={(e) => setTabRelease(prev => ({
-                          ...prev,
-                          aoVivo: { ...prev.aoVivo, time: e.target.value }
-                        }))}
-                        style={{
-                          padding: '8px 10px',
-                          background: 'rgba(10, 12, 18, 0.8)',
-                          border: '1px solid rgba(100, 116, 139, 0.3)',
-                          borderRadius: '6px',
-                          color: theme.colors.text.primary,
-                          fontSize: '12px',
-                          outline: 'none',
-                        }}
-                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '10px', color: theme.colors.text.muted, minWidth: '60px' }}>Liberar:</span>
+                          <input
+                            type="date"
+                            value={tabRelease.aoVivo.unlockDate}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              aoVivo: { ...prev.aoVivo, unlockDate: e.target.value }
+                            }))}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                          <input
+                            type="time"
+                            value={tabRelease.aoVivo.unlockTime}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              aoVivo: { ...prev.aoVivo, unlockTime: e.target.value }
+                            }))}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '10px', color: theme.colors.text.muted, minWidth: '60px' }}>Bloquear:</span>
+                          <input
+                            type="date"
+                            value={tabRelease.aoVivo.lockDate}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              aoVivo: { ...prev.aoVivo, lockDate: e.target.value }
+                            }))}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                          <input
+                            type="time"
+                            value={tabRelease.aoVivo.lockTime}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              aoVivo: { ...prev.aoVivo, lockTime: e.target.value }
+                            }))}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                      </div>
                       <span style={{ fontSize: '11px', color: tabRelease.aoVivo.enabled ? '#EF4444' : theme.colors.text.muted, marginLeft: 'auto' }}>
                         {tabRelease.aoVivo.enabled ? '✓ Liberado' : 'Bloqueado'}
                       </span>
@@ -1002,49 +1462,119 @@ export function Admin() {
                       <span style={{ fontSize: '13px', fontWeight: 'bold', color: theme.colors.text.primary, minWidth: '100px' }}>
                         Pós Evento
                       </span>
-                      <input
-                        type="date"
-                        value={tabRelease.posEvento.date}
-                        onChange={(e) => setTabRelease(prev => ({
-                          ...prev,
-                          posEvento: { ...prev.posEvento, date: e.target.value }
-                        }))}
-                        style={{
-                          padding: '8px 10px',
-                          background: 'rgba(10, 12, 18, 0.8)',
-                          border: '1px solid rgba(100, 116, 139, 0.3)',
-                          borderRadius: '6px',
-                          color: theme.colors.text.primary,
-                          fontSize: '12px',
-                          outline: 'none',
-                        }}
-                      />
-                      <input
-                        type="time"
-                        value={tabRelease.posEvento.time}
-                        onChange={(e) => setTabRelease(prev => ({
-                          ...prev,
-                          posEvento: { ...prev.posEvento, time: e.target.value }
-                        }))}
-                        style={{
-                          padding: '8px 10px',
-                          background: 'rgba(10, 12, 18, 0.8)',
-                          border: '1px solid rgba(100, 116, 139, 0.3)',
-                          borderRadius: '6px',
-                          color: theme.colors.text.primary,
-                          fontSize: '12px',
-                          outline: 'none',
-                        }}
-                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '10px', color: theme.colors.text.muted, minWidth: '60px' }}>Liberar:</span>
+                          <input
+                            type="date"
+                            value={tabRelease.posEvento.unlockDate}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              posEvento: { ...prev.posEvento, unlockDate: e.target.value }
+                            }))}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                          <input
+                            type="time"
+                            value={tabRelease.posEvento.unlockTime}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              posEvento: { ...prev.posEvento, unlockTime: e.target.value }
+                            }))}
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '10px', color: theme.colors.text.muted, minWidth: '60px' }}>Bloquear:</span>
+                          <input
+                            type="date"
+                            value={tabRelease.posEvento.lockDate}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              posEvento: { ...prev.posEvento, lockDate: e.target.value }
+                            }))}
+                            placeholder="Opcional"
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                          <input
+                            type="time"
+                            value={tabRelease.posEvento.lockTime}
+                            onChange={(e) => setTabRelease(prev => ({
+                              ...prev,
+                              posEvento: { ...prev.posEvento, lockTime: e.target.value }
+                            }))}
+                            placeholder="Opcional"
+                            style={{
+                              padding: '6px 8px',
+                              background: 'rgba(10, 12, 18, 0.8)',
+                              border: '1px solid rgba(100, 116, 139, 0.3)',
+                              borderRadius: '6px',
+                              color: theme.colors.text.primary,
+                              fontSize: '11px',
+                              outline: 'none',
+                            }}
+                          />
+                        </div>
+                      </div>
                       <span style={{ fontSize: '11px', color: tabRelease.posEvento.enabled ? theme.colors.accent.purple.light : theme.colors.text.muted, marginLeft: 'auto' }}>
                         {tabRelease.posEvento.enabled ? '✓ Liberado' : 'Bloqueado'}
                       </span>
                     </div>
                   </div>
 
-                  <p style={{ fontSize: '11px', color: theme.colors.text.muted, marginTop: '12px' }}>
-                    As abas serão liberadas automaticamente na data/hora configurada, ou você pode liberar manualmente usando o toggle.
+                  <p style={{ fontSize: '11px', color: theme.colors.text.muted, marginTop: '12px', marginBottom: '16px' }}>
+                    Toggle manual tem prioridade. Se desabilitado, bloqueia mesmo fora do horário. Bloqueio acontece automaticamente na data/hora de bloquear.
                   </p>
+
+                  {/* Save Tab Settings Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={saveTabSettings}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      background: 'linear-gradient(135deg, #22D3EE 0%, #3B82F6 100%)',
+                      border: 'none',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      color: '#fff',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    <Save size={16} />
+                    SALVAR CONFIGURAÇÕES DE ABAS
+                  </motion.button>
                 </div>
 
                 {/* Offer Links Settings */}
@@ -1234,6 +1764,53 @@ export function Admin() {
                     <p style={{ fontSize: '10px', color: theme.colors.text.muted, marginTop: '4px' }}>
                       Exemplo de link final: {offerLinks.ingresso1Percent}{offerLinks.ingresso1Percent.includes('?') ? '&' : '?'}utm_source={offerLinks.utmSource}&utm_medium={offerLinks.utmMedium}&utm_campaign={offerLinks.utmCampaign}&utm_content={offerLinks.utmContent}
                     </p>
+
+                    {/* Botão Salvar Links */}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleSaveOfferLinks}
+                      disabled={savingLinks}
+                      style={{
+                        marginTop: '16px',
+                        width: '100%',
+                        padding: '14px',
+                        background: savingLinks
+                          ? 'rgba(100, 116, 139, 0.3)'
+                          : 'linear-gradient(135deg, rgba(34, 211, 238, 0.2) 0%, rgba(6, 182, 212, 0.15) 100%)',
+                        border: savingLinks
+                          ? '1px solid rgba(100, 116, 139, 0.3)'
+                          : '2px solid rgba(34, 211, 238, 0.4)',
+                        borderRadius: '12px',
+                        color: savingLinks ? theme.colors.text.muted : theme.colors.accent.cyan.DEFAULT,
+                        fontSize: '13px',
+                        fontWeight: theme.typography.fontWeight.bold,
+                        letterSpacing: '0.05em',
+                        cursor: savingLinks ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        opacity: savingLinks ? 0.6 : 1,
+                      }}
+                    >
+                      {savingLinks ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                          >
+                            <Loader size={16} />
+                          </motion.div>
+                          Salvando...
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          Salvar Links da Oferta
+                        </>
+                      )}
+                    </motion.button>
                   </div>
                 </div>
               </div>
@@ -1380,105 +1957,151 @@ export function Admin() {
           </h2>
 
           {/* Live/Pause/Lunch Buttons */}
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleToggleLive}
-              style={{
-                flex: 1,
-                padding: '14px',
-                background: eventState.status !== 'offline'
-                  ? 'rgba(239, 68, 68, 0.2)'
-                  : 'rgba(34, 211, 238, 0.2)',
-                border: `1px solid ${eventState.status !== 'offline' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(34, 211, 238, 0.5)'}`,
-                borderRadius: '10px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                color: eventState.status !== 'offline' ? '#EF4444' : theme.colors.accent.cyan.DEFAULT,
-                fontSize: '14px',
-                fontWeight: 'bold',
-              }}
-            >
-              <Power size={18} />
-              {eventState.status !== 'offline' ? 'ENCERRAR' : 'INICIAR TRANSMISSÃO'}
-            </motion.button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+            {/* Primeira linha: INICIAR/PAUSAR */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleToggleLive}
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  background: (eventState.status === 'offline' || eventState.status === 'finished')
+                    ? 'rgba(34, 211, 238, 0.2)'
+                    : 'rgba(100, 116, 139, 0.2)',
+                  border: `1px solid ${(eventState.status === 'offline' || eventState.status === 'finished') ? 'rgba(34, 211, 238, 0.5)' : 'rgba(100, 116, 139, 0.3)'}`,
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  color: (eventState.status === 'offline' || eventState.status === 'finished') ? theme.colors.accent.cyan.DEFAULT : '#94A3B8',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                }}
+              >
+                <Power size={18} />
+                {(eventState.status === 'offline' || eventState.status === 'finished') ? 'INICIAR TRANSMISSÃO' : 'EM ANDAMENTO'}
+              </motion.button>
 
-            {eventState.status !== 'offline' && (
-              <>
+              {(eventState.status !== 'offline' && eventState.status !== 'finished') && (
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={(eventState.status !== 'activity' && !eventState.lunchActive) ? { scale: 1.02 } : {}}
+                  whileTap={(eventState.status !== 'activity' && !eventState.lunchActive) ? { scale: 0.98 } : {}}
                   onClick={handleTogglePause}
+                  disabled={eventState.status === 'activity' || eventState.lunchActive}
                   style={{
-                    padding: '14px 16px',
+                    flex: 1,
+                    padding: '14px',
                     background: eventState.status === 'paused' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(245, 158, 11, 0.2)',
                     border: `1px solid ${eventState.status === 'paused' ? 'rgba(34, 211, 238, 0.5)' : 'rgba(245, 158, 11, 0.5)'}`,
                     borderRadius: '10px',
-                    cursor: 'pointer',
+                    cursor: (eventState.status === 'activity' || eventState.lunchActive) ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    justifyContent: 'center',
+                    gap: '8px',
                     color: eventState.status === 'paused' ? theme.colors.accent.cyan.DEFAULT : '#F59E0B',
-                    fontSize: '13px',
+                    fontSize: '14px',
                     fontWeight: 'bold',
-                    whiteSpace: 'nowrap',
+                    opacity: (eventState.status === 'activity' || eventState.lunchActive) ? 0.4 : 1,
+                    transition: 'opacity 0.2s',
                   }}
                 >
-                  {eventState.status === 'paused' ? <Play size={16} /> : <Pause size={16} />}
+                  {eventState.status === 'paused' ? <Play size={18} /> : <Pause size={18} />}
                   {eventState.status === 'paused' ? 'RETOMAR' : 'PAUSAR'}
                 </motion.button>
+              )}
+            </div>
 
+            {/* Segunda linha: ATIVIDADE e ALMOÇO */}
+            {(eventState.status !== 'offline' && eventState.status !== 'finished') && (
+              <div style={{ display: 'flex', gap: '12px' }}>
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={(!eventState.lunchActive && eventState.status !== 'paused') ? { scale: 1.02 } : {}}
+                  whileTap={(!eventState.lunchActive && eventState.status !== 'paused') ? { scale: 0.98 } : {}}
                   onClick={handleToggleActivity}
+                  disabled={eventState.lunchActive || eventState.status === 'paused'}
                   style={{
-                    padding: '14px 16px',
+                    flex: 1,
+                    padding: '14px',
                     background: eventState.status === 'activity' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(168, 85, 247, 0.2)',
                     border: `1px solid ${eventState.status === 'activity' ? 'rgba(34, 211, 238, 0.5)' : 'rgba(168, 85, 247, 0.5)'}`,
                     borderRadius: '10px',
-                    cursor: 'pointer',
+                    cursor: (eventState.lunchActive || eventState.status === 'paused') ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    justifyContent: 'center',
+                    gap: '8px',
                     color: eventState.status === 'activity' ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light,
-                    fontSize: '13px',
+                    fontSize: '14px',
                     fontWeight: 'bold',
-                    whiteSpace: 'nowrap',
+                    opacity: (eventState.lunchActive || eventState.status === 'paused') ? 0.4 : 1,
+                    transition: 'opacity 0.2s',
                   }}
                 >
-                  <FileText size={16} />
-                  {eventState.status === 'activity' ? 'FIM' : 'ATIVIDADE'}
+                  <FileText size={18} />
+                  {eventState.status === 'activity' ? 'FIM ATIVIDADE' : 'ATIVIDADE'}
                 </motion.button>
 
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={(!eventState.status || eventState.status === 'live' || eventState.lunchActive) ? { scale: 1.02 } : {}}
+                  whileTap={(!eventState.status || eventState.status === 'live' || eventState.lunchActive) ? { scale: 0.98 } : {}}
                   onClick={handleToggleLunch}
+                  disabled={eventState.status === 'activity' || eventState.status === 'paused'}
                   style={{
-                    padding: '14px 16px',
-                    background: eventState.status === 'lunch' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                    border: `1px solid ${eventState.status === 'lunch' ? 'rgba(34, 211, 238, 0.5)' : 'rgba(245, 158, 11, 0.5)'}`,
+                    flex: 1,
+                    padding: '14px',
+                    background: eventState.lunchActive ? 'rgba(34, 211, 238, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                    border: `1px solid ${eventState.lunchActive ? 'rgba(34, 211, 238, 0.5)' : 'rgba(245, 158, 11, 0.5)'}`,
                     borderRadius: '10px',
-                    cursor: 'pointer',
+                    cursor: (eventState.status === 'activity' || eventState.status === 'paused') ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    color: eventState.status === 'lunch' ? theme.colors.accent.cyan.DEFAULT : '#F59E0B',
-                    fontSize: '13px',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    color: eventState.lunchActive ? theme.colors.accent.cyan.DEFAULT : '#F59E0B',
+                    fontSize: '14px',
                     fontWeight: 'bold',
-                    whiteSpace: 'nowrap',
+                    opacity: (eventState.status === 'activity' || eventState.status === 'paused') ? 0.4 : 1,
+                    transition: 'opacity 0.2s',
                   }}
                 >
-                  <Coffee size={16} />
-                  {eventState.status === 'lunch' ? 'FIM' : 'ALMOÇO'}
+                  <Coffee size={18} />
+                  {eventState.lunchActive ? 'FIM ALMOÇO' : 'ALMOÇO'}
                 </motion.button>
-              </>
+              </div>
             )}
+
+            {/* Terceira linha: FINALIZAR EVENTO (menor e discreto) */}
+            {(eventState.status !== 'offline' && eventState.status !== 'finished') && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowFinishModal(true)}
+                style={{
+                  padding: '10px 12px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  color: '#EF4444',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                <XCircle size={14} />
+                FINALIZAR EVENTO
+              </motion.button>
+            )}
+
           </div>
 
           {/* Lunch Return Time (only visible when lunch mode) */}
@@ -1500,7 +2123,7 @@ export function Admin() {
               <input
                 type="time"
                 value={eventState.lunchReturnTime}
-                onChange={(e) => setEventState(prev => ({ ...prev, lunchReturnTime: e.target.value }))}
+                onChange={(e) => handleLunchReturnTimeChange(e.target.value)}
                 style={{
                   padding: '8px 12px',
                   background: 'rgba(10, 12, 18, 0.8)',
@@ -1811,7 +2434,7 @@ export function Admin() {
               <p style={{ fontSize: '12px', color: theme.colors.text.secondary, margin: 0 }}>
                 {eventState.offerReleased
                   ? 'Liberada para os participantes'
-                  : 'Bloqueada - aguardando liberação'}
+                  : 'Não liberada - aguardando'}
               </p>
             </div>
             <motion.button
@@ -1834,8 +2457,8 @@ export function Admin() {
                 fontWeight: 'bold',
               }}
             >
-              {eventState.offerReleased ? <Lock size={16} /> : <Unlock size={16} />}
-              {eventState.offerReleased ? 'BLOQUEAR' : 'LIBERAR OFERTA'}
+              {eventState.offerReleased ? <XCircle size={16} /> : <Unlock size={16} />}
+              {eventState.offerReleased ? 'ENCERRAR OFERTA' : 'LIBERAR OFERTA'}
             </motion.button>
           </div>
         </div>
@@ -1929,12 +2552,23 @@ export function Admin() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => {
+              onClick={async () => {
+                const title = 'Avalie o Dia 1'
+                const message = 'Conta pra gente como foi sua experiência no primeiro dia! (+30 XP)'
+
+                // Salvar no banco
+                await createNotification('info', title, message, {
+                  action_type: 'internal',
+                  target_page: 'ao-vivo',
+                  target_section: 'nps-day1',
+                })
+
+                // Preview local
                 const notification: ToastNotification = {
                   id: Date.now().toString(),
                   type: 'nps',
-                  title: 'Avalie o Dia 1',
-                  message: 'Conta pra gente como foi sua experiência no primeiro dia! (+25 XP)',
+                  title,
+                  message,
                   actionLabel: 'Avaliar agora',
                   timestamp: new Date(),
                   read: false,
@@ -1967,12 +2601,23 @@ export function Admin() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => {
+              onClick={async () => {
+                const title = 'Avalie a Imersão'
+                const message = 'Como foi sua experiência na Imersão Diagnóstico de Vendas? (+30 XP)'
+
+                // Salvar no banco
+                await createNotification('info', title, message, {
+                  action_type: 'internal',
+                  target_page: 'ao-vivo',
+                  target_section: 'nps-final',
+                })
+
+                // Preview local
                 const notification: ToastNotification = {
                   id: Date.now().toString(),
                   type: 'nps',
-                  title: 'Avalie a Imersão',
-                  message: 'Como foi sua experiência na Imersão Diagnóstico de Vendas? (+50 XP)',
+                  title,
+                  message,
                   actionLabel: 'Avaliar agora',
                   timestamp: new Date(),
                   read: false,
@@ -2305,11 +2950,11 @@ export function Admin() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
           <Monitor size={18} color={theme.colors.text.muted} />
           <span style={{ fontSize: '12px', color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            Visão do Participante
+            Visão do Participante (Tempo Real)
           </span>
         </div>
 
-        {/* Phone Mockup */}
+        {/* Live Iframe - Real Participant View */}
         <div
           style={{
             width: '375px',
@@ -2323,273 +2968,16 @@ export function Admin() {
             flexShrink: 0,
           }}
         >
-          {/* Status Bar */}
-          <div
+          <iframe
+            src="/ao-vivo"
             style={{
-              height: '44px',
-              background: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderBottom: '1px solid rgba(100, 116, 139, 0.1)',
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              display: 'block',
             }}
-          >
-            <div
-              style={{
-                width: '120px',
-                height: '28px',
-                background: '#000',
-                borderRadius: '14px',
-              }}
-            />
-          </div>
-
-          {/* Content */}
-          <div
-            style={{
-              padding: '16px',
-              height: 'calc(100% - 44px)',
-              overflowY: 'auto',
-            }}
-          >
-            {/* Header */}
-            <div style={{ marginBottom: '16px', textAlign: 'center' }}>
-              <h3
-                style={{
-                  fontFamily: theme.typography.fontFamily.orbitron,
-                  fontSize: '14px',
-                  color: theme.colors.accent.cyan.DEFAULT,
-                  letterSpacing: '0.1em',
-                  margin: 0,
-                }}
-              >
-                IMERSÃO
-              </h3>
-              <p style={{ fontSize: '10px', color: theme.colors.text.secondary, margin: '2px 0 0 0' }}>
-                DIAGNÓSTICO DE VENDAS
-              </p>
-            </div>
-
-            {/* Live Ticker Preview */}
-            <div
-              style={{
-                background: 'rgba(15, 17, 21, 0.95)',
-                border: eventState.status === 'live'
-                  ? '1px solid rgba(255, 68, 68, 0.4)'
-                  : eventState.status === 'lunch'
-                  ? '1px solid rgba(245, 158, 11, 0.4)'
-                  : '1px solid rgba(100, 116, 139, 0.3)',
-                borderRadius: '12px',
-                padding: '14px',
-                marginBottom: '16px',
-              }}
-            >
-              {eventState.status === 'live' && (
-                <div
-                  style={{
-                    position: 'relative',
-                    height: '2px',
-                    background: 'linear-gradient(90deg, transparent 0%, #FF4444 50%, transparent 100%)',
-                    marginBottom: '10px',
-                    marginTop: '-14px',
-                    marginLeft: '-14px',
-                    marginRight: '-14px',
-                  }}
-                />
-              )}
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                {eventState.status !== 'offline' ? (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '4px 8px',
-                      background: eventState.status === 'activity' ? 'rgba(168, 85, 247, 0.15)' : eventState.status === 'lunch' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 68, 68, 0.15)',
-                      borderRadius: '4px',
-                    }}
-                  >
-                    {eventState.status === 'live' && (
-                      <motion.div
-                        animate={{ scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }}
-                        transition={{ duration: 1.5, repeat: Infinity }}
-                        style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          background: '#FF4444',
-                        }}
-                      />
-                    )}
-                    {eventState.status === 'lunch' && <Coffee size={12} color="#F59E0B" />}
-                    {eventState.status === 'paused' && <Pause size={12} color="#F59E0B" />}
-                    {eventState.status === 'activity' && <FileText size={12} color="#A855F7" />}
-                    <span style={{ fontSize: '9px', fontWeight: 'bold', color: eventState.status === 'live' ? '#FF4444' : eventState.status === 'activity' ? '#A855F7' : '#F59E0B' }}>
-                      {eventState.status === 'live' ? 'AO VIVO' : eventState.status === 'lunch' ? `ALMOÇO - Volta ${eventState.lunchReturnTime} (${lunchMinutesRemaining} min)` : eventState.status === 'activity' ? 'ATIVIDADE EM ANDAMENTO' : 'PAUSADO'}
-                    </span>
-                  </div>
-                ) : (
-                  <span style={{ fontSize: '9px', color: theme.colors.text.muted }}>OFFLINE</span>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '9px', color: theme.colors.text.muted }}>
-                    MÓDULO {eventState.currentModule}/{TOTAL_MODULES - 1}
-                  </span>
-                  {/* Notification bell with badge */}
-                  <div style={{ position: 'relative' }}>
-                    <Bell size={14} color={theme.colors.text.secondary} />
-                    {sentNotifications.length > 0 && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '-4px',
-                          right: '-4px',
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          background: '#EF4444',
-                          border: '1px solid #050505',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '7px',
-                          fontWeight: 'bold',
-                          color: '#fff',
-                        }}
-                      >
-                        {sentNotifications.length > 9 ? '9+' : sentNotifications.length}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    background: eventState.status === 'activity' ? 'rgba(168, 85, 247, 0.2)' : eventState.status === 'lunch' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 68, 68, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {eventState.status === 'activity' ? (
-                    <FileText size={18} color="#A855F7" />
-                  ) : eventState.status === 'lunch' ? (
-                    <Coffee size={18} color="#F59E0B" />
-                  ) : (
-                    <Radio size={18} color="#FF4444" />
-                  )}
-                </div>
-                <div>
-                  <p
-                    style={{
-                      fontFamily: theme.typography.fontFamily.orbitron,
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      color: theme.colors.text.primary,
-                      margin: 0,
-                    }}
-                  >
-                    {eventState.status === 'lunch' ? 'HORA DO ALMOÇO' : eventState.status === 'activity' ? 'ATIVIDADE EM ANDAMENTO' : currentModule?.title}
-                  </p>
-                  <p style={{ fontSize: '9px', color: theme.colors.text.secondary, margin: '2px 0 0 0' }}>
-                    {eventState.status === 'lunch' ? `Retorno às ${eventState.lunchReturnTime} (em ${lunchMinutesRemaining} minutos)` : eventState.status === 'activity' ? 'Complete a atividade antes de continuarmos' : currentModule?.subtitle}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Presence Card Preview (if live) */}
-            {eventState.status === 'live' && (
-              <motion.div
-                initial={{ y: -10, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                style={{
-                  background: 'rgba(168, 85, 247, 0.15)',
-                  border: '1px solid rgba(168, 85, 247, 0.4)',
-                  borderRadius: '10px',
-                  padding: '12px',
-                  marginBottom: '16px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Zap size={16} color={theme.colors.accent.purple.light} />
-                    <span style={{ fontSize: '10px', color: theme.colors.accent.purple.light, fontWeight: 'bold' }}>
-                      +10 XP
-                    </span>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    marginTop: '8px',
-                    padding: '10px',
-                    background: 'rgba(168, 85, 247, 0.2)',
-                    borderRadius: '6px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <span style={{ fontSize: '10px', color: theme.colors.accent.purple.light, fontWeight: 'bold' }}>
-                    CONFIRMAR PRESENÇA
-                  </span>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Offer Preview (if released) */}
-            {eventState.offerReleased && (
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                style={{
-                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(234, 179, 8, 0.1) 100%)',
-                  border: '1px solid rgba(245, 158, 11, 0.5)',
-                  borderRadius: '10px',
-                  padding: '12px',
-                  marginBottom: '16px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <Gift size={16} color="#F59E0B" />
-                  <span
-                    style={{
-                      fontSize: '10px',
-                      color: '#F59E0B',
-                      fontWeight: 'bold',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    OFERTA EXCLUSIVA
-                  </span>
-                </div>
-                <p style={{ fontSize: '10px', color: theme.colors.text.secondary, margin: 0 }}>
-                  Imersão IMPACT com condição especial
-                </p>
-              </motion.div>
-            )}
-
-            {/* Placeholder content */}
-            <div
-              style={{
-                height: '120px',
-                background: 'rgba(15, 17, 21, 0.5)',
-                borderRadius: '10px',
-                marginBottom: '12px',
-              }}
-            />
-            <div
-              style={{
-                height: '80px',
-                background: 'rgba(15, 17, 21, 0.5)',
-                borderRadius: '10px',
-              }}
-            />
-          </div>
+            title="Visão do Participante - Ao Vivo"
+          />
         </div>
       </div>
 
@@ -3560,6 +3948,226 @@ export function Admin() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Admin Toast */}
+      <AnimatePresence>
+        {adminToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            style={{
+              position: 'fixed',
+              top: '24px',
+              right: '24px',
+              padding: '16px 20px',
+              background: adminToast.type === 'info' ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.95) 0%, rgba(6, 182, 212, 0.95) 100%)'
+                : adminToast.type === 'warning' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%)'
+                : 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%)',
+              borderRadius: '12px',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+              color: '#fff',
+              fontSize: '14px',
+              fontWeight: '500',
+              maxWidth: '400px',
+              zIndex: 10000,
+            }}
+          >
+            {adminToast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Lunch Time Modal */}
+      <AnimatePresence>
+        {showLunchTimeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10001,
+              backdropFilter: 'blur(8px)',
+            }}
+            onClick={() => setShowLunchTimeModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%)',
+                border: '1px solid rgba(249, 115, 22, 0.3)',
+                borderRadius: '20px',
+                padding: '32px',
+                maxWidth: '440px',
+                width: '90%',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              }}
+            >
+              {/* Icon */}
+              <div
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  margin: '0 auto 20px',
+                  background: 'rgba(249, 115, 22, 0.15)',
+                  border: '2px solid rgba(249, 115, 22, 0.4)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Coffee size={32} color="#F97316" />
+              </div>
+
+              {/* Title */}
+              <h3
+                style={{
+                  fontSize: '24px',
+                  fontWeight: 'bold',
+                  color: '#fff',
+                  textAlign: 'center',
+                  marginBottom: '8px',
+                  fontFamily: theme.typography.fontFamily.orbitron,
+                  letterSpacing: '0.05em',
+                }}
+              >
+                Intervalo para Almoço
+              </h3>
+
+              {/* Subtitle */}
+              <p
+                style={{
+                  fontSize: '14px',
+                  color: theme.colors.text.secondary,
+                  textAlign: 'center',
+                  marginBottom: '28px',
+                  lineHeight: '1.5',
+                }}
+              >
+                Informe o horário de retorno que será enviado aos participantes
+              </p>
+
+              {/* Time Input */}
+              <div style={{ marginBottom: '28px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    color: theme.colors.text.secondary,
+                    marginBottom: '8px',
+                    fontWeight: '500',
+                  }}
+                >
+                  Horário de Retorno
+                </label>
+                <input
+                  type="time"
+                  value={lunchReturnTime}
+                  onChange={(e) => setLunchReturnTime(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    fontSize: '16px',
+                    background: 'rgba(30, 41, 59, 0.6)',
+                    border: '1px solid rgba(249, 115, 22, 0.3)',
+                    borderRadius: '12px',
+                    color: '#fff',
+                    outline: 'none',
+                    fontFamily: theme.typography.fontFamily.body,
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(249, 115, 22, 0.6)'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(249, 115, 22, 0.3)'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                />
+              </div>
+
+              {/* Buttons */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                }}
+              >
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowLunchTimeModal(false)}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    background: 'rgba(100, 116, 139, 0.2)',
+                    border: '1px solid rgba(148, 163, 184, 0.3)',
+                    borderRadius: '12px',
+                    color: theme.colors.text.secondary,
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    fontFamily: theme.typography.fontFamily.body,
+                  }}
+                >
+                  Cancelar
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleConfirmLunchTime}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    background: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
+                    border: 'none',
+                    borderRadius: '12px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    fontFamily: theme.typography.fontFamily.body,
+                    boxShadow: '0 4px 12px rgba(249, 115, 22, 0.3)',
+                  }}
+                >
+                  Confirmar
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation Modal - Finish Event */}
+      <ConfirmationModal
+        isOpen={showFinishModal}
+        onClose={() => setShowFinishModal(false)}
+        onConfirm={handleFinishEvent}
+        title="ATENÇÃO: Finalizar Evento"
+        message="Você está prestes a encerrar a imersão ao vivo. Esta ação é irreversível."
+        confirmText="Finalizar Evento"
+        cancelText="Cancelar"
+        type="danger"
+        details={[
+          'Encerrar a transmissão ao vivo',
+          'Redirecionar participantes para Pós-Evento',
+          'Não pode ser desfeito facilmente',
+        ]}
+      />
 
       {/* CSS for pulse animation */}
       <style>{`

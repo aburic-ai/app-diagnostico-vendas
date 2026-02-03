@@ -25,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Carregar perfil do banco
   const loadProfile = async (userId: string) => {
     try {
+      console.log('👤 [AuthContext] Loading profile for user:', userId)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -32,9 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single()
 
       if (error) throw error
+      console.log('👤 [AuthContext] Profile loaded:', { ...data, is_admin: data?.is_admin })
       setProfile(data)
     } catch (error) {
-      console.error('Error loading profile:', error)
+      console.error('❌ [AuthContext] Error loading profile:', error)
       setProfile(null)
     }
   }
@@ -48,13 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Verificar sessão ao carregar
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        loadProfile(session.user.id)
+        await loadProfile(session.user.id)  // Aguardar profile carregar!
       }
-      setLoading(false)
+      setLoading(false)  // Só agora que profile está carregado
     })
 
     // Listener para mudanças de auth

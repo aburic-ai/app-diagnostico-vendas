@@ -26,6 +26,10 @@ import {
   Star,
   Crown,
   Ticket,
+  Clock,
+  Pause,
+  Coffee,
+  CheckSquare,
 } from 'lucide-react'
 
 import {
@@ -39,13 +43,19 @@ import {
   AvatarButton,
   NotificationDrawer,
   AIChatFAB,
+  AIChatInterface,
   SponsorBadge,
+  ProfileModal,
+  EventCountdown,
+  EventFinishedView,
 } from '../components/ui'
 import type { IMPACTData } from '../components/ui'
 import type { Notification } from '../hooks/useNotifications'
 import { theme } from '../styles/theme'
 import { getModuleById, EVENT_MODULES } from '../data/modules'
 import { useDiagnostic, useAuth, useUserProgress } from '../hooks'
+import { useEventState } from '../hooks/useEventState'
+import { useNotifications } from '../hooks/useNotifications'
 import type { DiagnosticScores } from '../hooks'
 import { XP_CONFIG } from '../config/xp-system'
 
@@ -66,6 +76,7 @@ const buildOfferUrl = (baseUrl: string, utmContent?: string): string => {
 }
 
 // Helper: Converter DiagnosticScores para IMPACTData
+// Agora ambos usam os mesmos nomes em português!
 const scoresToIMPACT = (scores: DiagnosticScores | null): IMPACTData => {
   if (!scores) {
     return {
@@ -77,52 +88,80 @@ const scoresToIMPACT = (scores: DiagnosticScores | null): IMPACTData => {
       transformacao: 0,
     }
   }
-  return {
-    inspiracao: scores.intention_score,
-    motivacao: scores.message_score,
-    preparacao: scores.pain_score,
-    apresentacao: scores.authority_score,
-    conversao: scores.commitment_score,
-    transformacao: scores.transformation_score,
-  }
+  // Mesmos nomes, retorna direto
+  return { ...scores }
 }
 
 // Helper: Converter IMPACTData para DiagnosticScores
+// Agora ambos usam os mesmos nomes em português!
 const impactToScores = (impact: IMPACTData): DiagnosticScores => {
-  return {
-    intention_score: impact.inspiracao,
-    message_score: impact.motivacao,
-    pain_score: impact.preparacao,
-    authority_score: impact.apresentacao,
-    commitment_score: impact.conversao,
-    transformation_score: impact.transformacao,
-  }
+  // Mesmos nomes, retorna direto
+  return { ...impact }
 }
 
 export function AoVivo() {
   const { profile, user } = useAuth()
   const { getDiagnosticByDay, saveDiagnostic, loading: diagnosticLoading } = useDiagnostic()
   const { completeStep } = useUserProgress()
+  const { eventState, isAoVivoAccessible, isAdmin } = useEventState()
   const location = useLocation()
 
   // Refs para scroll to section (avisos clickables)
   const diagnosticSlidersRef = useRef<HTMLDivElement>(null)
 
   const [activeNav, setActiveNav] = useState('aovivo')
-  const [selectedDay, setSelectedDay] = useState<1 | 2>(1)
+  const [selectedDay, setSelectedDay] = useState<1 | 2>(eventState?.current_day || 1)
   const [showSliders, setShowSliders] = useState(true)
-  const [currentModule] = useState(5) // Módulo atual (simulado - vem do admin)
-  const [viewingModule, setViewingModule] = useState(5) // Módulo que o usuário está vendo
+
+  // Get current module and status from database
+  const currentModule = eventState?.current_module || 0
+  const isLive = eventState?.status === 'live'
+  const isPaused = eventState?.status === 'paused'
+  const isLunch = eventState?.lunch_active || false
+  const isActivity = eventState?.status === 'activity'
+
+  // Sync selectedDay with eventState.current_day
+  useEffect(() => {
+    if (eventState?.current_day && eventState.current_day !== selectedDay) {
+      console.log(`🗓️ [AoVivo] Dia mudou no servidor: ${selectedDay} → ${eventState.current_day}`)
+      setSelectedDay(eventState.current_day as 1 | 2)
+    }
+  }, [eventState?.current_day])
+
+  // Debug log
+  console.log('🎮 [AoVivo] Status:', {
+    status: eventState?.status,
+    lunch_active: eventState?.lunch_active,
+    current_day: eventState?.current_day,
+    selectedDay,
+    isLive,
+    isPaused,
+    isLunch,
+    isActivity,
+  })
+
+  const [viewingModule, setViewingModule] = useState(currentModule)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showAIChat, setShowAIChat] = useState(false)
   const [showOfferModal, setShowOfferModal] = useState(false)
-  const [isOfferUnlocked] = useState(false) // Libera no módulo 11
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const isOfferUnlocked = eventState?.offer_visible || false
   const [confirmedModules, setConfirmedModules] = useState<number[]>([0, 1, 2, 3, 4]) // Módulos já confirmados
 
-  // Notificações de exemplo (vazias - usar useNotifications para notificações reais)
-  const [notifications] = useState<Notification[]>([])
+  // Notificações reais do banco de dados
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications()
 
-  const unreadCount = notifications.filter(n => !n.read_by?.includes(user?.id || '')).length
+  // Sync viewing module with current module from Admin
+  useEffect(() => {
+    if (eventState?.current_module !== undefined) {
+      setViewingModule(eventState.current_module)
+    }
+  }, [eventState?.current_module])
 
   // Dados do diagnóstico - inicializados vazios, carregados do banco via useEffect
   const [day1Data, setDay1Data] = useState<IMPACTData>({
@@ -222,7 +261,7 @@ export function AoVivo() {
   }
 
   const gargalo = findGargalo(currentData)
-  const showGargalo = hasFilledData(currentData) && gargalo[1] <= 5
+  const showGargalo = hasFilledData(currentData) && gargalo && gargalo[1] <= 5
   const gargaloMap: Record<keyof IMPACTData, { etapa: string; letra: string }> = {
     inspiracao: { etapa: 'Inspiração', letra: 'I' },
     motivacao: { etapa: 'Motivação', letra: 'M' },
@@ -236,7 +275,9 @@ export function AoVivo() {
   const userContext = {
     name: profile?.name || 'Participante',
     businessType: 'Consultoria B2B',
-    gargalo: { etapa: gargaloMap[gargalo[0]].etapa, valor: gargalo[1] },
+    gargalo: gargalo && gargalo[0] && gargaloMap[gargalo[0]]
+      ? { etapa: gargaloMap[gargalo[0]].etapa, valor: gargalo[1] }
+      : { etapa: 'Inspiração', valor: 0 },
     diagnostico: currentData,
   }
 
@@ -260,6 +301,8 @@ export function AoVivo() {
   }
 
   const updateDimension = async (key: keyof IMPACTData, value: number) => {
+    console.log(`🔄 [AoVivo] updateDimension chamado: ${key} = ${value}, dia = ${selectedDay}`)
+
     // Atualizar estado local imediatamente (UX responsivo)
     const updatedData = { ...currentData, [key]: value }
     setCurrentData(updatedData)
@@ -267,15 +310,19 @@ export function AoVivo() {
     // Salvar no banco em background
     try {
       const scores = impactToScores(updatedData)
-      const { error } = await saveDiagnostic(selectedDay, scores)
+      console.log('📝 [AoVivo] Scores a salvar:', scores)
+      console.log('👤 [AoVivo] User:', user?.id)
 
-      if (error) {
-        console.error('Erro ao salvar diagnóstico:', error)
+      const result = await saveDiagnostic(selectedDay, scores)
+      console.log('💾 [AoVivo] Resultado do save:', result)
+
+      if (result.error) {
+        console.error('❌ Erro ao salvar diagnóstico:', result.error)
       } else {
-        console.log(`✅ Diagnóstico Dia ${selectedDay} salvo`)
+        console.log(`✅ Diagnóstico Dia ${selectedDay} salvo com sucesso!`)
       }
     } catch (err) {
-      console.error('Erro ao salvar diagnóstico:', err)
+      console.error('❌ Exceção ao salvar diagnóstico:', err)
     }
   }
 
@@ -332,6 +379,207 @@ export function AoVivo() {
 
   // Calculate total XP from confirmed modules
   const totalXP = confirmedModules.length * XP_CONFIG.EVENT.MODULE_CHECKIN
+
+  // Check tab access (admins bypass)
+  if (!isAdmin && !isAoVivoAccessible()) {
+    return (
+      <PageWrapper backgroundColor={theme.colors.background.dark}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '70vh',
+            padding: '40px',
+            textAlign: 'center',
+          }}
+        >
+          <Lock size={64} color={theme.colors.text.muted} style={{ marginBottom: '24px' }} />
+          <h2 style={{
+            fontSize: '24px',
+            fontWeight: 'bold',
+            color: theme.colors.text.primary,
+            marginBottom: '12px',
+          }}>
+            Aba Bloqueada
+          </h2>
+          <p style={{
+            fontSize: '16px',
+            color: theme.colors.text.secondary,
+            maxWidth: '500px',
+          }}>
+            Esta aba será liberada automaticamente na data/hora do evento ao vivo. Aguarde a liberação.
+          </p>
+        </div>
+        <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+      </PageWrapper>
+    )
+  }
+
+  // FINISHED - Redirect to Pós-Evento
+  if (eventState?.status === 'finished') {
+    return <EventFinishedView />
+  }
+
+  // Show countdown if event is offline AND before scheduled start
+  if (eventState?.status === 'offline' && eventState?.event_scheduled_start) {
+    const scheduledDate = new Date(eventState.event_scheduled_start)
+    const now = new Date()
+
+    // Se ainda não chegou a data, mostrar countdown
+    if (now < scheduledDate) {
+      return (
+        <PageWrapper
+          backgroundColor={theme.colors.background.dark}
+          showAnimatedBackground={true}
+          showOverlay={false}
+        >
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              paddingBottom: '100px',
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '20px',
+              }}
+            >
+              <EventCountdown
+                targetDate={eventState.event_scheduled_start}
+                day={eventState.current_day || 1}
+              />
+            </motion.div>
+          </div>
+          <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+        </PageWrapper>
+      )
+    }
+
+    // Se já passou da data, mostrar "Aguardando Início"
+    return (
+      <PageWrapper
+        backgroundColor={theme.colors.background.dark}
+        showAnimatedBackground={true}
+        showOverlay={false}
+      >
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            paddingBottom: '100px',
+          }}
+        >
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '70vh',
+              padding: '40px 20px',
+              textAlign: 'center',
+            }}
+          >
+          <Clock size={64} color="#22D3EE" style={{ marginBottom: '24px' }} />
+          <h2 style={{
+            fontSize: '28px',
+            fontWeight: 'bold',
+            color: '#fff',
+            marginBottom: '12px',
+          }}>
+            Aguardando Início
+          </h2>
+          <p style={{
+            fontSize: '16px',
+            color: '#94A3B8',
+            maxWidth: '500px',
+            marginBottom: '40px',
+          }}>
+            O evento começará em breve. Aguarde o instrutor iniciar a transmissão ao vivo.
+          </p>
+
+          {/* Avisos importantes */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            maxWidth: '600px',
+            width: '100%',
+          }}>
+            {/* Aviso 1: Manter página aberta */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              style={{
+                padding: '16px 20px',
+                background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(34, 211, 238, 0.05) 100%)',
+                border: '1px solid rgba(34, 211, 238, 0.3)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px',
+                textAlign: 'left',
+              }}
+            >
+              <Zap size={20} color="#22D3EE" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <p style={{
+                fontSize: '14px',
+                color: '#E2E8F0',
+                lineHeight: '1.6',
+                margin: 0,
+              }}>
+                <strong style={{ color: '#22D3EE' }}>Esta é a página do evento ao vivo!</strong><br />
+                Aqui você terá todos os recursos: diagnóstico em tempo real, chat com IA, check-ins de módulos e muito mais. A transmissão começará em breve.
+              </p>
+            </motion.div>
+
+            {/* Aviso 2: Gravação */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              style={{
+                padding: '16px 20px',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px',
+                textAlign: 'left',
+              }}
+            >
+              <Star size={20} color="#F59E0B" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <p style={{
+                fontSize: '14px',
+                color: '#E2E8F0',
+                lineHeight: '1.6',
+                margin: 0,
+              }}>
+                <strong style={{ color: '#F59E0B' }}>Evento 100% online e ao vivo.</strong><br />
+                A gravação não está inclusa. Se desejar, ela pode ser adquirida na página de preparação
+                até o início do evento. Depois não estará mais disponível.
+              </p>
+            </motion.div>
+          </div>
+        </motion.div>
+        </div>
+        <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+      </PageWrapper>
+    )
+  }
 
   return (
     <PageWrapper
@@ -413,8 +661,9 @@ export function AoVivo() {
                 )}
               </motion.button>
               <AvatarButton
-                name="João Silva"
-                onClick={() => {/* TODO: navigate to profile */}}
+                name={profile?.name || 'Usuário'}
+                photoUrl={profile?.photo_url || undefined}
+                onClick={() => setShowProfileModal(true)}
               />
             </div>
           </motion.div>
@@ -425,7 +674,13 @@ export function AoVivo() {
             style={{
               marginBottom: '20px',
               background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.95) 0%, rgba(10, 12, 18, 0.98) 100%)',
-              border: '1px solid rgba(255, 68, 68, 0.4)',
+              border: `1px solid ${
+                isLive ? 'rgba(255, 68, 68, 0.4)'
+                : isPaused ? 'rgba(245, 158, 11, 0.4)'
+                : isLunch ? 'rgba(245, 158, 11, 0.4)'
+                : isActivity ? 'rgba(168, 85, 247, 0.4)'
+                : 'rgba(100, 116, 139, 0.3)'
+              }`,
               borderRadius: '16px',
               overflow: 'hidden',
               position: 'relative',
@@ -439,10 +694,104 @@ export function AoVivo() {
                 left: 0,
                 right: 0,
                 height: '2px',
-                background: 'linear-gradient(90deg, transparent 0%, #FF4444 50%, transparent 100%)',
-                boxShadow: '0 0 20px #FF444480',
+                background: `linear-gradient(90deg, transparent 0%, ${
+                  isLive ? '#FF4444'
+                  : isPaused ? '#F59E0B'
+                  : isLunch ? '#F59E0B'
+                  : isActivity ? '#A855F7'
+                  : '#64748B'
+                } 50%, transparent 100%)`,
+                boxShadow: `0 0 20px ${
+                  isLive ? '#FF444480'
+                  : isPaused ? '#F59E0B80'
+                  : isLunch ? '#F59E0B80'
+                  : isActivity ? '#A855F780'
+                  : '#64748B80'
+                }`,
               }}
             />
+
+            {/* Status Overlay - Soft color layer */}
+            <AnimatePresence>
+              {(isPaused || isLunch || isActivity) && isViewingCurrent && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.5 }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: isPaused || isLunch
+                      ? 'rgba(245, 158, 11, 0.35)'
+                      : 'rgba(168, 85, 247, 0.35)',
+                    backdropFilter: 'blur(6px)',
+                    borderRadius: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    zIndex: 10,
+                  }}
+                >
+                  {/* Icon */}
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+                  >
+                    {isPaused && <Pause size={36} color="rgba(255, 255, 255, 0.95)" strokeWidth={2.5} />}
+                    {isLunch && <Coffee size={36} color="rgba(255, 255, 255, 0.95)" strokeWidth={2.5} />}
+                    {isActivity && <CheckSquare size={36} color="rgba(255, 255, 255, 0.95)" strokeWidth={2.5} />}
+                  </motion.div>
+
+                  {/* Title */}
+                  <motion.div
+                    initial={{ y: 10, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: theme.typography.fontWeight.bold,
+                      color: 'rgba(255, 255, 255, 0.98)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {isPaused && 'Pausado'}
+                    {isLunch && 'Intervalo'}
+                    {isActivity && 'Atividade'}
+                  </motion.div>
+
+                  {/* Subtitle */}
+                  <motion.div
+                    initial={{ y: 10, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.35 }}
+                    style={{
+                      fontSize: '11px',
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      textAlign: 'center',
+                      maxWidth: '80%',
+                    }}
+                  >
+                    {isPaused && 'A transmissão será retomada em breve'}
+                    {isLunch && eventState?.lunch_started_at && (() => {
+                      const lunchEnd = new Date(eventState.lunch_started_at)
+                      lunchEnd.setMinutes(lunchEnd.getMinutes() + (eventState.lunch_duration_minutes || 60))
+                      return `Retorno previsto: ${lunchEnd.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                    })()}
+                    {isLunch && !eventState?.lunch_started_at && 'Aproveite para descansar'}
+                    {isActivity && 'Complete a atividade proposta'}
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Content Section */}
             <div style={{ padding: '14px 16px' }}>
@@ -455,48 +804,82 @@ export function AoVivo() {
                   marginBottom: '12px',
                 }}
               >
-                {/* Left side - Live badge + Day */}
+                {/* Left side - Status badge + Day */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {/* AO VIVO Badge */}
+                  {/* Status Badge - conditional */}
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
                       padding: '4px 10px',
-                      background: 'rgba(255, 68, 68, 0.15)',
-                      border: '1px solid rgba(255, 68, 68, 0.4)',
+                      background: isLive ? 'rgba(255, 68, 68, 0.15)'
+                        : isPaused ? 'rgba(245, 158, 11, 0.15)'
+                        : isLunch ? 'rgba(245, 158, 11, 0.15)'
+                        : isActivity ? 'rgba(168, 85, 247, 0.15)'
+                        : 'rgba(100, 116, 139, 0.15)',
+                      border: `1px solid ${
+                        isLive ? 'rgba(255, 68, 68, 0.4)'
+                        : isPaused ? 'rgba(245, 158, 11, 0.4)'
+                        : isLunch ? 'rgba(245, 158, 11, 0.4)'
+                        : isActivity ? 'rgba(168, 85, 247, 0.4)'
+                        : 'rgba(100, 116, 139, 0.3)'
+                      }`,
                       borderRadius: '6px',
                     }}
                   >
-                    <motion.div
-                      animate={{
-                        scale: [1, 1.3, 1],
-                        opacity: [1, 0.5, 1],
-                      }}
-                      transition={{
-                        duration: 1.5,
-                        repeat: Infinity,
-                        ease: 'easeInOut',
-                      }}
-                      style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: '#FF4444',
-                        boxShadow: '0 0 10px #FF4444',
-                      }}
-                    />
+                    {/* Pulse animation only for live */}
+                    {isLive && (
+                      <motion.div
+                        animate={{
+                          scale: [1, 1.3, 1],
+                          opacity: [1, 0.5, 1],
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: 'easeInOut',
+                        }}
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#FF4444',
+                          boxShadow: '0 0 10px #FF4444',
+                        }}
+                      />
+                    )}
+                    {!isLive && (
+                      <div
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: isPaused ? '#F59E0B'
+                            : isLunch ? '#F59E0B'
+                            : isActivity ? '#A855F7'
+                            : '#64748B',
+                        }}
+                      />
+                    )}
                     <span
                       style={{
                         fontSize: '10px',
                         fontWeight: theme.typography.fontWeight.bold,
-                        color: '#FF4444',
+                        color: isLive ? '#FF4444'
+                          : isPaused ? '#F59E0B'
+                          : isLunch ? '#F59E0B'
+                          : isActivity ? '#A855F7'
+                          : '#64748B',
                         letterSpacing: '0.1em',
                         textTransform: 'uppercase',
                       }}
                     >
-                      AO VIVO
+                      {isLive ? 'AO VIVO'
+                        : isPaused ? 'PAUSADO'
+                        : isLunch ? 'INTERVALO'
+                        : isActivity ? 'ATIVIDADE'
+                        : 'OFFLINE'}
                     </span>
                   </div>
 
@@ -504,14 +887,14 @@ export function AoVivo() {
                   <span
                     style={{
                       fontSize: '10px',
-                      color: theme.colors.accent.cyan.DEFAULT,
+                      color: selectedDay === 1 ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light,
                       fontWeight: theme.typography.fontWeight.semibold,
                       padding: '4px 8px',
-                      background: 'rgba(34, 211, 238, 0.1)',
+                      background: selectedDay === 1 ? 'rgba(34, 211, 238, 0.1)' : 'rgba(168, 85, 247, 0.1)',
                       borderRadius: '6px',
                     }}
                   >
-                    DIA {currentDay}
+                    DIA {selectedDay}
                   </span>
                 </div>
 
@@ -569,13 +952,25 @@ export function AoVivo() {
                   <p
                     style={{
                       fontSize: '10px',
-                      color: isViewingCurrent ? '#FF4444' : theme.colors.text.muted,
+                      color: isViewingCurrent
+                        ? (isLive ? '#FF4444'
+                          : isPaused ? '#F59E0B'
+                          : isLunch ? '#F59E0B'
+                          : isActivity ? '#A855F7'
+                          : '#64748B')
+                        : theme.colors.text.muted,
                       margin: '0 0 2px 0',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
                     }}
                   >
-                    {isViewingCurrent ? '● AO VIVO AGORA' : `MÓDULO ${viewingModule} DE ${EVENT_MODULES.length - 1}`}
+                    {isViewingCurrent
+                      ? (isLive ? '● AO VIVO AGORA'
+                        : isPaused ? '⏸ PAUSADO'
+                        : isLunch ? '☕ INTERVALO'
+                        : isActivity ? '📝 ATIVIDADE'
+                        : '⚫ OFFLINE')
+                      : `MÓDULO ${viewingModule} DE ${EVENT_MODULES.length - 1}`}
                   </p>
                   <h3
                     style={{
@@ -905,7 +1300,7 @@ export function AoVivo() {
           </motion.div>
 
           {/* ==================== GARGALO ALERT ==================== */}
-          {showGargalo && (
+          {showGargalo && gargalo && gargalo[0] && (
             <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
               <GargaloAlert
                 etapa={gargaloMap[gargalo[0]].etapa}
@@ -980,18 +1375,23 @@ export function AoVivo() {
 
             {/* IA Simulator Button */}
             <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowAIChat(true)}
+              whileTap={eventState?.ai_enabled ? { scale: 0.95 } : {}}
+              onClick={eventState?.ai_enabled ? () => setShowAIChat(true) : undefined}
               style={{
                 padding: '16px',
-                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(124, 58, 237, 0.1) 100%)',
-                border: '1px solid rgba(168, 85, 247, 0.4)',
+                background: eventState?.ai_enabled
+                  ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(124, 58, 237, 0.1) 100%)'
+                  : 'rgba(30, 35, 45, 0.5)',
+                border: eventState?.ai_enabled
+                  ? '1px solid rgba(168, 85, 247, 0.4)'
+                  : '1px solid rgba(100, 116, 139, 0.2)',
                 borderRadius: '12px',
-                cursor: 'pointer',
+                cursor: eventState?.ai_enabled ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 gap: '8px',
+                opacity: eventState?.ai_enabled ? 1 : 0.5,
               }}
             >
               <div
@@ -999,20 +1399,27 @@ export function AoVivo() {
                   width: '44px',
                   height: '44px',
                   borderRadius: '12px',
-                  background: 'rgba(168, 85, 247, 0.2)',
-                  border: '1px solid rgba(168, 85, 247, 0.3)',
+                  background: eventState?.ai_enabled
+                    ? 'rgba(168, 85, 247, 0.2)'
+                    : 'rgba(30, 35, 45, 0.8)',
+                  border: eventState?.ai_enabled
+                    ? '1px solid rgba(168, 85, 247, 0.3)'
+                    : '1px solid rgba(100, 116, 139, 0.3)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Brain size={22} color={theme.colors.accent.purple.light} />
+                <Brain
+                  size={22}
+                  color={eventState?.ai_enabled ? theme.colors.accent.purple.light : theme.colors.text.muted}
+                />
               </div>
               <span
                 style={{
                   fontSize: '11px',
                   fontWeight: theme.typography.fontWeight.bold,
-                  color: theme.colors.accent.purple.light,
+                  color: eventState?.ai_enabled ? theme.colors.accent.purple.light : theme.colors.text.muted,
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                 }}
@@ -1025,7 +1432,7 @@ export function AoVivo() {
                   color: theme.colors.text.secondary,
                 }}
               >
-                Testar hipóteses
+                Mapear jornada psicológica
               </span>
             </motion.button>
           </motion.div>
@@ -1034,9 +1441,8 @@ export function AoVivo() {
           <motion.div variants={itemVariants} style={{ marginBottom: '20px' }}>
             <LockedOffer
               title="PROTOCOLO IMPACT"
-              subtitle="Imersão Presencial de 3 Dias"
+              subtitle="Imersão Presencial de 2 Dias"
               isUnlocked={isOfferUnlocked}
-              unlockTime="15:00"
               lockedMessage="Essa etapa exige algo que não acontece sozinho."
               onClick={isOfferUnlocked ? () => setShowOfferModal(true) : undefined}
             />
@@ -1055,7 +1461,7 @@ export function AoVivo() {
       {/* ==================== FLOATING AI CHAT BUTTON ==================== */}
       <AIChatFAB
         onClick={() => setShowAIChat(true)}
-        isAvailable={true}
+        isAvailable={eventState?.ai_enabled || false}
       />
 
       {/* ==================== NOTIFICATION DRAWER ==================== */}
@@ -1063,7 +1469,7 @@ export function AoVivo() {
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
-        onMarkAllRead={() => console.log('Mark all as read')}
+        onMarkAllRead={markAllAsRead}
         userId={user?.id}
       />
 
@@ -1131,56 +1537,15 @@ export function AoVivo() {
                 </motion.button>
               </div>
 
-              {/* Context Card */}
-              <div
-                style={{
-                  margin: '16px',
-                  padding: '12px 16px',
-                  background: 'rgba(168, 85, 247, 0.1)',
-                  border: '1px solid rgba(168, 85, 247, 0.3)',
-                  borderRadius: '12px',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '10px',
-                    color: theme.colors.accent.purple.light,
-                    textTransform: 'uppercase',
-                    fontWeight: theme.typography.fontWeight.bold,
-                    letterSpacing: '0.05em',
-                    marginBottom: '8px',
-                  }}
-                >
-                  Contexto do seu diagnóstico
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '11px',
-                    color: theme.colors.text.secondary,
-                  }}
-                >
-                  <span>Negócio: {userContext.businessType}</span>
-                  <span style={{ color: '#EF4444' }}>
-                    Gargalo: {userContext.gargalo.etapa} ({userContext.gargalo.valor}/10)
-                  </span>
-                </div>
-              </div>
-
-              {/* Placeholder content */}
-              <div
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '20px',
-                }}
-              >
-                <p style={{ color: theme.colors.text.muted, textAlign: 'center' }}>
-                  Chat com IA será implementado com integração OpenAI
-                </p>
+              {/* AI Chat Interface */}
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <AIChatInterface
+                  userContext={userContext}
+                  isAvailable={eventState?.ai_enabled && eventState?.status === 'live'}
+                  onBack={() => setShowAIChat(false)}
+                  event_day={selectedDay}
+                  module_id={viewingModule}
+                />
               </div>
             </div>
           </motion.div>
@@ -1298,7 +1663,7 @@ export function AoVivo() {
                       margin: 0,
                     }}
                   >
-                    Imersão Presencial IMPACT - 3 Dias
+                    Imersão Presencial IMPACT - 2 Dias
                   </p>
                 </div>
 
@@ -1458,6 +1823,12 @@ export function AoVivo() {
 
       {/* ==================== BOTTOM NAVIGATION ==================== */}
       <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+
+      {/* ==================== PROFILE MODAL ==================== */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+      />
     </PageWrapper>
   )
 }

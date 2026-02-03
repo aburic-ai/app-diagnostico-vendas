@@ -33,10 +33,11 @@ import {
 } from 'lucide-react'
 
 import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } from '../components/ui'
-import type { Notification } from '../hooks/useNotifications'
+import { useNotifications, type Notification } from '../hooks/useNotifications'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
 import { useUserProgress } from '../hooks/useUserProgress'
+import { useEventState } from '../hooks/useEventState'
 import { XP_CONFIG, STEP_IDS } from '../config/xp-system'
 import { supabase } from '../lib/supabase'
 
@@ -105,6 +106,7 @@ const LESSONS: LessonData[] = [
 export function PreEvento() {
   const { user, profile: userProfile, refreshProfile } = useAuth()
   const { xp, completedSteps, completeStep, isStepCompleted } = useUserProgress()
+  const { isPreEventoAccessible, isAoVivoAccessible, isPosEventoAccessible, isAdmin } = useEventState()
   const [activeNav, setActiveNav] = useState('preparacao')
   const [showSchedule, setShowSchedule] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -161,8 +163,8 @@ export function PreEvento() {
   const profileProgress = Math.round((completedFields / profileFields.length) * 100)
   const isProfileComplete = profileProgress === 100
 
-  // Notificações de exemplo (vazias - usar useNotifications para notificações reais)
-  const [notifications] = useState<Notification[]>([])
+  // Notificações em tempo real
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
 
   // Data do evento: 28/02/2026 às 9h30
   const eventDate = new Date('2026-02-28T09:30:00')
@@ -488,6 +490,43 @@ export function PreEvento() {
     visible: { y: 0, opacity: 1, transition: { duration: 0.5 } },
   }
 
+  // Check tab access (admins bypass)
+  if (!isAdmin && !isPreEventoAccessible()) {
+    return (
+      <PageWrapper backgroundColor={theme.colors.background.dark}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '70vh',
+            padding: '40px',
+            textAlign: 'center',
+          }}
+        >
+          <Lock size={64} color={theme.colors.text.muted} style={{ marginBottom: '24px' }} />
+          <h2 style={{
+            fontSize: '24px',
+            fontWeight: 'bold',
+            color: theme.colors.text.primary,
+            marginBottom: '12px',
+          }}>
+            Aba Bloqueada
+          </h2>
+          <p style={{
+            fontSize: '16px',
+            color: theme.colors.text.secondary,
+            maxWidth: '500px',
+          }}>
+            Esta aba será liberada automaticamente na data/hora configurada pelo instrutor. Aguarde a liberação.
+          </p>
+        </div>
+        <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+      </PageWrapper>
+    )
+  }
+
   return (
     <PageWrapper
       backgroundColor={theme.colors.background.dark}
@@ -564,7 +603,7 @@ export function PreEvento() {
                   }}
                 >
                   <Bell size={18} color={theme.colors.text.secondary} />
-                  {notifications.filter(n => !n.read_by?.includes(user?.id || '')).length > 0 && (
+                  {unreadCount > 0 && (
                     <div
                       style={{
                         position: 'absolute',
@@ -583,7 +622,7 @@ export function PreEvento() {
                         color: '#fff',
                       }}
                     >
-                      {notifications.filter(n => !n.read_by?.includes(user?.id || '')).length}
+                      {unreadCount}
                     </div>
                   )}
                 </motion.button>
@@ -1957,7 +1996,7 @@ export function PreEvento() {
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
-        onMarkAllRead={() => {}}
+        onMarkAllRead={markAllAsRead}
         userId={user?.id}
       />
 

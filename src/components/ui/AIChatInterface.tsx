@@ -3,19 +3,14 @@
  *
  * Mostra contexto do usuário, prompts sugeridos, histórico de mensagens
  * Só funciona durante o evento ao vivo
+ * INTEGRADO COM OPENAI GPT-4o-mini
  */
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bot, Send, User, Sparkles, AlertCircle, ArrowLeft } from 'lucide-react'
 import { theme } from '../../styles/theme'
-
-interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-}
+import { useAIChat } from '../../hooks/useAIChat'
 
 interface UserContext {
   name: string
@@ -38,8 +33,10 @@ interface AIChatInterfaceProps {
   isAvailable?: boolean
   /** Callback para voltar */
   onBack?: () => void
-  /** Callback para enviar mensagem */
-  onSendMessage?: (message: string) => void
+  /** Dia do evento (1 ou 2) */
+  event_day: number
+  /** ID do módulo atual */
+  module_id: number
 }
 
 const suggestedPrompts = [
@@ -53,48 +50,22 @@ export function AIChatInterface({
   userContext,
   isAvailable = true,
   onBack,
-  onSendMessage,
+  event_day,
+  module_id,
 }: AIChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      role: 'assistant',
-      content: `Olá ${userContext.name.split(' ')[0]}! Sou seu consultor de vendas IA. Baseado no seu diagnóstico, percebi que seu principal gargalo está em **${userContext.gargalo.etapa}** (${userContext.gargalo.valor}/10). Como posso ajudar você a melhorar nessa área?`,
-      timestamp: new Date(),
-    },
-  ])
+  // Use real AI chat hook
+  const { messages, loading, error, sendMessage } = useAIChat({
+    event_day,
+    module_id,
+  })
+
   const [inputValue, setInputValue] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
 
-  const handleSend = () => {
-    if (!inputValue.trim() || !isAvailable) return
+  const handleSend = async () => {
+    if (!inputValue.trim() || !isAvailable || loading) return
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: inputValue.trim(),
-      timestamp: new Date(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
+    await sendMessage(inputValue.trim())
     setInputValue('')
-    setIsTyping(true)
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `Entendo sua pergunta sobre "${inputValue.slice(0, 50)}...". Com base no seu perfil de ${userContext.businessType} e considerando que seu gargalo está em ${userContext.gargalo.etapa}, recomendo focar em...
-
-[Esta é uma simulação. No app final, aqui virá a resposta real da IA contextualizada]`,
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, aiMessage])
-      setIsTyping(false)
-    }, 1500)
-
-    onSendMessage?.(inputValue.trim())
   }
 
   const handlePromptClick = (prompt: string) => {
@@ -198,22 +169,19 @@ export function AIChatInterface({
               letterSpacing: '0.05em',
             }}
           >
-            Contexto do seu diagnóstico
+            Contexto do seu negócio
           </span>
         </div>
-        <div
+        <p
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
             fontSize: '11px',
             color: theme.colors.text.secondary,
+            margin: 0,
+            lineHeight: 1.4,
           }}
         >
-          <span>Negócio: {userContext.businessType}</span>
-          <span style={{ color: '#EF4444' }}>
-            Gargalo: {userContext.gargalo.etapa} ({userContext.gargalo.valor}/10)
-          </span>
-        </div>
+          Usando sua pesquisa de boas-vindas, seu radar IMPACT e as respostas anteriores deste chat
+        </p>
       </div>
 
       {/* Messages */}
@@ -293,8 +261,8 @@ export function AIChatInterface({
           ))}
         </AnimatePresence>
 
-        {/* Typing indicator */}
-        {isTyping && (
+        {/* Typing indicator (loading) */}
+        {loading && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -341,6 +309,34 @@ export function AIChatInterface({
                 />
               ))}
             </div>
+          </motion.div>
+        )}
+
+        {/* Error display */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              padding: '12px 16px',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+            }}
+          >
+            <AlertCircle size={18} color="#EF4444" />
+            <p
+              style={{
+                fontSize: '12px',
+                color: '#EF4444',
+                margin: 0,
+              }}
+            >
+              {error}
+            </p>
           </motion.div>
         )}
       </div>
@@ -453,7 +449,7 @@ export function AIChatInterface({
                 }
               }}
               placeholder="Digite sua pergunta..."
-              disabled={!isAvailable}
+              disabled={!isAvailable || loading}
               rows={1}
               style={{
                 width: '100%',
@@ -469,19 +465,19 @@ export function AIChatInterface({
             />
           </div>
           <motion.button
-            whileHover={isAvailable && inputValue.trim() ? { scale: 1.05 } : {}}
-            whileTap={isAvailable && inputValue.trim() ? { scale: 0.95 } : {}}
+            whileHover={isAvailable && inputValue.trim() && !loading ? { scale: 1.05 } : {}}
+            whileTap={isAvailable && inputValue.trim() && !loading ? { scale: 0.95 } : {}}
             onClick={handleSend}
-            disabled={!isAvailable || !inputValue.trim()}
+            disabled={!isAvailable || !inputValue.trim() || loading}
             style={{
               width: '50px',
               height: '50px',
               borderRadius: '14px',
-              background: isAvailable && inputValue.trim()
+              background: isAvailable && inputValue.trim() && !loading
                 ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.9) 0%, rgba(124, 58, 237, 0.9) 100%)'
                 : 'rgba(100, 116, 139, 0.2)',
               border: 'none',
-              cursor: isAvailable && inputValue.trim() ? 'pointer' : 'not-allowed',
+              cursor: isAvailable && inputValue.trim() && !loading ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -490,7 +486,7 @@ export function AIChatInterface({
           >
             <Send
               size={20}
-              color={isAvailable && inputValue.trim() ? '#fff' : theme.colors.text.muted}
+              color={isAvailable && inputValue.trim() && !loading ? '#fff' : theme.colors.text.muted}
             />
           </motion.button>
         </div>

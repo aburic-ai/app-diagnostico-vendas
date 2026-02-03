@@ -278,46 +278,6 @@ export function LockedOffer({
         )}
       </div>
 
-      {/* Unlock time indicator */}
-      {!isUnlocked && unlockTime && (
-        <div
-          style={{
-            marginTop: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-          }}
-        >
-          <div
-            style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: 'rgba(100, 116, 139, 0.4)',
-            }}
-          />
-          <span
-            style={{
-              fontSize: '10px',
-              color: theme.colors.text.muted,
-            }}
-          >
-            Libera às{' '}
-            <span style={{ color: theme.colors.text.secondary, fontWeight: theme.typography.fontWeight.semibold }}>
-              {unlockTime}
-            </span>
-          </span>
-          <div
-            style={{
-              width: '6px',
-              height: '6px',
-              borderRadius: '50%',
-              background: 'rgba(100, 116, 139, 0.4)',
-            }}
-          />
-        </div>
-      )}
     </motion.div>
   )
 }

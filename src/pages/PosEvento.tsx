@@ -37,12 +37,17 @@ import {
   AvatarButton,
   NotificationDrawer,
   PageHeader,
+  ProfileModal,
 } from '../components/ui'
 import type { IMPACTData, ActionItem } from '../components/ui'
-import type { Notification } from '../hooks/useNotifications'
+import { useNotifications, type Notification } from '../hooks/useNotifications'
+import { useEventState } from '../hooks/useEventState'
+import { useScenarioProjection } from '../hooks/useScenarioProjection'
+import { useActionPlan } from '../hooks/useActionPlan'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
 import { useUserProgress } from '../hooks/useUserProgress'
+import { useDiagnostic } from '../hooks/useDiagnostic'
 import { XP_CONFIG } from '../config/xp-system'
 
 // Dados do perfil
@@ -73,7 +78,24 @@ const buildOfferUrl = (baseUrl: string, utmContent?: string): string => {
 export function PosEvento() {
   const { profile: userProfile, user } = useAuth()
   const { completeStep } = useUserProgress()
+  const { eventState, isPosEventoAccessible, isAdmin } = useEventState()
+  const { getDiagnosticByDay, loading: diagnosticLoading } = useDiagnostic()
+  const { projections, loading: loadingProjections, error: errorProjections, isEventFinished } = useScenarioProjection()
   const location = useLocation()
+
+  // State para forçar atualização dos dados
+  const [dataLoaded, setDataLoaded] = useState(false)
+
+  // Garantir que dados foram carregados
+  useEffect(() => {
+    if (!diagnosticLoading) {
+      setDataLoaded(true)
+      console.log('📊 [PosEvento] Dados do diagnóstico carregados')
+    }
+  }, [diagnosticLoading])
+
+  // Event state
+  const isOfferVisible = eventState?.offer_visible || false
 
   // Refs para scroll to section (avisos clickables)
   const finalReportRef = useRef<HTMLDivElement>(null)
@@ -96,14 +118,29 @@ export function PosEvento() {
     photoUrl: null,
   })
 
+  // Sincronizar com dados do Supabase (incluindo foto)
+  useEffect(() => {
+    if (userProfile) {
+      setProfile(prev => ({
+        ...prev,
+        name: userProfile.name || prev.name,
+        email: userProfile.email || prev.email,
+        phone: userProfile.phone || prev.phone,
+        company: userProfile.company || prev.company,
+        role: userProfile.role || prev.role,
+        photoUrl: userProfile.photo_url || prev.photoUrl,
+      }))
+    }
+  }, [userProfile])
+
   // Calculate profile completion
   const profileFields = [profile.name, profile.email, profile.phone, profile.company, profile.role, profile.photoUrl]
   const completedFields = profileFields.filter(f => f && f.trim() !== '').length
   const profileProgress = Math.round((completedFields / profileFields.length) * 100)
   const isProfileComplete = profileProgress === 100
 
-  // Notificações de exemplo (vazias - usar useNotifications para notificações reais)
-  const [notifications] = useState<Notification[]>([])
+  // Notificações em tempo real
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
 
   // Handle photo upload simulation
   const handlePhotoUpload = () => {
@@ -118,94 +155,146 @@ export function PosEvento() {
     setProfile(prev => ({ ...prev, [field]: value }))
   }
 
-  // Dados do diagnóstico consolidado (viria do estado global/backend)
-  const diagnosticData: IMPACTData = {
-    inspiracao: 7,
-    motivacao: 6,
-    preparacao: 5,
-    apresentacao: 4,
-    conversao: 3,
-    transformacao: 6,
+  // Buscar dados reais do diagnóstico do banco
+  const diagnosticDay1 = getDiagnosticByDay(1)
+  const diagnosticDay2 = getDiagnosticByDay(2)
+
+  // Debug: Ver o que está retornando
+  console.log('📊 [PosEvento] Diagnóstico Dia 1:', diagnosticDay1)
+  console.log('📊 [PosEvento] Diagnóstico Dia 2:', diagnosticDay2)
+
+  // Converter para IMPACTData (Dia 1)
+  // Agora as interfaces usam os mesmos nomes em português!
+  const diagnosticDataDay1: IMPACTData = diagnosticDay1 ? {
+    inspiracao: diagnosticDay1.inspiracao || 0,
+    motivacao: diagnosticDay1.motivacao || 0,
+    preparacao: diagnosticDay1.preparacao || 0,
+    apresentacao: diagnosticDay1.apresentacao || 0,
+    conversao: diagnosticDay1.conversao || 0,
+    transformacao: diagnosticDay1.transformacao || 0,
+  } : {
+    inspiracao: 0,
+    motivacao: 0,
+    preparacao: 0,
+    apresentacao: 0,
+    conversao: 0,
+    transformacao: 0,
   }
 
-  // Calcular score (média * 10)
-  const values = Object.values(diagnosticData)
-  const average = values.reduce((a, b) => a + b, 0) / values.length
-  const score = Math.round(average * 10)
+  // Converter para IMPACTData (Dia 2 - dados consolidados)
+  const diagnosticDataDay2: IMPACTData | undefined = diagnosticDay2 ? {
+    inspiracao: diagnosticDay2.inspiracao || 0,
+    motivacao: diagnosticDay2.motivacao || 0,
+    preparacao: diagnosticDay2.preparacao || 0,
+    apresentacao: diagnosticDay2.apresentacao || 0,
+    conversao: diagnosticDay2.conversao || 0,
+    transformacao: diagnosticDay2.transformacao || 0,
+  } : undefined // Não mostrar Dia 2 se não houver dados
 
-  // Encontrar gargalo (menor valor)
+  // ============================================
+  // VERIFICAR SE TEM DIAGNÓSTICO
+  // ============================================
+  const hasDiagnostic = !!(diagnosticDay1 || diagnosticDay2)
+
+  // ============================================
+  // CALCULAR SCORE (Média Simples dos 2 dias)
+  // ============================================
+  let score = 0
+  let diagnosticData: IMPACTData = diagnosticDataDay1 // Fallback
+
+  if (hasDiagnostic) {
+    if (diagnosticDataDay2 && diagnosticDay1) {
+      // TEM OS 2 DIAS: Média simples
+      const keys: (keyof IMPACTData)[] = [
+        'inspiracao',
+        'motivacao',
+        'preparacao',
+        'apresentacao',
+        'conversao',
+        'transformacao',
+      ]
+
+      // Calcular média de cada dimensão
+      const avgData: IMPACTData = {} as IMPACTData
+      keys.forEach(key => {
+        avgData[key] = (diagnosticDataDay1[key] + diagnosticDataDay2[key]) / 2
+      })
+
+      diagnosticData = avgData
+
+      // Score = média das 6 dimensões × 10
+      const values = Object.values(avgData)
+      const average = values.reduce((a, b) => a + b, 0) / values.length
+      score = Math.round(average * 10)
+
+      console.log('📊 [PosEvento] Média dos 2 dias:', avgData)
+      console.log('📊 [PosEvento] Score calculado:', score)
+    } else if (diagnosticDataDay2) {
+      // TEM SÓ DIA 2
+      diagnosticData = diagnosticDataDay2
+      const values = Object.values(diagnosticDataDay2)
+      const average = values.reduce((a, b) => a + b, 0) / values.length
+      score = Math.round(average * 10)
+    } else {
+      // TEM SÓ DIA 1
+      diagnosticData = diagnosticDataDay1
+      const values = Object.values(diagnosticDataDay1)
+      const average = values.reduce((a, b) => a + b, 0) / values.length
+      score = Math.round(average * 10)
+    }
+  }
+
+  // ============================================
+  // ENCONTRAR GARGALO (menor valor)
+  // Prioridade em caso de empate: I > M > P > A > C > T
+  // ============================================
+
+  const gargaloMap: Record<keyof IMPACTData, { nome: string; peso: number }> = {
+    inspiracao: { nome: 'Inspiração', peso: 1 },
+    motivacao: { nome: 'Motivação', peso: 2 },
+    preparacao: { nome: 'Preparação', peso: 3 },
+    apresentacao: { nome: 'Apresentação', peso: 4 },
+    conversao: { nome: 'Conversão', peso: 5 },
+    transformacao: { nome: 'Transformação', peso: 6 },
+  }
+
   const entries = Object.entries(diagnosticData) as [keyof IMPACTData, number][]
-  const sorted = entries.sort((a, b) => a[1] - b[1])
+  const sorted = entries.sort((a, b) => {
+    // Primeiro: ordenar por valor (menor primeiro)
+    if (a[1] !== b[1]) {
+      return a[1] - b[1]
+    }
+    // Empate: ordenar por peso (I=1, M=2, P=3, A=4, C=5, T=6)
+    return gargaloMap[a[0]].peso - gargaloMap[b[0]].peso
+  })
+
   const gargaloKey = sorted[0][0]
   const gargaloValue = sorted[0][1]
 
-  const gargaloMap: Record<keyof IMPACTData, string> = {
-    inspiracao: 'Inspiração',
-    motivacao: 'Motivação',
-    preparacao: 'Preparação',
-    apresentacao: 'Apresentação',
-    conversao: 'Conversão',
-    transformacao: 'Transformação',
-  }
-
   const gargalo = {
-    etapa: gargaloMap[gargaloKey],
+    etapa: gargaloMap[gargaloKey].nome,
     letra: gargaloKey[0].toUpperCase(),
     valor: gargaloValue,
   }
 
-  // Plano de ação de 7 dias
-  const [actions, setActions] = useState<ActionItem[]>([
-    {
-      id: '1',
-      day: 1,
-      title: 'Revisar anotações do evento',
-      description: 'Consolide os principais insights em 3 bullets.',
-      completed: false,
-    },
-    {
-      id: '2',
-      day: 2,
-      title: 'Reunião de alinhamento',
-      description: 'Compartilhe o diagnóstico com sócios/equipe.',
-      completed: false,
-    },
-    {
-      id: '3',
-      day: 3,
-      title: 'Mapear gargalo principal',
-      description: `Analise onde o "${gargalo.etapa}" trava no seu processo.`,
-      completed: false,
-    },
-    {
-      id: '4',
-      day: 4,
-      title: 'Listar 3 ações imediatas',
-      description: 'Defina micro-correções que podem ser feitas esta semana.',
-      completed: false,
-    },
-    {
-      id: '5',
-      day: 5,
-      title: 'Implementar primeira correção',
-      description: 'Execute a ação de menor esforço com maior impacto.',
-      completed: false,
-    },
-    {
-      id: '6',
-      day: 6,
-      title: 'Medir resultado inicial',
-      description: 'Compare métricas antes vs depois da correção.',
-      completed: false,
-    },
-    {
-      id: '7',
-      day: 7,
-      title: 'Decidir próximo passo',
-      description: 'Continuar sozinho ou ativar o Protocolo IMPACT?',
-      completed: false,
-    },
-  ])
+  // Plano de ação de 7 dias - Gerado por IA com fallback hardcoded
+  const {
+    actions: generatedActions,
+    loading: loadingPlan,
+    error: errorPlan,
+    cached: planCached,
+    isPersonalized,
+  } = useActionPlan()
+
+  // Estado local para gerenciar completed (UI somente, não persiste)
+  const [actions, setActions] = useState<ActionItem[]>(generatedActions)
+
+  // Sincronizar com ações geradas pelo hook
+  useEffect(() => {
+    if (generatedActions.length > 0) {
+      setActions(generatedActions)
+    }
+  }, [generatedActions])
 
   // Dia atual (simulado - seria calculado pela data real)
   const currentDay = 1
@@ -328,6 +417,43 @@ export function PosEvento() {
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1, transition: { duration: 0.5 } },
+  }
+
+  // Check tab access (admins bypass)
+  if (!isAdmin && !isPosEventoAccessible()) {
+    return (
+      <PageWrapper backgroundColor={theme.colors.background.dark}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '70vh',
+            padding: '40px',
+            textAlign: 'center',
+          }}
+        >
+          <Lock size={64} color={theme.colors.text.muted} style={{ marginBottom: '24px' }} />
+          <h2 style={{
+            fontSize: '24px',
+            fontWeight: 'bold',
+            color: theme.colors.text.primary,
+            marginBottom: '12px',
+          }}>
+            Aba Bloqueada
+          </h2>
+          <p style={{
+            fontSize: '16px',
+            color: theme.colors.text.secondary,
+            maxWidth: '500px',
+          }}>
+            Esta aba será liberada automaticamente após o evento ao vivo. Aguarde a liberação.
+          </p>
+        </div>
+        <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+      </PageWrapper>
+    )
   }
 
   return (
@@ -500,38 +626,157 @@ export function PosEvento() {
 
           {/* ==================== FINAL REPORT ==================== */}
           <motion.div ref={finalReportRef} variants={itemVariants} style={{ marginBottom: '20px' }}>
-            <FinalReport
-              data={diagnosticData}
-              score={score}
-              gargalo={gargalo}
-              onDownload={() => console.log('Baixar PDF')}
-            />
+            {hasDiagnostic ? (
+              <FinalReport
+                data={diagnosticDataDay1}
+                dataDay2={diagnosticDataDay2}
+                score={score}
+                gargalo={gargalo}
+                onDownload={() => console.log('Baixar PDF')}
+              />
+            ) : (
+              // DIAGNÓSTICO NÃO REALIZADO
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.95) 0%, rgba(10, 12, 18, 0.98) 100%)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  borderRadius: '16px',
+                  padding: '32px 24px',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    border: '2px solid rgba(245, 158, 11, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 20px',
+                  }}
+                >
+                  <Target size={32} color={theme.colors.gold.DEFAULT} />
+                </div>
+                <h3
+                  style={{
+                    fontFamily: theme.typography.fontFamily.orbitron,
+                    fontSize: '20px',
+                    fontWeight: theme.typography.fontWeight.bold,
+                    color: theme.colors.gold.DEFAULT,
+                    letterSpacing: '0.05em',
+                    marginBottom: '12px',
+                  }}
+                >
+                  DIAGNÓSTICO PENDENTE
+                </h3>
+                <p
+                  style={{
+                    fontSize: '14px',
+                    color: theme.colors.text.secondary,
+                    lineHeight: 1.6,
+                    maxWidth: '500px',
+                    margin: '0 auto 16px',
+                  }}
+                >
+                  Você não preencheu o diagnóstico IMPACT durante o evento ao vivo.
+                </p>
+                <p
+                  style={{
+                    fontSize: '12px',
+                    color: theme.colors.text.muted,
+                    fontStyle: 'italic',
+                  }}
+                >
+                  O diagnóstico estava disponível apenas durante a imersão ao vivo.
+                </p>
+              </div>
+            )}
           </motion.div>
 
           {/* ==================== SCENARIO PROJECTION ==================== */}
           <motion.div ref={scenarioProjectionRef} variants={itemVariants} style={{ marginBottom: '20px' }}>
-            <ScenarioProjection gargalo={gargalo.etapa} />
+            <ScenarioProjection
+              gargalo={gargalo.etapa}
+              projections={projections}
+              loading={loadingProjections}
+              error={errorProjections}
+            />
           </motion.div>
 
           {/* ==================== UNLOCKED OFFER (PREMIUM) ==================== */}
           <motion.div ref={impactOfferRef} variants={itemVariants} style={{ marginBottom: '20px' }}>
             <LockedOffer
               title="IMERSÃO PRESENCIAL IMPACT"
-              subtitle="Protocolo de Correção em 3 Dias"
-              isUnlocked={true}
-              onClick={() => {
+              subtitle="Imersão Presencial de 2 Dias"
+              isUnlocked={isOfferVisible}
+              onClick={isOfferVisible ? () => {
                 // Abrir link
                 window.open(buildOfferUrl(OFFER_LINKS.posEventoLink, 'oferta'), '_blank')
 
                 // Tracking: Interesse em IMPACT (o XP total de 300 virá do webhook Hotmart)
                 console.log('📊 Usuário clicou em "Imersão IMPACT"')
                 // TODO: Track event para analytics
-              }}
+              } : undefined}
             />
           </motion.div>
 
           {/* ==================== ACTION PLAN ==================== */}
           <motion.div ref={actionPlanRef} variants={itemVariants}>
+            {/* Badge de plano personalizado */}
+            {isPersonalized && !loadingPlan && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  marginBottom: '12px',
+                  padding: '8px 14px',
+                  background: 'rgba(34, 211, 238, 0.1)',
+                  border: '1px solid rgba(34, 211, 238, 0.3)',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  color: theme.colors.accent.cyan.DEFAULT,
+                  fontWeight: theme.typography.fontWeight.semibold,
+                }}
+              >
+                <span>✨</span>
+                <span>
+                  Plano personalizado com IA baseado no seu gargalo e perfil
+                  {planCached && ' (cache)'}
+                </span>
+              </motion.div>
+            )}
+
+            {/* Erro ao gerar plano (usando fallback) */}
+            {errorPlan && !isPersonalized && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '12px',
+                  padding: '8px 14px',
+                  background: 'rgba(245, 158, 11, 0.1)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  color: theme.colors.gold.DEFAULT,
+                  fontWeight: theme.typography.fontWeight.medium,
+                }}
+              >
+                <span>ℹ️</span>
+                <span>Plano padrão (não foi possível gerar personalizado)</span>
+              </motion.div>
+            )}
+
             <ActionPlan
               actions={actions}
               currentDay={currentDay}
@@ -575,365 +820,18 @@ export function PosEvento() {
       </div>
 
       {/* ==================== PROFILE MODAL ==================== */}
-      {showProfileModal && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.9)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-          }}
-          onClick={() => setShowProfileModal(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
-              maxWidth: '400px',
-              maxHeight: '85vh',
-              background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.98) 0%, rgba(10, 12, 18, 0.99) 100%)',
-              border: '1px solid rgba(245, 158, 11, 0.4)',
-              borderRadius: '20px',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {/* Header */}
-            <div
-              style={{
-                padding: '20px',
-                borderBottom: '1px solid rgba(100, 116, 139, 0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '12px',
-                    background: 'rgba(245, 158, 11, 0.2)',
-                    border: '1px solid rgba(245, 158, 11, 0.4)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <User size={20} color={theme.colors.gold.DEFAULT} />
-                </div>
-                <div>
-                  <h3
-                    style={{
-                      fontFamily: theme.typography.fontFamily.orbitron,
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      color: theme.colors.gold.DEFAULT,
-                      margin: 0,
-                    }}
-                  >
-                    MEU PERFIL
-                  </h3>
-                  <span style={{ fontSize: '10px', color: theme.colors.text.muted }}>
-                    Diagnóstico finalizado
-                  </span>
-                </div>
-              </div>
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                onClick={() => setShowProfileModal(false)}
-                style={{
-                  background: 'rgba(100, 116, 139, 0.2)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '8px',
-                  cursor: 'pointer',
-                }}
-              >
-                <X size={18} color={theme.colors.text.muted} />
-              </motion.button>
-            </div>
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+      />
 
-            {/* Content */}
-            <div
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '20px',
-              }}
-            >
-              {/* Progress */}
-              <div style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
-                    Progresso do perfil
-                  </span>
-                  <span style={{ fontSize: '11px', color: theme.colors.gold.DEFAULT, fontWeight: 'bold' }}>
-                    {profileProgress}%
-                  </span>
-                </div>
-                <div
-                  style={{
-                    width: '100%',
-                    height: '6px',
-                    background: 'rgba(30, 35, 45, 0.8)',
-                    borderRadius: '3px',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${profileProgress}%` }}
-                    style={{
-                      height: '100%',
-                      background: profileProgress === 100
-                        ? theme.colors.accent.cyan.DEFAULT
-                        : `linear-gradient(90deg, ${theme.colors.gold.DEFAULT} 0%, ${theme.colors.gold.light} 100%)`,
-                      borderRadius: '3px',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Photo Upload */}
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handlePhotoUpload}
-                  style={{
-                    position: 'relative',
-                    width: '100px',
-                    height: '100px',
-                    borderRadius: '50%',
-                    background: profile.photoUrl
-                      ? `url(${profile.photoUrl}) center/cover`
-                      : 'rgba(245, 158, 11, 0.15)',
-                    border: `3px solid ${profile.photoUrl ? theme.colors.accent.cyan.DEFAULT : 'rgba(245, 158, 11, 0.4)'}`,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {!profile.photoUrl && (
-                    <Camera size={32} color={theme.colors.gold.DEFAULT} />
-                  )}
-                </motion.button>
-              </div>
-              <p style={{ fontSize: '11px', color: theme.colors.text.muted, textAlign: 'center', marginBottom: '4px' }}>
-                {profile.photoUrl ? 'Clique para alterar a foto' : 'Clique para adicionar uma foto'}
-              </p>
-              <p style={{ fontSize: '9px', color: theme.colors.text.muted, textAlign: 'center', marginBottom: '20px', fontStyle: 'italic' }}>
-                Não aparecerá para outros participantes
-              </p>
-
-              {/* Form Fields */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* Name */}
-                <div>
-                  <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <User size={12} />
-                    Nome completo
-                    {profile.name && <Check size={12} color={theme.colors.accent.cyan.DEFAULT} />}
-                  </label>
-                  <input
-                    type="text"
-                    value={profile.name}
-                    onChange={(e) => handleProfileChange('name', e.target.value)}
-                    placeholder="Seu nome"
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      background: 'rgba(10, 12, 18, 0.8)',
-                      border: `1px solid ${profile.name ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
-                      borderRadius: '10px',
-                      color: theme.colors.text.primary,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                  <span style={{ fontSize: '9px', color: theme.colors.text.muted, marginTop: '4px', display: 'block', fontStyle: 'italic' }}>
-                    Visível para outros participantes
-                  </span>
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <Mail size={12} />
-                    E-mail
-                    {profile.email && <Check size={12} color={theme.colors.accent.cyan.DEFAULT} />}
-                  </label>
-                  <input
-                    type="email"
-                    value={profile.email}
-                    onChange={(e) => handleProfileChange('email', e.target.value)}
-                    placeholder="seu@email.com"
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      background: 'rgba(10, 12, 18, 0.8)',
-                      border: `1px solid ${profile.email ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
-                      borderRadius: '10px',
-                      color: theme.colors.text.primary,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                  <span style={{ fontSize: '9px', color: theme.colors.text.muted, marginTop: '4px', display: 'block', fontStyle: 'italic' }}>
-                    Não aparecerá para outros participantes
-                  </span>
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <Phone size={12} />
-                    Telefone
-                    {profile.phone && <Check size={12} color={theme.colors.accent.cyan.DEFAULT} />}
-                  </label>
-                  <input
-                    type="tel"
-                    value={profile.phone}
-                    onChange={(e) => handleProfileChange('phone', e.target.value)}
-                    placeholder="(11) 99999-9999"
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      background: 'rgba(10, 12, 18, 0.8)',
-                      border: `1px solid ${profile.phone ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
-                      borderRadius: '10px',
-                      color: theme.colors.text.primary,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                  <span style={{ fontSize: '9px', color: theme.colors.text.muted, marginTop: '4px', display: 'block', fontStyle: 'italic' }}>
-                    Não aparecerá para outros participantes
-                  </span>
-                </div>
-
-                {/* Company */}
-                <div>
-                  <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <Building2 size={12} />
-                    Empresa
-                    {profile.company && <Check size={12} color={theme.colors.accent.cyan.DEFAULT} />}
-                  </label>
-                  <input
-                    type="text"
-                    value={profile.company}
-                    onChange={(e) => handleProfileChange('company', e.target.value)}
-                    placeholder="Nome da empresa"
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      background: 'rgba(10, 12, 18, 0.8)',
-                      border: `1px solid ${profile.company ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
-                      borderRadius: '10px',
-                      color: theme.colors.text.primary,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                  <span style={{ fontSize: '9px', color: theme.colors.text.muted, marginTop: '4px', display: 'block', fontStyle: 'italic' }}>
-                    Não aparecerá para outros participantes
-                  </span>
-                </div>
-
-                {/* Role */}
-                <div>
-                  <label style={{ fontSize: '11px', color: theme.colors.text.muted, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <User size={12} />
-                    Cargo / Função
-                    {profile.role && <Check size={12} color={theme.colors.accent.cyan.DEFAULT} />}
-                  </label>
-                  <input
-                    type="text"
-                    value={profile.role}
-                    onChange={(e) => handleProfileChange('role', e.target.value)}
-                    placeholder="Seu cargo"
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      background: 'rgba(10, 12, 18, 0.8)',
-                      border: `1px solid ${profile.role ? 'rgba(34, 211, 238, 0.3)' : 'rgba(100, 116, 139, 0.3)'}`,
-                      borderRadius: '10px',
-                      color: theme.colors.text.primary,
-                      fontSize: '14px',
-                      outline: 'none',
-                    }}
-                  />
-                  <span style={{ fontSize: '9px', color: theme.colors.text.muted, marginTop: '4px', display: 'block', fontStyle: 'italic' }}>
-                    Não aparecerá para outros participantes
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div
-              style={{
-                padding: '16px 20px',
-                borderTop: '1px solid rgba(100, 116, 139, 0.2)',
-              }}
-            >
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowProfileModal(false)}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  background: isProfileComplete
-                    ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.3) 0%, rgba(6, 182, 212, 0.2) 100%)'
-                    : 'linear-gradient(135deg, rgba(245, 158, 11, 0.3) 0%, rgba(234, 179, 8, 0.2) 100%)',
-                  border: `1px solid ${isProfileComplete ? 'rgba(34, 211, 238, 0.5)' : 'rgba(245, 158, 11, 0.5)'}`,
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  color: isProfileComplete ? theme.colors.accent.cyan.DEFAULT : theme.colors.gold.DEFAULT,
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                }}
-              >
-                {isProfileComplete ? (
-                  <>
-                    <Check size={18} />
-                    PERFIL COMPLETO
-                  </>
-                ) : (
-                  'SALVAR ALTERAÇÕES'
-                )}
-              </motion.button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
 
       {/* ==================== NOTIFICATION DRAWER ==================== */}
       <NotificationDrawer
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
         notifications={notifications}
-        onMarkAllRead={() => {}}
+        onMarkAllAsRead={markAllAsRead}
         userId={user?.id}
       />
 

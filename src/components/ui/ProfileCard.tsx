@@ -464,24 +464,6 @@ export function ProfileCard({
                 {gargalo.etapa}
               </p>
             </div>
-            <div
-              style={{
-                padding: '8px 16px',
-                background: 'rgba(239, 68, 68, 0.2)',
-                borderRadius: '8px',
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: theme.typography.fontFamily.orbitron,
-                  fontSize: '20px',
-                  fontWeight: theme.typography.fontWeight.bold,
-                  color: '#EF4444',
-                }}
-              >
-                {gargalo.valor}/10
-              </span>
-            </div>
           </div>
         </div>
       )}

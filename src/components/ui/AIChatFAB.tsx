@@ -30,8 +30,8 @@ export function AIChatFAB({
       onClick={isAvailable ? onClick : undefined}
       style={{
         position: 'fixed',
-        bottom: 'calc(110px + env(safe-area-inset-bottom, 24px))',
-        right: '16px',
+        bottom: '24px',
+        right: '20px',
         width: '60px',
         height: '60px',
         borderRadius: '20px',
@@ -45,11 +45,11 @@ export function AIChatFAB({
           ? '0 4px 20px rgba(168, 85, 247, 0.5), 0 0 40px rgba(168, 85, 247, 0.3)'
           : 'none',
         cursor: isAvailable ? 'pointer' : 'not-allowed',
-        display: 'flex',
+        display: isAvailable ? 'flex' : 'none',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: theme.zIndex.content + 5,
-        opacity: isAvailable ? 1 : 0.5,
+        zIndex: 60,
+        opacity: 1,
       }}
     >
       {/* Pulse animation */}

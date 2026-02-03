@@ -17,6 +17,7 @@ import { Admin } from './pages/Admin'
 import { Demo } from './pages/Demo'
 import { Sandbox } from './pages/Sandbox'
 import { ThankYou } from './pages/ThankYou'
+import ChatTest from './pages/ChatTest'
 import { AppLayout, ProtectedRoute } from './components/ui'
 import { AuthProvider } from './context/AuthContext'
 import './index.css'
@@ -38,6 +39,13 @@ function App() {
 
           {/* Sandbox tem layout próprio - para prints e forms */}
           <Route path="/sandbox" element={<Sandbox />} />
+
+          {/* ChatTest - Debug page para testar chat IA */}
+          <Route path="/chat-test" element={
+            <ProtectedRoute>
+              <ChatTest />
+            </ProtectedRoute>
+          } />
 
           {/* ThankYou page - pós-compra Hotmart - PÚBLICO */}
           <Route path="/obrigado" element={<ThankYou />} />

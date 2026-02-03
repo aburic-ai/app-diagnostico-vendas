@@ -68,7 +68,18 @@ const typeConfig: Record<ToastNotificationType, {
 export function NotificationToast({ notification, onClose, onAction }: NotificationToastProps) {
   if (!notification) return null
 
-  const config = typeConfig[notification.type]
+  // Mapear tipos do banco para tipos do toast
+  const mapTypeToToast = (type: string): ToastNotificationType => {
+    switch (type) {
+      case 'success': return 'info'
+      case 'warning': return 'alert'
+      case 'error': return 'alert'
+      default: return type as ToastNotificationType
+    }
+  }
+
+  const toastType = mapTypeToToast(notification.type as string)
+  const config = typeConfig[toastType] || typeConfig.info // Fallback para 'info'
   const Icon = config.icon
 
   return (

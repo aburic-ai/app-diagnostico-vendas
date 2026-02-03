@@ -21,6 +21,10 @@ interface ScenarioProjectionProps {
   gargalo: string
   /** Pontos de projeção customizados */
   projections?: ProjectionPoint[]
+  /** Estado de carregamento */
+  loading?: boolean
+  /** Erro ao gerar projeções */
+  error?: string | null
 }
 
 const defaultProjections: ProjectionPoint[] = [
@@ -65,7 +69,12 @@ const severityConfig = {
 export function ScenarioProjection({
   gargalo,
   projections = defaultProjections,
+  loading = false,
+  error = null,
 }: ScenarioProjectionProps) {
+  // Use custom projections if available and no error, otherwise fallback to default
+  const displayProjections = !error && projections && projections.length > 0 ? projections : defaultProjections
+
   return (
     <div
       style={{
@@ -156,14 +165,103 @@ export function ScenarioProjection({
         </div>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          style={{
+            padding: '32px 16px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              border: '3px solid rgba(239, 68, 68, 0.2)',
+              borderTopColor: '#EF4444',
+            }}
+          />
+          <p
+            style={{
+              fontSize: '13px',
+              color: theme.colors.text.secondary,
+              margin: 0,
+              fontWeight: theme.typography.fontWeight.medium,
+            }}
+          >
+            Gerando sua projeção personalizada...
+          </p>
+          <p
+            style={{
+              fontSize: '10px',
+              color: theme.colors.text.muted,
+              margin: 0,
+            }}
+          >
+            Analisando seu diagnóstico e conversas com IA
+          </p>
+        </motion.div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{
+            padding: '12px 14px',
+            marginBottom: '16px',
+            background: 'rgba(239, 68, 68, 0.15)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}
+        >
+          <AlertOctagon size={16} color="#EF4444" />
+          <div style={{ flex: 1 }}>
+            <p
+              style={{
+                fontSize: '11px',
+                color: '#EF4444',
+                margin: 0,
+                fontWeight: theme.typography.fontWeight.semibold,
+              }}
+            >
+              Erro ao gerar projeção personalizada
+            </p>
+            <p
+              style={{
+                fontSize: '10px',
+                color: theme.colors.text.muted,
+                margin: '2px 0 0 0',
+              }}
+            >
+              Usando projeção padrão baseada no gargalo identificado
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Trend Line Visual */}
-      <div
-        style={{
-          position: 'relative',
-          marginBottom: '20px',
-          padding: '0 10px',
-        }}
-      >
+      {!loading && (
+        <div
+          style={{
+            position: 'relative',
+            marginBottom: '20px',
+            padding: '0 10px',
+          }}
+        >
         {/* Timeline base */}
         <div
           style={{
@@ -205,7 +303,7 @@ export function ScenarioProjection({
             zIndex: 1,
           }}
         >
-          {projections.map((point, index) => (
+          {displayProjections.map((point, index) => (
             <motion.div
               key={point.days}
               initial={{ y: 10, opacity: 0 }}
@@ -249,10 +347,12 @@ export function ScenarioProjection({
           ))}
         </div>
       </div>
+      )}
 
       {/* Projection Cards */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {projections.map((point, index) => {
+      {!loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {displayProjections.map((point, index) => {
           const config = severityConfig[point.severity]
           return (
             <motion.div
@@ -332,31 +432,37 @@ export function ScenarioProjection({
               </div>
             </motion.div>
           )
-        })}
-      </div>
+          })}
+        </div>
+      )}
 
-      {/* Bottom warning */}
-      <div
+      {/* Bottom info - Data sources */}
+      {!loading && (
+        <div
         style={{
           marginTop: '14px',
-          padding: '10px',
-          background: 'rgba(220, 38, 38, 0.15)',
+          padding: '12px',
+          background: 'rgba(59, 130, 246, 0.08)',
           borderRadius: '8px',
-          border: '1px solid rgba(220, 38, 38, 0.3)',
-          textAlign: 'center',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
         }}
       >
         <p
           style={{
             fontSize: '10px',
-            color: '#EF4444',
+            color: theme.colors.text.secondary,
             margin: 0,
-            fontWeight: theme.typography.fontWeight.semibold,
+            lineHeight: 1.5,
+            textAlign: 'center',
           }}
         >
-          "Isso é matemática, não opinião."
+          <span style={{ color: '#60A5FA', fontWeight: theme.typography.fontWeight.semibold }}>
+            Projeção personalizada
+          </span>
+          {' '}gerada com base no seu diagnóstico IMPACT, respostas da pesquisa de calibragem e conversas com a IA durante o evento.
         </p>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
