@@ -762,69 +762,6 @@ export function ThankYou() {
                 </div>
               </div>
 
-              {/* COMPRA IDENTIFICADA - Show at top when found */}
-              {verificationStatus === 'found' && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Card variant="cyan">
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '16px',
-                      }}
-                    >
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                      >
-                        <CheckCircle size={36} color={theme.colors.accent.cyan.DEFAULT} />
-                      </motion.div>
-                      <div style={{ textAlign: 'center' }}>
-                        <p
-                          style={{
-                            fontFamily: theme.typography.fontFamily.orbitron,
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                            color: theme.colors.accent.cyan.DEFAULT,
-                            marginBottom: '4px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.12em',
-                          }}
-                        >
-                          COMPRA IDENTIFICADA!
-                        </p>
-                        <p
-                          style={{
-                            fontSize: '12px',
-                            color: theme.colors.text.secondary,
-                            margin: 0,
-                          }}
-                        >
-                          Seu acesso foi confirmado.
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                </motion.div>
-              )}
-
-              {/* Button - Show below COMPRA IDENTIFICADA when found */}
-              {verificationStatus === 'found' && (
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '-8px' }}>
-                  <Button onClick={() => setStep('survey')}>
-                    INICIAR CALIBRAGEM
-                    <ChevronRight size={18} />
-                  </Button>
-                </div>
-              )}
-
               {/* Title with Mini Radar */}
               <div
                 style={{
@@ -963,6 +900,52 @@ export function ThankYou() {
                   </h2>
                 </div>
               </div>
+
+              {/* COMPRA IDENTIFICADA - Compact inline badge */}
+              {verificationStatus === 'found' && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 14px',
+                      background: 'rgba(34, 211, 238, 0.08)',
+                      border: '1px solid rgba(34, 211, 238, 0.25)',
+                      borderRadius: '10px',
+                    }}
+                  >
+                    <CheckCircle size={20} color={theme.colors.accent.cyan.DEFAULT} style={{ flexShrink: 0 }} />
+                    <div>
+                      <p
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          color: theme.colors.accent.cyan.DEFAULT,
+                          margin: 0,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                        }}
+                      >
+                        COMPRA IDENTIFICADA
+                      </p>
+                      <p
+                        style={{
+                          fontSize: '11px',
+                          color: theme.colors.text.secondary,
+                          margin: 0,
+                        }}
+                      >
+                        Seu acesso foi confirmado.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
               {/* Content Card */}
               <Card variant="default">
@@ -1143,6 +1126,21 @@ export function ThankYou() {
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Button - Separated at the bottom when purchase found */}
+              {verificationStatus === 'found' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}
+                >
+                  <Button onClick={() => setStep('survey')}>
+                    INICIAR CALIBRAGEM
+                    <ChevronRight size={18} />
+                  </Button>
+                </motion.div>
+              )}
             </motion.div>
           )}
 
