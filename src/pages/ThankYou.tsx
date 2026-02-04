@@ -901,51 +901,153 @@ export function ThankYou() {
                 </div>
               </div>
 
-              {/* COMPRA IDENTIFICADA - Compact inline badge */}
-              {verificationStatus === 'found' && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '10px 14px',
-                      background: 'rgba(34, 211, 238, 0.08)',
-                      border: '1px solid rgba(34, 211, 238, 0.25)',
-                      borderRadius: '10px',
-                    }}
+              {/* Verification Status - All states unified in same position */}
+              <AnimatePresence mode="wait">
+                {verificationStatus === 'checking' && (
+                  <motion.div
+                    key="checking"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
                   >
-                    <CheckCircle size={20} color={theme.colors.accent.cyan.DEFAULT} style={{ flexShrink: 0 }} />
-                    <div>
-                      <p
+                    <Card variant="purple">
+                      <div
                         style={{
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          color: theme.colors.accent.cyan.DEFAULT,
-                          margin: 0,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.06em',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '16px',
+                          padding: '8px 0',
                         }}
                       >
-                        COMPRA IDENTIFICADA
-                      </p>
-                      <p
-                        style={{
-                          fontSize: '11px',
-                          color: theme.colors.text.secondary,
-                          margin: 0,
-                        }}
-                      >
-                        Seu acesso foi confirmado.
-                      </p>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                        >
+                          <Loader2 size={32} color={theme.colors.accent.purple.light} />
+                        </motion.div>
+                        <div style={{ textAlign: 'center' }}>
+                          <p
+                            style={{
+                              fontFamily: theme.typography.fontFamily.orbitron,
+                              fontSize: '12px',
+                              color: theme.colors.accent.purple.light,
+                              marginBottom: '4px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.1em',
+                            }}
+                          >
+                            VERIFICANDO COMPRA...
+                          </p>
+                          <p
+                            style={{
+                              fontSize: '11px',
+                              color: theme.colors.text.muted,
+                            }}
+                          >
+                            Aguarde enquanto localizamos seus dados
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                )}
+
+                {verificationStatus === 'found' && (
+                  <motion.div
+                    key="found"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '10px 14px',
+                        background: 'rgba(34, 211, 238, 0.08)',
+                        border: '1px solid rgba(34, 211, 238, 0.25)',
+                        borderRadius: '10px',
+                      }}
+                    >
+                      <CheckCircle size={20} color={theme.colors.accent.cyan.DEFAULT} style={{ flexShrink: 0 }} />
+                      <div>
+                        <p
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            color: theme.colors.accent.cyan.DEFAULT,
+                            margin: 0,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.06em',
+                          }}
+                        >
+                          COMPRA IDENTIFICADA
+                        </p>
+                        <p
+                          style={{
+                            fontSize: '11px',
+                            color: theme.colors.text.secondary,
+                            margin: 0,
+                          }}
+                        >
+                          Seu acesso foi confirmado.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              )}
+                  </motion.div>
+                )}
+
+                {verificationStatus === 'not_found' && (
+                  <motion.div
+                    key="not_found"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                  >
+                    <Card variant="default">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <p
+                          style={{
+                            fontSize: '13px',
+                            color: theme.colors.text.secondary,
+                            textAlign: 'center',
+                            margin: 0,
+                          }}
+                        >
+                          Informe o e-mail usado na compra para identificar seu acesso:
+                        </p>
+                        <Input
+                          type="email"
+                          placeholder="seu@email.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          autoFocus
+                        />
+                        {emailError && (
+                          <p
+                            style={{
+                              fontSize: '12px',
+                              color: theme.colors.status.danger,
+                              textAlign: 'center',
+                              margin: 0,
+                            }}
+                          >
+                            {emailError}
+                          </p>
+                        )}
+                        <Button onClick={handleEmailSubmit}>
+                          VERIFICAR E-MAIL
+                          <ChevronRight size={18} />
+                        </Button>
+                        {/* ❌ REMOVIDO: Botão "Continuar sem verificação" - vulnerabilidade de segurança */}
+                      </div>
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Content Card */}
               <Card variant="default">
@@ -1025,107 +1127,6 @@ export function ThankYou() {
                   </p>
                 </div>
               </Card>
-
-              {/* Verification Box - Changes based on status */}
-              <AnimatePresence mode="wait">
-                {verificationStatus === 'checking' && (
-                  <motion.div
-                    key="checking"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                  >
-                    <Card variant="purple">
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: '16px',
-                          padding: '8px 0',
-                        }}
-                      >
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                        >
-                          <Loader2 size={32} color={theme.colors.accent.purple.light} />
-                        </motion.div>
-                        <div style={{ textAlign: 'center' }}>
-                          <p
-                            style={{
-                              fontFamily: theme.typography.fontFamily.orbitron,
-                              fontSize: '12px',
-                              color: theme.colors.accent.purple.light,
-                              marginBottom: '4px',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.1em',
-                            }}
-                          >
-                            VERIFICANDO COMPRA...
-                          </p>
-                          <p
-                            style={{
-                              fontSize: '11px',
-                              color: theme.colors.text.muted,
-                            }}
-                          >
-                            Aguarde enquanto localizamos seus dados
-                          </p>
-                        </div>
-                      </div>
-                    </Card>
-                  </motion.div>
-                )}
-
-                {verificationStatus === 'not_found' && (
-                  <motion.div
-                    key="not_found"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                  >
-                    <Card variant="default">
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <p
-                          style={{
-                            fontSize: '13px',
-                            color: theme.colors.text.secondary,
-                            textAlign: 'center',
-                            margin: 0,
-                          }}
-                        >
-                          Informe o e-mail usado na compra para identificar seu acesso:
-                        </p>
-                        <Input
-                          type="email"
-                          placeholder="seu@email.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          autoFocus
-                        />
-                        {emailError && (
-                          <p
-                            style={{
-                              fontSize: '12px',
-                              color: theme.colors.status.danger,
-                              textAlign: 'center',
-                              margin: 0,
-                            }}
-                          >
-                            {emailError}
-                          </p>
-                        )}
-                        <Button onClick={handleEmailSubmit}>
-                          VERIFICAR E-MAIL
-                          <ChevronRight size={18} />
-                        </Button>
-                        {/* ❌ REMOVIDO: Botão "Continuar sem verificação" - vulnerabilidade de segurança */}
-                      </div>
-                    </Card>
-                  </motion.div>
-                )}
-              </AnimatePresence>
 
               {/* Button - Separated at the bottom when purchase found */}
               {verificationStatus === 'found' && (
