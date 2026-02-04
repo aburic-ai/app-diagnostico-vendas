@@ -49,6 +49,8 @@ import {
   ProfileModal,
   EventCountdown,
   EventFinishedView,
+  LiveEventModal,
+  NPSForm,
 } from '../components/ui'
 import type { IMPACTData } from '../components/ui'
 import { theme } from '../styles/theme'
@@ -58,7 +60,8 @@ import { useHeartbeat } from '../hooks/useHeartbeat'
 import { useEventState } from '../hooks/useEventState'
 import { useNotifications } from '../hooks/useNotifications'
 import type { DiagnosticScores } from '../hooks'
-import { XP_CONFIG } from '../config/xp-system'
+import { XP_CONFIG, STEP_IDS } from '../config/xp-system'
+import { supabase } from '../lib/supabase'
 
 // Links da oferta (viriam do Admin/Backend)
 const OFFER_LINKS = {
@@ -105,8 +108,8 @@ export function AoVivo() {
   const { profile, user } = useAuth()
   useHeartbeat() // Atualiza last_seen_at a cada 30s
   const { getDiagnosticByDay, saveDiagnostic, loading: diagnosticLoading } = useDiagnostic()
-  const { completeStep } = useUserProgress()
-  const { eventState, isAoVivoAccessible, isAdmin } = useEventState()
+  const { completeStep, isStepCompleted } = useUserProgress()
+  const { eventState, isAoVivoAccessible, isPosEventoAccessible, isAdmin } = useEventState()
   const location = useLocation()
 
   // Refs para scroll to section (avisos clickables)
@@ -149,7 +152,7 @@ export function AoVivo() {
   const [showOfferModal, setShowOfferModal] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const isOfferUnlocked = eventState?.offer_visible || false
-  const [confirmedModules, setConfirmedModules] = useState<number[]>([0, 1, 2, 3, 4]) // Módulos já confirmados
+  const [confirmedModules, setConfirmedModules] = useState<number[]>([]) // Módulos confirmados (vazio inicialmente, carregado do perfil)
 
   // Notificações reais do banco de dados
   const {
@@ -283,11 +286,47 @@ export function AoVivo() {
     diagnostico: currentData,
   }
 
+  // Dynamic nav items baseado no estado do evento
   const navItems = [
-    { id: 'preparacao', label: 'Preparação', icon: <Rocket size={20} />, status: 'Liberado' },
-    { id: 'aovivo', label: 'Ao Vivo', icon: <Radio size={20} />, badge: 'LIVE', status: 'Liberado' },
-    { id: 'posevento', label: 'Pós Evento', icon: <Target size={20} />, status: 'Libera 16/03' },
+    {
+      id: 'preparacao',
+      label: 'Preparação',
+      icon: <Rocket size={20} />,
+      status: 'Liberado',
+      isAccessible: true
+    },
+    {
+      id: 'aovivo',
+      label: 'Ao Vivo',
+      icon: <Radio size={20} />,
+      badge: isLive ? 'LIVE' : (eventState?.status === 'offline' ? 'EM BREVE' : undefined),
+      status: isLive ? 'Liberado' : (eventState?.status === 'offline' ? 'Em Breve' : 'Liberado'),
+      isAccessible: true
+    },
+    {
+      id: 'posevento',
+      label: 'Pós Evento',
+      icon: <Target size={20} />,
+      status: isPosEventoAccessible() ? 'Liberado' :
+        eventState?.pos_evento_unlock_date ?
+          `Libera ${new Date(eventState.pos_evento_unlock_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` :
+          'Bloqueado',
+      isAccessible: isPosEventoAccessible()
+    },
   ]
+
+  // Handler de navegação entre abas
+  const handleNavigation = (tabId: string) => {
+    const routes: Record<string, string> = {
+      preparacao: '/pre-evento',
+      aovivo: '/ao-vivo',
+      posevento: '/pos-evento',
+    }
+
+    if (routes[tabId]) {
+      navigate(routes[tabId])
+    }
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -378,41 +417,48 @@ export function AoVivo() {
   // Calculate total XP from confirmed modules
   const totalXP = confirmedModules.length * XP_CONFIG.EVENT.MODULE_CHECKIN
 
-  // Check tab access (admins bypass)
-  if (!isAdmin && !isAoVivoAccessible()) {
-    return (
-      <PageWrapper backgroundColor={theme.colors.background.dark}>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '70vh',
-            padding: '40px',
-            textAlign: 'center',
-          }}
-        >
-          <Lock size={64} color={theme.colors.text.muted} style={{ marginBottom: '24px' }} />
-          <h2 style={{
-            fontSize: '24px',
-            fontWeight: 'bold',
-            color: theme.colors.text.primary,
-            marginBottom: '12px',
-          }}>
-            Aba Bloqueada
-          </h2>
-          <p style={{
-            fontSize: '16px',
-            color: theme.colors.text.secondary,
-            maxWidth: '500px',
-          }}>
-            Esta aba será liberada automaticamente na data/hora do evento ao vivo. Aguarde a liberação.
-          </p>
-        </div>
-        <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
-      </PageWrapper>
-    )
+  // Detectar quando countdown do Ao Vivo acabou (para mostrar "Evento Prestes a Iniciar")
+  const [aoVivoCountdownEnded, setAoVivoCountdownEnded] = useState(false)
+
+  useEffect(() => {
+    if (!eventState?.ao_vivo_unlock_date) return
+
+    const check = () => {
+      const now = new Date()
+      const target = new Date(eventState.ao_vivo_unlock_date!)
+      setAoVivoCountdownEnded(now >= target)
+    }
+
+    check()
+    const interval = setInterval(check, 1000)
+    return () => clearInterval(interval)
+  }, [eventState?.ao_vivo_unlock_date])
+
+  // NPS: mostrar formulário bloqueante quando admin ativa
+  const npsType = eventState?.nps_active as 'day1' | 'final' | null
+  const npsStepId = npsType === 'day1' ? STEP_IDS.NPS_DAY1 : npsType === 'final' ? STEP_IDS.NPS_FINAL : null
+  const showNPS = !!(npsType && npsStepId && !isStepCompleted(npsStepId) && !isAdmin)
+
+  const handleNPSSubmit = async (score: number, feedback: string, type: 'day1' | 'final') => {
+    const stepId = type === 'day1' ? STEP_IDS.NPS_DAY1 : STEP_IDS.NPS_FINAL
+    const xpReward = type === 'day1' ? XP_CONFIG.EVENT.NPS_DAY1 : XP_CONFIG.EVENT.NPS_FINAL
+
+    try {
+      await completeStep(stepId, xpReward)
+
+      // Salvar resposta NPS no banco
+      await supabase.from('nps_responses').insert({
+        user_id: user?.id,
+        type,
+        score,
+        feedback: feedback || null,
+        event_day: eventState?.current_day || 1,
+      })
+
+      console.log(`✅ NPS ${type} enviado! Score: ${score}, +${xpReward} XP`)
+    } catch (error) {
+      console.error('❌ Erro ao salvar NPS:', error)
+    }
   }
 
   // FINISHED - Redirect to Pós-Evento
@@ -420,48 +466,8 @@ export function AoVivo() {
     return <EventFinishedView />
   }
 
-  // Show countdown if event is offline AND before scheduled start
-  if (eventState?.status === 'offline' && eventState?.event_scheduled_start) {
-    const scheduledDate = new Date(eventState.event_scheduled_start)
-    const now = new Date()
-
-    // Se ainda não chegou a data, mostrar countdown
-    if (now < scheduledDate) {
-      return (
-        <PageWrapper
-          backgroundColor={theme.colors.background.dark}
-          showAnimatedBackground={true}
-          showOverlay={false}
-        >
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              paddingBottom: '100px',
-            }}
-          >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                padding: '20px',
-              }}
-            >
-              <EventCountdown
-                targetDate={eventState.event_scheduled_start}
-                day={eventState.current_day || 1}
-              />
-            </motion.div>
-          </div>
-          <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
-        </PageWrapper>
-      )
-    }
-
-    // Se já passou da data, mostrar "Aguardando Início"
+  // Show countdown while event is offline and countdown hasn't ended yet
+  if (eventState?.status === 'offline' && eventState?.ao_vivo_unlock_date && !aoVivoCountdownEnded) {
     return (
       <PageWrapper
         backgroundColor={theme.colors.background.dark}
@@ -482,44 +488,130 @@ export function AoVivo() {
             style={{
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: '70vh',
-              padding: '40px 20px',
-              textAlign: 'center',
+              padding: '20px',
             }}
           >
-          <Clock size={64} color="#22D3EE" style={{ marginBottom: '24px' }} />
-          <h2 style={{
-            fontSize: '28px',
-            fontWeight: 'bold',
-            color: '#fff',
-            marginBottom: '12px',
-          }}>
-            Aguardando Início
+            <EventCountdown
+              targetDate={eventState.ao_vivo_unlock_date}
+              day={eventState.current_day || 1}
+            />
+          </motion.div>
+        </div>
+        <BottomNav items={navItems} activeId={activeNav} onSelect={handleNavigation} />
+      </PageWrapper>
+    )
+  }
+
+  // Evento prestes a iniciar: offline + (countdown acabou ou sem data agendada)
+  if (eventState?.status === 'offline') {
+    return (
+      <PageWrapper
+        backgroundColor={theme.colors.background.dark}
+        showAnimatedBackground={true}
+        showOverlay={false}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '40px 24px',
+            textAlign: 'center',
+          }}
+        >
+          {/* Ícone pulsante */}
+          <motion.div
+            animate={{
+              scale: [1, 1.1, 1],
+              opacity: [0.8, 1, 0.8],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: 'easeInOut',
+            }}
+            style={{
+              width: '100px',
+              height: '100px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%)',
+              border: '2px solid rgba(34, 211, 238, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '28px',
+              boxShadow: '0 0 40px rgba(34, 211, 238, 0.3)',
+            }}
+          >
+            <Radio size={48} color={theme.colors.accent.cyan.DEFAULT} />
+          </motion.div>
+
+          {/* Título */}
+          <h2
+            style={{
+              fontFamily: theme.typography.fontFamily.orbitron,
+              fontSize: '22px',
+              fontWeight: theme.typography.fontWeight.bold,
+              color: theme.colors.accent.cyan.DEFAULT,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: '12px',
+              textShadow: '0 0 20px rgba(34, 211, 238, 0.5)',
+            }}
+          >
+            Evento Prestes a Iniciar
           </h2>
-          <p style={{
-            fontSize: '16px',
-            color: '#94A3B8',
-            maxWidth: '500px',
-            marginBottom: '40px',
-          }}>
-            O evento começará em breve. Aguarde o instrutor iniciar a transmissão ao vivo.
+
+          {/* Subtítulo */}
+          <p
+            style={{
+              fontSize: '15px',
+              color: theme.colors.text.secondary,
+              lineHeight: 1.6,
+              maxWidth: '340px',
+              marginBottom: '32px',
+            }}
+          >
+            Aguardando o instrutor iniciar a transmissão ao vivo. Fique nesta tela — você será redirecionado automaticamente.
           </p>
+
+          {/* Indicador de loading com dots */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  opacity: [0.3, 1, 0.3],
+                  scale: [0.8, 1.2, 0.8],
+                }}
+                transition={{
+                  duration: 1.4,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                  ease: 'easeInOut',
+                }}
+                style={{
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  background: theme.colors.accent.cyan.DEFAULT,
+                  boxShadow: `0 0 8px ${theme.colors.accent.cyan.DEFAULT}`,
+                }}
+              />
+            ))}
+          </div>
 
           {/* Avisos importantes */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             gap: '16px',
-            maxWidth: '600px',
+            maxWidth: '340px',
             width: '100%',
           }}>
-            {/* Aviso 1: Manter página aberta */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
+            <div
               style={{
                 padding: '16px 20px',
                 background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(34, 211, 238, 0.05) 100%)',
@@ -533,21 +625,17 @@ export function AoVivo() {
             >
               <Zap size={20} color="#22D3EE" style={{ flexShrink: 0, marginTop: '2px' }} />
               <p style={{
-                fontSize: '14px',
+                fontSize: '13px',
                 color: '#E2E8F0',
-                lineHeight: '1.6',
+                lineHeight: '1.5',
                 margin: 0,
               }}>
                 <strong style={{ color: '#22D3EE' }}>Esta é a página do evento ao vivo!</strong><br />
-                Aqui você terá todos os recursos: diagnóstico em tempo real, chat com IA, check-ins de módulos e muito mais. A transmissão começará em breve.
+                Diagnóstico em tempo real, chat com IA, check-ins de módulos e muito mais.
               </p>
-            </motion.div>
+            </div>
 
-            {/* Aviso 2: Gravação */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
+            <div
               style={{
                 padding: '16px 20px',
                 background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
@@ -561,20 +649,18 @@ export function AoVivo() {
             >
               <Star size={20} color="#F59E0B" style={{ flexShrink: 0, marginTop: '2px' }} />
               <p style={{
-                fontSize: '14px',
+                fontSize: '13px',
                 color: '#E2E8F0',
-                lineHeight: '1.6',
+                lineHeight: '1.5',
                 margin: 0,
               }}>
                 <strong style={{ color: '#F59E0B' }}>Evento 100% online e ao vivo.</strong><br />
-                A gravação não está inclusa. Se desejar, ela pode ser adquirida na página de preparação
-                até o início do evento. Depois não estará mais disponível.
+                A gravação não está inclusa e pode ser adquirida na aba de preparação até o início do evento.
               </p>
-            </motion.div>
+            </div>
           </div>
-        </motion.div>
         </div>
-        <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+        <BottomNav items={navItems} activeId={activeNav} onSelect={handleNavigation} />
       </PageWrapper>
     )
   }
@@ -585,6 +671,20 @@ export function AoVivo() {
       showAnimatedBackground={true}
       showOverlay={false}
     >
+      {/* Live Event Modal - aparece quando evento está ao vivo */}
+      <LiveEventModal isLive={isLive} />
+
+      {/* NPS Form - overlay bloqueante quando admin ativa */}
+      {npsType && (
+        <NPSForm
+          type={npsType}
+          isOpen={showNPS}
+          onClose={() => {}} // mandatory = não fecha
+          onSubmit={handleNPSSubmit}
+          mandatory={true}
+        />
+      )}
+
       {/* Scrollable Content */}
       <div
         style={{
@@ -1859,7 +1959,7 @@ export function AoVivo() {
       </AnimatePresence>
 
       {/* ==================== BOTTOM NAVIGATION ==================== */}
-      <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+      <BottomNav items={navItems} activeId={activeNav} onSelect={handleNavigation} />
 
       {/* ==================== PROFILE MODAL ==================== */}
       <ProfileModal

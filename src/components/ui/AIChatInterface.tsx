@@ -6,7 +6,7 @@
  * INTEGRADO COM OPENAI GPT-4o-mini
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bot, Send, User, Sparkles, AlertCircle, ArrowLeft } from 'lucide-react'
 import { theme } from '../../styles/theme'
@@ -54,23 +54,56 @@ export function AIChatInterface({
   module_id,
 }: AIChatInterfaceProps) {
   // Use real AI chat hook
-  const { messages, loading, error, sendMessage } = useAIChat({
+  const { messages, loading, error, sendMessage, conversationId } = useAIChat({
     event_day,
     module_id,
   })
 
   const [inputValue, setInputValue] = useState('')
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
+  const DEBUG_MODE = false // Debug desativado - chat funcionando!
+
+  const addDebugLog = (log: string) => {
+    if (DEBUG_MODE) {
+      setDebugLogs(prev => [...prev.slice(-10), `${new Date().toLocaleTimeString()}: ${log}`])
+    }
+  }
 
   const handleSend = async () => {
-    if (!inputValue.trim() || !isAvailable || loading) return
+    addDebugLog('🎯 handleSend called')
+    if (!inputValue.trim() || !isAvailable || loading) {
+      addDebugLog(`❌ Early return: input=${!!inputValue.trim()}, available=${isAvailable}, loading=${loading}`)
+      return
+    }
+    addDebugLog('✅ Calling sendMessage')
 
-    await sendMessage(inputValue.trim())
+    try {
+      await sendMessage(inputValue.trim())
+      addDebugLog('✅ sendMessage completed')
+    } catch (err) {
+      addDebugLog(`❌ sendMessage error: ${err}`)
+    }
+
     setInputValue('')
   }
 
   const handlePromptClick = (prompt: string) => {
+    addDebugLog(`📝 Prompt clicked: ${prompt.substring(0, 30)}...`)
     setInputValue(prompt)
   }
+
+  // Monitor hook state changes
+  useEffect(() => {
+    addDebugLog(`🔄 loading changed: ${loading}`)
+  }, [loading])
+
+  useEffect(() => {
+    if (error) addDebugLog(`❌ error changed: ${error}`)
+  }, [error])
+
+  useEffect(() => {
+    addDebugLog(`💬 messages count: ${messages.length}`)
+  }, [messages.length])
 
   return (
     <div
@@ -183,6 +216,87 @@ export function AIChatInterface({
           Usando sua pesquisa de boas-vindas, seu radar IMPACT e as respostas anteriores deste chat
         </p>
       </div>
+
+      {/* DEBUG LOGS - Visível na tela */}
+      {DEBUG_MODE && debugLogs.length > 0 && (
+        <div
+          style={{
+            margin: '16px 16px 0 16px',
+            padding: '8px 12px',
+            background: 'rgba(0, 255, 0, 0.1)',
+            border: '1px solid rgba(0, 255, 0, 0.3)',
+            borderRadius: '8px',
+            maxHeight: '150px',
+            overflowY: 'auto',
+          }}
+        >
+          <p
+            style={{
+              fontSize: '9px',
+              color: '#0F0',
+              fontFamily: 'monospace',
+              margin: '0 0 4px 0',
+              fontWeight: 'bold',
+            }}
+          >
+            🐛 DEBUG LOGS:
+          </p>
+          {debugLogs.map((log, i) => (
+            <p
+              key={i}
+              style={{
+                fontSize: '8px',
+                color: '#0F0',
+                fontFamily: 'monospace',
+                margin: '2px 0',
+                lineHeight: 1.2,
+              }}
+            >
+              {log}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Initialization Error Warning */}
+      {!conversationId && !loading && (
+        <div
+          style={{
+            margin: '16px 16px 0 16px',
+            padding: '12px 16px',
+            background: 'rgba(239, 68, 68, 0.15)',
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px',
+          }}
+        >
+          <AlertCircle size={18} color="#EF4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ flex: 1 }}>
+            <p
+              style={{
+                fontSize: '12px',
+                fontWeight: 'bold',
+                color: '#EF4444',
+                margin: '0 0 6px 0',
+              }}
+            >
+              Erro ao inicializar chat
+            </p>
+            <p
+              style={{
+                fontSize: '11px',
+                color: '#EF4444',
+                margin: 0,
+                lineHeight: 1.4,
+              }}
+            >
+              A conversa não foi inicializada. Por favor, recarregue a página. Se o problema persistir, tire um print e envie para o suporte.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div
@@ -322,21 +436,45 @@ export function AIChatInterface({
               background: 'rgba(239, 68, 68, 0.15)',
               border: '1px solid rgba(239, 68, 68, 0.4)',
               borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
             }}
           >
-            <AlertCircle size={18} color="#EF4444" />
-            <p
-              style={{
-                fontSize: '12px',
-                color: '#EF4444',
-                margin: 0,
-              }}
-            >
-              {error}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <AlertCircle size={18} color="#EF4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ flex: 1 }}>
+                <p
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    color: '#EF4444',
+                    margin: '0 0 6px 0',
+                  }}
+                >
+                  Erro ao enviar mensagem
+                </p>
+                <p
+                  style={{
+                    fontSize: '11px',
+                    color: '#EF4444',
+                    margin: 0,
+                    wordBreak: 'break-word',
+                    whiteSpace: 'pre-wrap',
+                    opacity: 0.9,
+                  }}
+                >
+                  {error}
+                </p>
+                <p
+                  style={{
+                    fontSize: '10px',
+                    color: 'rgba(239, 68, 68, 0.7)',
+                    margin: '6px 0 0 0',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  Por favor, tire um print desta mensagem e envie para o suporte.
+                </p>
+              </div>
+            </div>
           </motion.div>
         )}
       </div>

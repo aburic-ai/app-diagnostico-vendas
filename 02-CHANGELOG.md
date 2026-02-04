@@ -1,12 +1,13 @@
 # 02. CHANGELOG
 
 **Projeto:** App Diagnóstico de Vendas
-**Última Atualização:** 2026-02-03
+**Última Atualização:** 2026-02-04
 
 ---
 
 ## 📋 ÍNDICE
 
+- [2.4.0 - 2026-02-04: Event Prep & UX Polish](#240---2026-02-04-event-prep--ux-polish)
 - [2.3.0 - 2026-02-03: Documentation Reorganization](#230---2026-02-03-documentation-reorganization)
 - [2.2.0 - 2026-02-02 (Part B): Admin Improvements](#220---2026-02-02-part-b-admin-improvements)
 - [2.1.0 - 2026-02-02 (Part A): Critical Fixes](#210---2026-02-02-part-a-critical-fixes)
@@ -17,6 +18,206 @@
 - [1.2.0 - 2026-01-29: Design System + Radar Chart](#120---2026-01-29-design-system--radar-chart)
 - [1.1.0 - 2026-01-28: Modules + Survey](#110---2026-01-28-modules--survey)
 - [1.0.0 - 2026-01-27: Initial MVP](#100---2026-01-27-initial-mvp)
+
+---
+
+## [2.4.0] - 2026-02-04: Event Prep & UX Polish
+
+### 🎯 Preparação Final para o Evento
+
+Grande rodada de melhorias de UX, correções e novas funcionalidades focadas na experiência do participante e do administrador antes do evento (28/02).
+
+---
+
+#### 1. Sistema de Presença em Tempo Real
+
+**Novo:** Heartbeat system que atualiza `last_seen_at` a cada 30 segundos.
+
+**Implementação:**
+- ✅ Hook `useHeartbeat` atualiza presença no banco
+- ✅ Campo `last_seen_at` na tabela `profiles`
+- ✅ Status automático: **Online** (<10min), **Idle** (<30min), **Offline** (>30min)
+
+**Arquivos:**
+- `src/hooks/useHeartbeat.ts`
+- `src/pages/PreEvento.tsx`, `src/pages/AoVivo.tsx`, `src/pages/PosEvento.tsx`
+
+---
+
+#### 2. Admin: Indicadores de Presença e Filtros
+
+**Gerenciar Usuários agora mostra:**
+- ✅ Bolinha verde (online), amarela (idle) ou cinza (offline) ao lado de cada usuário
+- ✅ Label temporal ("agora", "5min atrás", "2h atrás", "3d atrás")
+- ✅ Filtro por status: botão "Online" para ver apenas usuários ativos
+- ✅ Ordenação: por XP (padrão) ou por atividade recente
+- ✅ Layout alterado de 70/30 para 65/35 split
+
+**Arquivo:** `src/pages/Admin.tsx`
+
+**Detalhes técnicos:**
+- Query `fetchAllUsers` agora inclui `last_seen_at` no select
+- Filtro online: `(Date.now() - last_seen_at) / 1000 / 60 < 10`
+- Sort por XP: `(b.xp || 0) - (a.xp || 0)`
+- Sort por recente: `bTime - aTime` baseado em `last_seen_at`
+
+---
+
+#### 3. Plano de Ação 7 Dias: Todos os Dias Visíveis
+
+**Antes:** Apenas dias desbloqueados eram mostrados.
+
+**Depois:** Todos os 7 dias são exibidos, com dias futuros travados visualmente:
+- ✅ Conteúdo com `blur(4px)` e `opacity: 0.3`
+- ✅ Overlay gradiente com ícone Lock e badge "Dia X"
+- ✅ Click desabilitado em dias futuros
+- ✅ Checkbox com blur e opacidade reduzida
+- ✅ Contador atualizado: `completedCount/unlockedCount` (não total)
+
+**Renomeação:** "Protocolo de Descompressão" → **"Protocolo de Implementação"**
+
+**currentDay dinâmico:** Calculado a partir de `pos_evento_unlock_date`:
+```typescript
+const diffDays = Math.floor(
+  (now.getTime() - unlockDate.getTime()) / (1000 * 60 * 60 * 24)
+)
+return Math.max(1, Math.min(7, diffDays + 1))
+```
+
+**Arquivos:**
+- `src/components/ui/ActionPlan.tsx` - Visual dos 7 dias com lock
+- `src/pages/PosEvento.tsx` - currentDay dinâmico
+
+---
+
+#### 4. Relatório Final: Removido Botão PDF
+
+- ✅ Removido botão de download PDF do componente `FinalReport`
+- ✅ Removida prop `onDownload` e import `FileDown`
+- ✅ Removida prop `onDownload` do uso em `PosEvento.tsx`
+
+**Arquivo:** `src/components/ui/FinalReport.tsx`
+
+---
+
+#### 5. Aulas Bônus Trancadas até 12/02
+
+**Novo:** Seção de aulas bônus no Pré-Evento com trava por data.
+
+- ✅ Badge "Libera 12/02" com ícone Lock
+- ✅ Overlay escuro sobre cada card de aula
+- ✅ Imagens em grayscale com opacidade reduzida
+- ✅ Click desabilitado enquanto `new Date() < aulasReleaseDate`
+- ✅ Liberação automática em `2026-02-12T00:00:00-03:00`
+
+**Arquivo:** `src/pages/PreEvento.tsx`
+
+---
+
+#### 6. Mensagem Contextual de Aba Bloqueada
+
+**Antes:** Pré-Evento mostrava "Aba Bloqueada - será liberada automaticamente" mesmo após o evento começar.
+
+**Depois:** Detecta se `pre_evento_lock_date` já passou:
+
+- **Antes do evento:** Mensagem original com Lock icon
+- **Após evento iniciar:** "Fase Concluída" com Zap icon, mensagem incentivando ir para próximas abas, botões de navegação para Ao Vivo e/ou Pós-Evento
+
+**Arquivo:** `src/pages/PreEvento.tsx`
+
+---
+
+#### 7. Links de Compra Hotmart com UTMs
+
+**Novo:** Steps de compra (Dossiê e Aulas Editadas) agora abrem checkout Hotmart com UTM tracking.
+
+**Links configurados:**
+- **Dossiê do Negócio (PDF):** `https://pay.hotmart.com/X104244085H?off=h8jdxfk4`
+- **Aulas Editadas:** `https://pay.hotmart.com/B104245453L?off=h15bzcne`
+
+**UTMs adicionados:**
+```
+utm_source=appdiagn
+utm_medium=app
+utm_campaign=imersao2026
+utm_content=dossie-pdf | aulas-editadas
+```
+
+**Implementação:**
+- Constante `PURCHASE_LINKS` com URLs e utm_content
+- Função `buildPurchaseUrl()` adiciona UTMs automaticamente
+- `handleStepClick` abre URL em nova aba ao clicar em steps de compra
+
+**Arquivo:** `src/pages/PreEvento.tsx`
+
+---
+
+#### 8. Notificações: Suporte a DELETE
+
+**Problema:** Ao deletar notificações pelo Admin, o realtime não atualizava a lista nos clientes.
+
+**Solução:**
+- ✅ Subscription mudou de `event: 'INSERT'` para `event: '*'`
+- ✅ Handler para `payload.eventType === 'DELETE'` remove notificação do state
+- ✅ `deleteAllNotifications` usa `.select('id')` para verificar se rows foram deletadas
+- ✅ Retorna erro se 0 rows deletadas (indica RLS policy faltando)
+
+**Arquivo:** `src/hooks/useNotifications.ts`
+
+---
+
+#### 9. LiveEventModal - Redirecionamento Automático
+
+**Novo componente:** Modal que aparece quando o evento está ao vivo, incentivando navegação para aba Ao Vivo.
+
+**Arquivo:** `src/components/ui/LiveEventModal.tsx` (novo)
+
+---
+
+#### 10. Outras Melhorias e Fixes
+
+- ✅ **Dynamic Countdown:** Countdown agora usa datas do `event_state` do banco de dados
+- ✅ **Protocol Survey:** Agora exige completar o protocolo antes de dar XP (não basta clicar)
+- ✅ **Image Compression:** Upload automático com compressão de imagem
+- ✅ **Auth Flow:** Correções no fluxo de criação de conta (handle existing users)
+- ✅ **Presence Status:** Melhorias no status de presença e erros de upload de foto
+- ✅ **Version Bump:** v1.0.5
+
+---
+
+### 📁 Arquivos Criados/Modificados
+
+**Criados:**
+- `src/components/ui/LiveEventModal.tsx` - Modal de evento ao vivo
+
+**Modificados (18 arquivos):**
+- `src/pages/Admin.tsx` - Layout 65/35, status dots, filtros, sort
+- `src/pages/PreEvento.tsx` - Aulas trancadas, msg contextual, purchase links
+- `src/pages/PosEvento.tsx` - currentDay dinâmico, removido onDownload
+- `src/pages/AoVivo.tsx` - Melhorias diversas
+- `src/components/ui/ActionPlan.tsx` - 7 dias com blur/lock, rename
+- `src/components/ui/FinalReport.tsx` - Removido botão PDF
+- `src/components/ui/BottomNav.tsx` - Ajustes
+- `src/components/ui/Countdown.tsx` - Countdown dinâmico
+- `src/components/ui/EventCountdown.tsx` - Ajustes
+- `src/components/ui/AIChatInterface.tsx` - Ajustes
+- `src/components/ui/index.ts` - Export LiveEventModal
+- `src/hooks/useNotifications.ts` - DELETE handler, verificação RLS
+- `src/hooks/useEventState.ts` - Ajustes
+- `src/hooks/useAIChat.ts` - Ajustes
+- `src/lib/supabase.ts` - Ajustes
+- `vite.config.ts` - Ajustes
+
+---
+
+### 🐛 Bugs Corrigidos
+
+1. **Status online não aparecia** - Query faltava `last_seen_at`, UI não tinha indicadores
+2. **Plano de ação idêntico entre usuários** - Prompt da Edge Function muito prescritivo (identificado, não corrigido)
+3. **Notificações não sumiam ao deletar** - Subscription só ouvia INSERT, não DELETE
+4. **Countdown estático** - Usava data hardcoded ao invés do event_state
+5. **XP dado sem completar survey** - Protocol survey dava XP ao clicar sem verificar conclusão
+6. **Msg enganosa pós-evento** - "Aba será liberada" quando evento já começou
 
 ---
 
@@ -864,6 +1065,7 @@ git push origin main  # Auto-deploy
 ```bash
 supabase functions deploy hotmart-webhook
 supabase functions deploy generate-audio
+supabase functions deploy generate-action-plan
 ```
 
 ---
@@ -901,22 +1103,30 @@ supabase functions deploy generate-audio
 - [x] Sistema de XP redesenhado (1000 XP)
 - [x] Pré-Evento com gamification
 - [x] Ao Vivo com checkins de módulos
+- [x] Pós-Evento com Plano 7 Dias (IA + fallback)
 - [x] Webhook Hotmart
 - [x] Admin Dashboard com dados reais
 - [x] RLS completo e seguro
 - [x] Pesquisa de calibragem (8 questões)
 - [x] Real-time updates via Supabase
-- [x] Sistema de notificações
+- [x] Sistema de notificações (com DELETE handler)
 - [x] Sincronização de dia Admin-Participante
 - [x] Controle de acesso às abas (unlock/lock dates)
 - [x] Sistema de áudio personalizado (Edge Function + ElevenLabs)
+- [x] Sistema de presença em tempo real (heartbeat 30s)
+- [x] Admin: indicadores online/idle/offline + filtros + sort
+- [x] Links de compra Hotmart com UTM tracking
+- [x] Plano 7 dias com blur/lock em dias futuros
+- [x] Aulas bônus com trava por data (12/02)
+- [x] LiveEventModal - redirecionamento automático ao vivo
+- [x] Countdown dinâmico baseado em event_state
+- [x] Compressão automática de imagens no upload
 - [x] Documentação reorganizada e hierarquizada
 
 ### 🔄 Em Progresso
-- [ ] Pós-Evento (Plano 7 Dias + IMPACT)
 - [ ] Google Sheets Integration
-- [ ] Validação de compras de order bumps (PDF + Aulas)
-- [ ] NPS Forms (Dia 1 + Final)
+- [ ] Personalização real do plano de ação IA (prompt menos prescritivo)
+- [ ] RLS policy DELETE para notifications (pode falhar ao limpar avisos)
 
 ### 📋 Planejado
 - [ ] Admin - seção "Inscritos IMPACT"
@@ -941,6 +1151,8 @@ supabase functions deploy generate-audio
 ### Abertos 🔄
 - [ ] Google Sheets sync não implementado
 - [ ] Manual approval UI no Admin (planejado)
+- [ ] Plano de ação IA gera planos muito similares entre usuários (prompt prescritivo)
+- [ ] RLS policy DELETE na tabela notifications pode estar faltando
 - [ ] Testes end-to-end de compra → XP → Google Sheets
 
 ---
@@ -964,9 +1176,9 @@ supabase functions deploy generate-audio
 
 ---
 
-**Última revisão:** 2026-02-03
-**Versão atual:** 2.3.0
-**Próxima milestone:** Google Sheets Integration + Admin IMPACT + Quickstart Guide
+**Última revisão:** 2026-02-04
+**Versão atual:** 2.4.0
+**Próxima milestone:** Evento 28/02 - Validação final + Google Sheets
 
 ---
 

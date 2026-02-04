@@ -7,7 +7,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, Circle, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
+import { Check, Circle, Calendar, ChevronDown, ChevronUp, Lock } from 'lucide-react'
 import { theme } from '../../styles/theme'
 
 export interface ActionItem {
@@ -37,10 +37,8 @@ export function ActionPlan({
 }: ActionPlanProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
 
-  // Filter to only show actions up to and including current day
-  const visibleActions = actions.filter(a => a.day <= currentDay)
-  const completedCount = visibleActions.filter(a => a.completed).length
-  const totalActions = visibleActions.length
+  const completedCount = actions.filter(a => a.day <= currentDay && a.completed).length
+  const unlockedCount = actions.filter(a => a.day <= currentDay).length
 
   const getActionStatus = (day: number) => {
     if (day < currentDay) return 'past'
@@ -108,7 +106,7 @@ export function ActionPlan({
                 margin: '2px 0 0 0',
               }}
             >
-              Protocolo de Descompressão (7 Dias)
+              Protocolo de Implementação (7 Dias)
             </p>
           </div>
         </div>
@@ -133,7 +131,7 @@ export function ActionPlan({
                 color: theme.colors.gold.DEFAULT,
               }}
             >
-              {completedCount}/{totalActions}
+              {completedCount}/{unlockedCount}
             </span>
           </div>
           {expanded ? (
@@ -221,10 +219,11 @@ export function ActionPlan({
                 })}
               </div>
 
-              {/* Actions - only shows visible (past + current) days */}
+              {/* Actions - all 7 days, future ones locked/blurred */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {visibleActions.map((action, index) => {
+                {actions.map((action, index) => {
                   const isActive = getActionStatus(action.day) === 'current'
+                  const isFutureAction = action.day > currentDay
 
                   return (
                     <motion.div
@@ -232,26 +231,73 @@ export function ActionPlan({
                       initial={{ x: -10, opacity: 0 }}
                       animate={{ x: 0, opacity: 1 }}
                       transition={{ delay: index * 0.05 }}
-                      onClick={() => onToggleAction(action.id)}
+                      onClick={() => !isFutureAction && onToggleAction(action.id)}
                       style={{
+                        position: 'relative',
                         display: 'flex',
                         alignItems: 'flex-start',
                         gap: '12px',
                         padding: '12px',
-                        background: isActive
+                        background: isFutureAction
+                          ? 'rgba(15, 17, 21, 0.3)'
+                          : isActive
                           ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(234, 179, 8, 0.05) 100%)'
                           : 'rgba(15, 17, 21, 0.5)',
                         border: `1px solid ${
-                          action.completed
+                          isFutureAction
+                            ? 'rgba(100, 116, 139, 0.08)'
+                            : action.completed
                             ? 'rgba(34, 211, 238, 0.4)'
                             : isActive
                             ? 'rgba(245, 158, 11, 0.3)'
                             : 'rgba(100, 116, 139, 0.15)'
                         }`,
                         borderRadius: '10px',
-                        cursor: 'pointer',
+                        cursor: isFutureAction ? 'default' : 'pointer',
+                        overflow: 'hidden',
                       }}
                     >
+                      {/* Locked overlay for future days */}
+                      {isFutureAction && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            zIndex: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-end',
+                            paddingRight: '14px',
+                            background: 'linear-gradient(90deg, transparent 0%, rgba(10, 10, 15, 0.85) 60%)',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '4px 10px',
+                              background: 'rgba(100, 116, 139, 0.15)',
+                              border: '1px solid rgba(100, 116, 139, 0.2)',
+                              borderRadius: '6px',
+                            }}
+                          >
+                            <Lock size={10} color="rgba(148, 163, 184, 0.6)" />
+                            <span
+                              style={{
+                                fontSize: '8px',
+                                fontWeight: theme.typography.fontWeight.bold,
+                                color: 'rgba(148, 163, 184, 0.6)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                              }}
+                            >
+                              Dia {action.day}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Checkbox */}
                       <div
                         style={{
@@ -260,10 +306,14 @@ export function ActionPlan({
                           borderRadius: '6px',
                           background: action.completed
                             ? theme.colors.accent.cyan.DEFAULT
+                            : isFutureAction
+                            ? 'rgba(100, 116, 139, 0.08)'
                             : 'rgba(100, 116, 139, 0.15)',
                           border: `2px solid ${
                             action.completed
                               ? theme.colors.accent.cyan.DEFAULT
+                              : isFutureAction
+                              ? 'rgba(100, 116, 139, 0.12)'
                               : isActive
                               ? theme.colors.gold.DEFAULT
                               : 'rgba(100, 116, 139, 0.3)'
@@ -275,6 +325,8 @@ export function ActionPlan({
                           boxShadow: action.completed
                             ? `0 0 10px ${theme.colors.accent.cyan.DEFAULT}`
                             : 'none',
+                          filter: isFutureAction ? 'blur(1px)' : 'none',
+                          opacity: isFutureAction ? 0.4 : 1,
                         }}
                       >
                         {action.completed ? (
@@ -285,7 +337,15 @@ export function ActionPlan({
                       </div>
 
                       {/* Content */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          filter: isFutureAction ? 'blur(4px)' : 'none',
+                          opacity: isFutureAction ? 0.3 : 1,
+                          userSelect: isFutureAction ? 'none' : 'auto',
+                        }}
+                      >
                         <div
                           style={{
                             display: 'flex',

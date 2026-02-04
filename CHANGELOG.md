@@ -1,6 +1,44 @@
 # 📝 Changelog - App Diagnóstico de Vendas
 
-**Última atualização:** 2026-02-01
+**Última atualização:** 2026-02-04
+
+> **Nota:** O changelog principal e detalhado está em [02-CHANGELOG.md](./02-CHANGELOG.md). Este arquivo mantém um resumo das versões.
+
+---
+
+## [2.4.0] - 2026-02-04 🎯 EVENT PREP & UX POLISH
+
+### Novas Features
+- ✅ **Sistema de Presença** - Heartbeat 30s, status online/idle/offline
+- ✅ **Admin: Filtros de Usuários** - Filtrar por online, ordenar por XP ou atividade recente
+- ✅ **Admin: Status Indicators** - Bolinha verde/amarela/cinza + "Xmin atrás" em cada usuário
+- ✅ **Plano 7 Dias: Todos os dias visíveis** - Dias futuros com blur + lock overlay
+- ✅ **Plano 7 Dias: currentDay dinâmico** - Calculado a partir de `pos_evento_unlock_date`
+- ✅ **Aulas Bônus trancadas** - Lock até 12/02/2026 com overlay visual
+- ✅ **Mensagem contextual** - "Fase Concluída" após evento iniciar (pré-evento bloqueado)
+- ✅ **Links de compra Hotmart** - Dossiê + Aulas Editadas com UTM tracking
+- ✅ **LiveEventModal** - Redirecionamento automático quando evento está ao vivo
+- ✅ **Compressão de imagem** - Auto-compress no upload de foto
+- ✅ **Countdown dinâmico** - Usa datas do event_state do banco
+
+### Correções
+- ✅ Protocol survey exige completar antes de dar XP
+- ✅ Notificações: subscription agora ouve DELETE events
+- ✅ deleteAllNotifications verifica se rows foram deletadas (RLS check)
+- ✅ Status online não aparecia no Gerenciar Usuários (query faltava last_seen_at)
+- ✅ Msg "Aba será liberada" quando evento já começou → agora mostra "Fase Concluída"
+
+### UI/UX
+- ✅ Admin layout 70/30 → 65/35
+- ✅ Removido botão PDF do Relatório Final
+- ✅ Renomeado "Protocolo de Descompressão" → "Protocolo de Implementação"
+
+### Arquivos Modificados (18+)
+- `Admin.tsx`, `PreEvento.tsx`, `PosEvento.tsx`, `AoVivo.tsx`
+- `ActionPlan.tsx`, `FinalReport.tsx`, `BottomNav.tsx`, `Countdown.tsx`
+- `useNotifications.ts`, `useEventState.ts`, `useAIChat.ts`
+- `LiveEventModal.tsx` (novo)
+- E outros
 
 ---
 
@@ -458,19 +496,22 @@ supabase functions deploy hotmart-webhook
 - [x] Sistema de autenticação (Supabase Auth)
 - [x] Thank You Page com validação de compras
 - [x] Sistema de XP redesenhado (1000 XP)
-- [x] Pré-Evento com gamification
+- [x] Pré-Evento com gamification + aulas bônus
 - [x] Ao Vivo com checkins de módulos
+- [x] Pós-Evento com Plano 7 Dias (IA + fallback)
 - [x] Webhook Hotmart
-- [x] Admin Dashboard com dados reais
+- [x] Admin Dashboard com dados reais + presença + filtros
 - [x] RLS completo e seguro
 - [x] Pesquisa de calibragem (8 questões)
 - [x] Real-time updates via Supabase
+- [x] Sistema de presença em tempo real (heartbeat 30s)
+- [x] Links de compra Hotmart com UTM tracking
+- [x] Countdown dinâmico baseado em event_state
 
 ### 🔄 Em Progresso
-- [ ] Pós-Evento (Plano 7 Dias + IMPACT)
 - [ ] Google Sheets Integration
-- [ ] Validação de compras de order bumps (PDF + Aulas)
-- [ ] NPS Forms (Dia 1 + Final)
+- [ ] Personalização do plano de ação IA
+- [ ] RLS policy DELETE para notifications
 
 ### 📋 Planejado
 - [ ] Admin - seção "Inscritos IMPACT"
@@ -514,9 +555,9 @@ supabase functions deploy hotmart-webhook
 
 ---
 
-**Última revisão:** 2026-02-01
-**Versão atual:** 2.0.0
-**Próxima milestone:** Google Sheets Integration + Admin IMPACT
+**Última revisão:** 2026-02-04
+**Versão atual:** 2.4.0
+**Próxima milestone:** Evento 28/02 - Validação final + Google Sheets
 
 ---
 

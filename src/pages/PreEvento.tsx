@@ -34,7 +34,7 @@ import {
   Shield,
 } from 'lucide-react'
 
-import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer } from '../components/ui'
+import { PageWrapper, Countdown, BottomNav, AvatarButton, NotificationDrawer, LiveEventModal } from '../components/ui'
 import { useNotifications } from '../hooks/useNotifications'
 import { theme } from '../styles/theme'
 import { useAuth } from '../hooks/useAuth'
@@ -53,6 +53,23 @@ interface JourneyStep {
   progress?: number
   xp?: number
   isPurchase?: boolean
+}
+
+// Links de compra Hotmart
+const PURCHASE_LINKS: Record<string, { url: string; utmContent: string }> = {
+  [STEP_IDS.PURCHASE_PDF_DIAGNOSIS]: {
+    url: 'https://pay.hotmart.com/X104244085H?off=h8jdxfk4',
+    utmContent: 'dossie-pdf',
+  },
+  [STEP_IDS.PURCHASE_EDITED_LESSONS]: {
+    url: 'https://pay.hotmart.com/B104245453L?off=h15bzcne',
+    utmContent: 'aulas-editadas',
+  },
+}
+
+const buildPurchaseUrl = (baseUrl: string, utmContent: string): string => {
+  const separator = baseUrl.includes('?') ? '&' : '?'
+  return `${baseUrl}${separator}utm_source=appdiagn&utm_medium=app&utm_campaign=imersao2026&utm_content=${utmContent}`
 }
 
 // Dados do perfil
@@ -111,7 +128,7 @@ export function PreEvento() {
   const { user, profile: userProfile, refreshProfile } = useAuth()
   useHeartbeat() // Atualiza last_seen_at a cada 30s
   const { xp, completedSteps, completeStep, isStepCompleted } = useUserProgress()
-  const { eventState, isPreEventoAccessible, isAdmin } = useEventState()
+  const { eventState, isPreEventoAccessible, isAoVivoAccessible, isPosEventoAccessible, isAdmin } = useEventState()
   const [activeNav, setActiveNav] = useState('preparacao')
   const [showSchedule, setShowSchedule] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -120,6 +137,13 @@ export function PreEvento() {
   const [lessons, setLessons] = useState<LessonData[]>(LESSONS)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
+
+  // Auto-redirect para /ao-vivo quando o admin iniciar o evento
+  useEffect(() => {
+    if (eventState?.status === 'live' && !isAdmin) {
+      navigate('/ao-vivo')
+    }
+  }, [eventState?.status, isAdmin, navigate])
 
   // Profile state - inicializar com dados do Supabase
   const [profile, setProfile] = useState<ProfileData>({
@@ -189,11 +213,49 @@ export function PreEvento() {
     return new Date(eventState.ao_vivo_unlock_date)
   }, [eventState])
 
+  // Dynamic nav items baseado no estado do evento
+  const isLive = eventState?.status === 'live'
+
   const navItems = [
-    { id: 'preparacao', label: 'Preparação', icon: <Rocket size={20} />, status: 'Liberado' },
-    { id: 'aovivo', label: 'Ao Vivo', icon: <Radio size={20} />, badge: 'LIVE', status: 'Libera 14/03' },
-    { id: 'posevento', label: 'Pós Evento', icon: <Target size={20} />, status: 'Libera 16/03' },
+    {
+      id: 'preparacao',
+      label: 'Preparação',
+      icon: <Rocket size={20} />,
+      status: 'Liberado',
+      isAccessible: true
+    },
+    {
+      id: 'aovivo',
+      label: 'Ao Vivo',
+      icon: <Radio size={20} />,
+      badge: isLive ? 'LIVE' : (eventState?.status === 'offline' ? 'EM BREVE' : undefined),
+      status: isLive ? 'Liberado' : (eventState?.status === 'offline' ? 'Em Breve' : 'Liberado'),
+      isAccessible: true
+    },
+    {
+      id: 'posevento',
+      label: 'Pós Evento',
+      icon: <Target size={20} />,
+      status: isPosEventoAccessible() ? 'Liberado' :
+        eventState?.pos_evento_unlock_date ?
+          `Libera ${new Date(eventState.pos_evento_unlock_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` :
+          'Bloqueado',
+      isAccessible: isPosEventoAccessible()
+    },
   ]
+
+  // Handler de navegação entre abas
+  const handleNavigation = (tabId: string) => {
+    const routes: Record<string, string> = {
+      preparacao: '/pre-evento',
+      aovivo: '/ao-vivo',
+      posevento: '/pos-evento',
+    }
+
+    if (routes[tabId]) {
+      navigate(routes[tabId])
+    }
+  }
 
   // Steps depend on profile completion
   const getSteps = (): JourneyStep[] => {
@@ -306,6 +368,9 @@ export function PreEvento() {
         // NÃO preencheu → redirecionar para Thank You Page
         navigate('/obrigado?email=' + encodeURIComponent(user?.email || ''))
       }
+    } else if (PURCHASE_LINKS[stepId]) {
+      const link = PURCHASE_LINKS[stepId]
+      window.open(buildPurchaseUrl(link.url, link.utmContent), '_blank')
     } else if (status === 'current') {
       handleComplete(stepId)
     }
@@ -447,9 +512,19 @@ export function PreEvento() {
       // Mostrar feedback de sucesso
       setProfileSaved(true)
 
-      // Se perfil está completo, marcar step como concluído
-      if (isProfileComplete) {
-        console.log('🎯 Perfil completo! Marcando step como concluído...')
+      // Verificar completude a partir dos dados recem salvos (evita closure stale)
+      const savedFields = [
+        profile.name,
+        userProfile?.email || user.email,
+        profile.phone,
+        profile.company,
+        profile.role,
+        profile.photoUrl,
+      ]
+      const isNowComplete = savedFields.every(f => f && String(f).trim() !== '')
+
+      if (isNowComplete) {
+        console.log('Perfil completo! Marcando step como concluido...')
         await completeStep(STEP_IDS.COMPLETE_PROFILE, XP_CONFIG.PRE_EVENT.COMPLETE_PROFILE)
       }
 
@@ -526,6 +601,12 @@ export function PreEvento() {
   }
 
   // Check tab access (admins bypass)
+  // Detectar se lock é porque o evento já começou (lock_date passed) vs ainda não liberou (unlock_date not reached)
+  const preEventoLockedAfterStart = (() => {
+    if (!eventState?.pre_evento_lock_date) return false
+    return new Date() >= new Date(eventState.pre_evento_lock_date)
+  })()
+
   if (!isAdmin && !isPreEventoAccessible()) {
     return (
       <PageWrapper backgroundColor={theme.colors.background.dark}>
@@ -540,24 +621,108 @@ export function PreEvento() {
             textAlign: 'center',
           }}
         >
-          <Lock size={64} color={theme.colors.text.muted} style={{ marginBottom: '24px' }} />
-          <h2 style={{
-            fontSize: '24px',
-            fontWeight: 'bold',
-            color: theme.colors.text.primary,
-            marginBottom: '12px',
-          }}>
-            Aba Bloqueada
-          </h2>
-          <p style={{
-            fontSize: '16px',
-            color: theme.colors.text.secondary,
-            maxWidth: '500px',
-          }}>
-            Esta aba será liberada automaticamente na data/hora configurada pelo instrutor. Aguarde a liberação.
-          </p>
+          {preEventoLockedAfterStart ? (
+            <>
+              <div
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%)',
+                  border: '2px solid rgba(34, 211, 238, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '24px',
+                }}
+              >
+                <Zap size={36} color={theme.colors.accent.cyan.DEFAULT} />
+              </div>
+              <h2 style={{
+                fontSize: '22px',
+                fontWeight: 'bold',
+                color: theme.colors.accent.cyan.DEFAULT,
+                marginBottom: '12px',
+                fontFamily: theme.typography.fontFamily.orbitron,
+                letterSpacing: '0.05em',
+              }}>
+                Fase Concluída
+              </h2>
+              <p style={{
+                fontSize: '15px',
+                color: theme.colors.text.secondary,
+                maxWidth: '340px',
+                lineHeight: 1.6,
+                marginBottom: '24px',
+              }}>
+                A etapa de preparação foi encerrada. O evento já está em andamento — sua jornada continua nas próximas abas.
+              </p>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '10px',
+                }}
+              >
+                {isAoVivoAccessible() && (
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => navigate('/ao-vivo')}
+                    style={{
+                      padding: '12px 24px',
+                      background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.2) 0%, rgba(34, 211, 238, 0.1) 100%)',
+                      border: '1px solid rgba(34, 211, 238, 0.4)',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      color: theme.colors.accent.cyan.DEFAULT,
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    IR PARA AO VIVO
+                  </motion.button>
+                )}
+                {isPosEventoAccessible() && (
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => navigate('/pos-evento')}
+                    style={{
+                      padding: '12px 24px',
+                      background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%)',
+                      border: '1px solid rgba(168, 85, 247, 0.4)',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      color: theme.colors.accent.purple.light,
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    PÓS-EVENTO
+                  </motion.button>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <Lock size={64} color={theme.colors.text.muted} style={{ marginBottom: '24px' }} />
+              <h2 style={{
+                fontSize: '24px',
+                fontWeight: 'bold',
+                color: theme.colors.text.primary,
+                marginBottom: '12px',
+              }}>
+                Aba Bloqueada
+              </h2>
+              <p style={{
+                fontSize: '16px',
+                color: theme.colors.text.secondary,
+                maxWidth: '500px',
+              }}>
+                Esta aba será liberada automaticamente na data/hora configurada pelo instrutor. Aguarde a liberação.
+              </p>
+            </>
+          )}
         </div>
-        <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+        <BottomNav items={navItems} activeId={activeNav} onSelect={handleNavigation} />
       </PageWrapper>
     )
   }
@@ -568,6 +733,9 @@ export function PreEvento() {
       showAnimatedBackground={true}
         showOverlay={false}
       >
+      {/* Live Event Modal - aparece quando evento está ao vivo */}
+      <LiveEventModal isLive={isLive} />
+
       {/* Scrollable Content */}
       <div
         style={{
@@ -1246,23 +1414,49 @@ export function PreEvento() {
           </motion.div>
 
           {/* ==================== MÓDULOS PREPARATÓRIOS ==================== */}
+          {(() => {
+            const aulasReleaseDate = new Date('2026-02-12T00:00:00-03:00')
+            const aulasLocked = new Date() < aulasReleaseDate
+
+            return (
           <motion.div variants={itemVariants} id="aulas-bonus-section" style={{ marginTop: '24px', scrollMarginTop: '80px' }}>
             {/* Section Title */}
-            <h3
-              style={{
-                fontSize: '14px',
-                fontWeight: theme.typography.fontWeight.bold,
-                color: theme.colors.text.primary,
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                marginBottom: '16px',
-              }}
-            >
-              MÓDULOS PREPARATÓRIOS{' '}
-              <span style={{ color: theme.colors.text.secondary, fontWeight: 'normal' }}>
-                (Aulas)
-              </span>
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3
+                style={{
+                  fontSize: '14px',
+                  fontWeight: theme.typography.fontWeight.bold,
+                  color: aulasLocked ? theme.colors.text.muted : theme.colors.text.primary,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  margin: 0,
+                }}
+              >
+                MÓDULOS PREPARATÓRIOS{' '}
+                <span style={{ color: theme.colors.text.secondary, fontWeight: 'normal' }}>
+                  (Aulas)
+                </span>
+              </h3>
+              {aulasLocked && (
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    color: theme.colors.accent.cyan.DEFAULT,
+                    background: 'rgba(34, 211, 238, 0.1)',
+                    border: '1px solid rgba(34, 211, 238, 0.3)',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                >
+                  <Lock size={10} />
+                  Libera 12/02
+                </span>
+              )}
+            </div>
 
             {/* Aulas Grid */}
             <div
@@ -1270,34 +1464,57 @@ export function PreEvento() {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
                 gap: '10px',
+                position: 'relative',
               }}
             >
               {lessons.map((lesson) => (
                 <motion.div
                   key={lesson.id}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedLesson(lesson)}
+                  whileHover={aulasLocked ? {} : { scale: 1.03 }}
+                  whileTap={aulasLocked ? {} : { scale: 0.98 }}
+                  onClick={() => !aulasLocked && setSelectedLesson(lesson)}
                   style={{
-                    background: lesson.watched
+                    background: aulasLocked
+                      ? 'rgba(10, 12, 18, 0.6)'
+                      : lesson.watched
                       ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%)'
                       : 'linear-gradient(135deg, rgba(10, 15, 20, 0.8) 0%, rgba(5, 10, 18, 0.9) 100%)',
-                    border: `1px solid ${lesson.watched ? 'rgba(34, 211, 238, 0.5)' : 'rgba(34, 211, 238, 0.35)'}`,
+                    border: `1px solid ${aulasLocked ? 'rgba(100, 116, 139, 0.15)' : lesson.watched ? 'rgba(34, 211, 238, 0.5)' : 'rgba(34, 211, 238, 0.35)'}`,
                     borderRadius: '8px',
                     padding: '14px 8px 10px 8px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: lesson.watched
+                    cursor: aulasLocked ? 'default' : 'pointer',
+                    boxShadow: aulasLocked
+                      ? 'none'
+                      : lesson.watched
                       ? '0 0 20px rgba(34, 211, 238, 0.2)'
                       : '0 0 15px rgba(34, 211, 238, 0.05)',
                     position: 'relative',
+                    overflow: 'hidden',
                   }}
                 >
+                  {/* Lock overlay */}
+                  {aulasLocked && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        zIndex: 2,
+                        background: 'rgba(10, 12, 18, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Lock size={20} color="rgba(148, 163, 184, 0.4)" />
+                    </div>
+                  )}
+
                   {/* Watched badge */}
-                  {lesson.watched && (
+                  {!aulasLocked && lesson.watched && (
                     <div
                       style={{
                         position: 'absolute',
@@ -1323,6 +1540,8 @@ export function PreEvento() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      opacity: aulasLocked ? 0.3 : 1,
+                      filter: aulasLocked ? 'grayscale(1)' : 'none',
                     }}
                   >
                     <img
@@ -1331,7 +1550,9 @@ export function PreEvento() {
                       style={{
                         width: '70px',
                         height: 'auto',
-                        filter: lesson.watched
+                        filter: aulasLocked
+                          ? 'none'
+                          : lesson.watched
                           ? 'drop-shadow(0 0 10px rgba(34, 211, 238, 0.5))'
                           : 'drop-shadow(0 0 10px rgba(245, 158, 11, 0.4))',
                       }}
@@ -1343,8 +1564,9 @@ export function PreEvento() {
                     style={{
                       fontSize: '11px',
                       fontWeight: theme.typography.fontWeight.semibold,
-                      color: lesson.watched ? theme.colors.accent.cyan.DEFAULT : theme.colors.text.primary,
+                      color: aulasLocked ? theme.colors.text.muted : lesson.watched ? theme.colors.accent.cyan.DEFAULT : theme.colors.text.primary,
                       letterSpacing: '0.03em',
+                      opacity: aulasLocked ? 0.5 : 1,
                     }}
                   >
                     Aula {lesson.id}
@@ -1353,6 +1575,8 @@ export function PreEvento() {
               ))}
             </div>
           </motion.div>
+            )
+          })()}
         </motion.div>
       </div>
 
@@ -2073,7 +2297,7 @@ export function PreEvento() {
       />
 
       {/* ==================== BOTTOM NAVIGATION ==================== */}
-      <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+      <BottomNav items={navItems} activeId={activeNav} onSelect={handleNavigation} />
     </PageWrapper>
   )
 }

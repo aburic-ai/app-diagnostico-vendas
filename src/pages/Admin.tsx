@@ -41,6 +41,7 @@ import {
   FileText,
   Save,
   Loader,
+  Trash2,
 } from 'lucide-react'
 import { EVENT_MODULES, TOTAL_MODULES } from '../data/modules'
 import { NotificationToast, ConfirmationModal } from '../components/ui'
@@ -145,7 +146,7 @@ const notificationTemplates = [
 export function Admin() {
   // Hooks
   const { user } = useAuth()
-  const { createNotification } = useNotifications()
+  const { createNotification, deleteAllNotifications } = useNotifications()
   const {
     eventState: dbEventState,
     loading: _loadingEventState,
@@ -161,6 +162,9 @@ export function Admin() {
     startLunch,
     toggleLunch,
     toggleActivity,
+    triggerNPS,
+    clearNPS,
+    resetEvent,
     updateEventState,
   } = useEventState()
 
@@ -235,6 +239,10 @@ export function Admin() {
 
   // Finish Event Confirmation Modal
   const [showFinishModal, setShowFinishModal] = useState(false)
+  const [showTestModal, setShowTestModal] = useState(false)
+  const [showResetModal, setShowResetModal] = useState(false)
+  const [showNPSModal, setShowNPSModal] = useState<'day1' | 'final' | null>(null)
+  const [showClearNotificationsModal, setShowClearNotificationsModal] = useState(false)
 
   // Notification Form
   const [notifType, setNotifType] = useState<NotificationType>('info')
@@ -276,6 +284,8 @@ export function Admin() {
   const [selectedUser, setSelectedUser] = useState<any | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [usersTab, setUsersTab] = useState<'all' | 'pending'>('all')
+  const [usersFilter, setUsersFilter] = useState<'all' | 'online'>('all')
+  const [usersSort, setUsersSortOption] = useState<'xp' | 'lastSeen'>('xp')
 
   // Calculate minutes remaining until lunch return
   const calculateLunchMinutes = () => {
@@ -400,7 +410,7 @@ export function Admin() {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, email, name, phone, company, role, xp, created_at, updated_at')
+          .select('id, email, name, phone, company, role, xp, created_at, updated_at, last_seen_at')
           .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -425,9 +435,13 @@ export function Admin() {
     const formatDateTime = (isoString: string | null) => {
       if (!isoString) return { date: '', time: '' }
       const d = new Date(isoString)
-      const date = d.toISOString().split('T')[0]
-      const time = d.toTimeString().slice(0, 5)
-      return { date, time }
+      // Usar timezone local consistentemente para data e hora
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      const hours = String(d.getHours()).padStart(2, '0')
+      const minutes = String(d.getMinutes()).padStart(2, '0')
+      return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` }
     }
 
     const unlockPrep = formatDateTime(dbEventState.pre_evento_unlock_date)
@@ -601,6 +615,38 @@ export function Admin() {
     await finishEvent()
     console.log('✅ Evento finalizado pelo Admin')
     setShowFinishModal(false)
+  }
+
+  const handleSetupTestEvent = async () => {
+    // Configura evento para começar em 1 minuto (para testes)
+    const oneMinuteFromNow = new Date()
+    oneMinuteFromNow.setMinutes(oneMinuteFromNow.getMinutes() + 1)
+
+    await updateEventState({
+      ao_vivo_unlock_date: oneMinuteFromNow.toISOString(),
+      ao_vivo_enabled: true,
+      pre_evento_enabled: true,
+      status: 'offline',
+    })
+
+    console.log('🧪 Evento de teste configurado para 1 minuto')
+    setAdminToast({
+      message: 'Evento de teste configurado! Countdown inicia em 1 minuto.',
+      type: 'success'
+    })
+    setTimeout(() => setAdminToast(null), 4000)
+    setShowTestModal(false)
+  }
+
+  const handleResetEvent = async () => {
+    await resetEvent()
+    console.log('🔄 Evento resetado para estado pré-início')
+    setAdminToast({
+      message: 'Evento resetado! Status: offline, módulo: 0, como se nunca tivesse iniciado.',
+      type: 'success'
+    })
+    setTimeout(() => setAdminToast(null), 4000)
+    setShowResetModal(false)
   }
 
   const handleToggleLunch = async () => {
@@ -936,14 +982,14 @@ export function Admin() {
         background: '#0a0a0f',
         display: 'flex',
         fontFamily: theme.typography.fontFamily.body,
-        overflow: 'hidden',
+        overflowX: 'auto',
+        overflowY: 'hidden',
       }}
     >
       {/* ==================== LADO ESQUERDO - CONTROLES ==================== */}
       <div
         style={{
-          width: '55%',
-          minWidth: '600px',
+          width: '65%',
           padding: '24px',
           overflowY: 'auto',
           borderRight: '1px solid rgba(100, 116, 139, 0.2)',
@@ -1591,6 +1637,33 @@ export function Admin() {
                     <Save size={16} />
                     SALVAR CONFIGURAÇÕES DE ABAS
                   </motion.button>
+
+                  {/* Clear All Notifications Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowClearNotificationsModal(true)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      marginTop: '12px',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      color: '#EF4444',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    <Trash2 size={16} />
+                    LIMPAR TODOS OS AVISOS
+                  </motion.button>
                 </div>
 
                 {/* Offer Links Settings */}
@@ -1828,6 +1901,93 @@ export function Admin() {
                       )}
                     </motion.button>
                   </div>
+                </div>
+
+                {/* Test Tools Section */}
+                <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: '1px solid rgba(100, 116, 139, 0.2)' }}>
+                  <h2
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      color: theme.colors.text.primary,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      margin: '0 0 16px 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <Clock size={16} />
+                    🧪 Ferramentas de Teste
+                  </h2>
+
+                  <p style={{ fontSize: '11px', color: theme.colors.text.muted, marginBottom: '12px', lineHeight: 1.5 }}>
+                    Ferramentas para testar funcionalidades do evento. <strong style={{ color: '#F59E0B' }}>⚠️ NÃO use durante evento real!</strong>
+                  </p>
+
+                  {/* Test Event Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowTestModal(true)}
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      border: '2px solid rgba(245, 158, 11, 0.4)',
+                      borderRadius: '12px',
+                      color: '#F59E0B',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      letterSpacing: '0.05em',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Clock size={16} />
+                    EVENTO DE TESTE (1 MINUTO)
+                  </motion.button>
+
+                  <p style={{ fontSize: '10px', color: theme.colors.text.muted, marginTop: '8px', lineHeight: 1.4 }}>
+                    Configura ao_vivo_unlock_date para daqui a 1 minuto. Útil para testar countdown e modal de confetti.
+                  </p>
+
+                  {/* Reset Event Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowResetModal(true)}
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      marginTop: '12px',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '2px solid rgba(239, 68, 68, 0.4)',
+                      borderRadius: '12px',
+                      color: '#EF4444',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      letterSpacing: '0.05em',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Power size={16} />
+                    RESETAR EVENTO
+                  </motion.button>
+
+                  <p style={{ fontSize: '10px', color: theme.colors.text.muted, marginTop: '8px', lineHeight: 1.4 }}>
+                    Volta o evento ao estado pré-início: offline, módulo 0, sem oferta. Como se nunca tivesse clicado em iniciar.
+                  </p>
                 </div>
               </div>
             </motion.div>
@@ -2568,36 +2728,14 @@ export function Admin() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={async () => {
-                const title = 'Avalie o Dia 1'
-                const message = 'Conta pra gente como foi sua experiência no primeiro dia! (+30 XP)'
-
-                // Salvar no banco
-                await createNotification('info', title, message, {
-                  action_type: 'internal',
-                  target_page: 'ao-vivo',
-                  target_section: 'nps-day1',
-                })
-
-                // Preview local
-                const notification: ToastNotification = {
-                  id: Date.now().toString(),
-                  type: 'nps',
-                  title,
-                  message,
-                  actionLabel: 'Avaliar agora',
-                  timestamp: new Date(),
-                  read: false,
-                }
-                setSentNotifications(prev => [notification as any, ...prev])
-                setPreviewNotification(notification)
-                setTimeout(() => setPreviewNotification(null), 5000)
-              }}
+              onClick={() => setShowNPSModal('day1')}
               style={{
                 flex: 1,
                 padding: '14px 16px',
-                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(124, 58, 237, 0.1) 100%)',
-                border: '1px solid rgba(168, 85, 247, 0.4)',
+                background: dbEventState?.nps_active === 'day1'
+                  ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.2) 0%, rgba(6, 182, 212, 0.15) 100%)'
+                  : 'linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(124, 58, 237, 0.1) 100%)',
+                border: `1px solid ${dbEventState?.nps_active === 'day1' ? 'rgba(34, 211, 238, 0.5)' : 'rgba(168, 85, 247, 0.4)'}`,
                 borderRadius: '10px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -2606,47 +2744,25 @@ export function Admin() {
                 gap: '6px',
               }}
             >
-              <Star size={20} color={theme.colors.accent.purple.light} />
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: theme.colors.accent.purple.light }}>
-                NPS DIA 1
+              <Star size={20} color={dbEventState?.nps_active === 'day1' ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light} />
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: dbEventState?.nps_active === 'day1' ? theme.colors.accent.cyan.DEFAULT : theme.colors.accent.purple.light }}>
+                {dbEventState?.nps_active === 'day1' ? 'NPS DIA 1 ATIVO' : 'NPS DIA 1'}
               </span>
               <span style={{ fontSize: '10px', color: theme.colors.text.muted }}>
-                +25 XP
+                +30 XP
               </span>
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={async () => {
-                const title = 'Avalie a Imersão'
-                const message = 'Como foi sua experiência na Imersão Diagnóstico de Vendas? (+30 XP)'
-
-                // Salvar no banco
-                await createNotification('info', title, message, {
-                  action_type: 'internal',
-                  target_page: 'ao-vivo',
-                  target_section: 'nps-final',
-                })
-
-                // Preview local
-                const notification: ToastNotification = {
-                  id: Date.now().toString(),
-                  type: 'nps',
-                  title,
-                  message,
-                  actionLabel: 'Avaliar agora',
-                  timestamp: new Date(),
-                  read: false,
-                }
-                setSentNotifications(prev => [notification as any, ...prev])
-                setPreviewNotification(notification)
-                setTimeout(() => setPreviewNotification(null), 5000)
-              }}
+              onClick={() => setShowNPSModal('final')}
               style={{
                 flex: 1,
                 padding: '14px 16px',
-                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(234, 179, 8, 0.1) 100%)',
-                border: '1px solid rgba(245, 158, 11, 0.4)',
+                background: dbEventState?.nps_active === 'final'
+                  ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.2) 0%, rgba(6, 182, 212, 0.15) 100%)'
+                  : 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(234, 179, 8, 0.1) 100%)',
+                border: `1px solid ${dbEventState?.nps_active === 'final' ? 'rgba(34, 211, 238, 0.5)' : 'rgba(245, 158, 11, 0.4)'}`,
                 borderRadius: '10px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -2655,12 +2771,12 @@ export function Admin() {
                 gap: '6px',
               }}
             >
-              <Star size={20} color={theme.colors.gold.DEFAULT} />
-              <span style={{ fontSize: '12px', fontWeight: 'bold', color: theme.colors.gold.DEFAULT }}>
-                NPS EVENTO
+              <Star size={20} color={dbEventState?.nps_active === 'final' ? theme.colors.accent.cyan.DEFAULT : theme.colors.gold.DEFAULT} />
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: dbEventState?.nps_active === 'final' ? theme.colors.accent.cyan.DEFAULT : theme.colors.gold.DEFAULT }}>
+                {dbEventState?.nps_active === 'final' ? 'NPS EVENTO ATIVO' : 'NPS EVENTO'}
               </span>
               <span style={{ fontSize: '10px', color: theme.colors.text.muted }}>
-                +50 XP
+                +30 XP
               </span>
             </motion.button>
           </div>
@@ -2953,8 +3069,8 @@ export function Admin() {
       {/* ==================== LADO DIREITO - MOCKUP DO PARTICIPANTE ==================== */}
       <div
         style={{
-          flex: 1,
-          padding: '24px',
+          width: '35%',
+          padding: '16px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -2973,15 +3089,15 @@ export function Admin() {
         {/* Live Iframe - Real Participant View */}
         <div
           style={{
-            width: '375px',
-            height: '700px',
+            width: '100%',
+            maxWidth: '380px',
+            height: 'calc(100vh - 100px)',
             background: '#050505',
-            borderRadius: '40px',
-            border: '8px solid #1a1a1f',
+            borderRadius: '32px',
+            border: '6px solid #1a1a1f',
             boxShadow: '0 0 60px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0, 0, 0, 0.3)',
             overflow: 'hidden',
             position: 'relative',
-            flexShrink: 0,
           }}
         >
           <iframe
@@ -3629,9 +3745,9 @@ export function Admin() {
                 </motion.button>
               </div>
 
-              {/* Search (only for all users tab) */}
+              {/* Search + Filter/Sort (only for all users tab) */}
               {usersTab === 'all' && (
-                <div style={{ marginBottom: '16px' }}>
+                <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <input
                     type="text"
                     value={userSearch}
@@ -3648,6 +3764,67 @@ export function Admin() {
                       outline: 'none',
                     }}
                   />
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {/* Filter: All / Online */}
+                    <button
+                      onClick={() => setUsersFilter(usersFilter === 'online' ? 'all' : 'online')}
+                      style={{
+                        padding: '6px 12px',
+                        background: usersFilter === 'online' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(100, 116, 139, 0.1)',
+                        border: `1px solid ${usersFilter === 'online' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(100, 116, 139, 0.2)'}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        color: usersFilter === 'online' ? '#22C55E' : theme.colors.text.muted,
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                      }}
+                    >
+                      <div style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        background: usersFilter === 'online' ? '#22C55E' : 'rgba(100, 116, 139, 0.4)',
+                      }} />
+                      Online
+                    </button>
+
+                    {/* Sort options */}
+                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+                      <button
+                        onClick={() => setUsersSortOption('xp')}
+                        style={{
+                          padding: '6px 10px',
+                          background: usersSort === 'xp' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(100, 116, 139, 0.1)',
+                          border: `1px solid ${usersSort === 'xp' ? 'rgba(245, 158, 11, 0.4)' : 'rgba(100, 116, 139, 0.2)'}`,
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          color: usersSort === 'xp' ? theme.colors.gold.DEFAULT : theme.colors.text.muted,
+                          fontSize: '11px',
+                          fontWeight: '600',
+                        }}
+                      >
+                        XP ↓
+                      </button>
+                      <button
+                        onClick={() => setUsersSortOption('lastSeen')}
+                        style={{
+                          padding: '6px 10px',
+                          background: usersSort === 'lastSeen' ? 'rgba(34, 211, 238, 0.2)' : 'rgba(100, 116, 139, 0.1)',
+                          border: `1px solid ${usersSort === 'lastSeen' ? 'rgba(34, 211, 238, 0.4)' : 'rgba(100, 116, 139, 0.2)'}`,
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          color: usersSort === 'lastSeen' ? theme.colors.accent.cyan.DEFAULT : theme.colors.text.muted,
+                          fontSize: '11px',
+                          fontWeight: '600',
+                        }}
+                      >
+                        Recente ↓
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -3666,8 +3843,33 @@ export function Admin() {
                           u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
                           (u.name || '').toLowerCase().includes(userSearch.toLowerCase())
                         )
+                        .filter(u => {
+                          if (usersFilter !== 'online') return true
+                          if (!u.last_seen_at) return false
+                          return (Date.now() - new Date(u.last_seen_at).getTime()) / 1000 / 60 < 10
+                        })
+                        .sort((a, b) => {
+                          if (usersSort === 'xp') return (b.xp || 0) - (a.xp || 0)
+                          const aTime = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0
+                          const bTime = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0
+                          return bTime - aTime
+                        })
                         .slice(0, 50)
-                        .map((user) => (
+                        .map((user) => {
+                          const lastSeen = user.last_seen_at ? new Date(user.last_seen_at) : null
+                          const minutesAgo = lastSeen
+                            ? (Date.now() - lastSeen.getTime()) / 1000 / 60
+                            : Infinity
+                          const userStatus = minutesAgo < 10 ? 'active' : minutesAgo < 30 ? 'idle' : 'inactive'
+                          const statusColor = userStatus === 'active' ? '#22C55E' : userStatus === 'idle' ? '#F59E0B' : 'rgba(100, 116, 139, 0.4)'
+                          const lastSeenLabel = lastSeen
+                            ? minutesAgo < 1 ? 'agora'
+                              : minutesAgo < 60 ? `${Math.floor(minutesAgo)}min atrás`
+                              : minutesAgo < 1440 ? `${Math.floor(minutesAgo / 60)}h atrás`
+                              : `${Math.floor(minutesAgo / 1440)}d atrás`
+                            : 'nunca'
+
+                          return (
                           <motion.div
                             key={user.id}
                             whileHover={{ scale: 1.01 }}
@@ -3684,24 +3886,37 @@ export function Admin() {
                               gap: '12px',
                             }}
                           >
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ fontSize: '14px', fontWeight: 'bold', color: theme.colors.text.primary, margin: '0 0 2px 0' }}>
-                                {user.name || 'Sem nome'}
-                              </p>
-                              <p
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                              {/* Status dot */}
+                              <div
                                 style={{
-                                  fontSize: '11px',
-                                  color: theme.colors.text.muted,
-                                  margin: 0,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  background: statusColor,
+                                  boxShadow: userStatus === 'active' ? '0 0 6px #22C55E' : 'none',
+                                  flexShrink: 0,
                                 }}
-                              >
-                                {user.email}
-                              </p>
+                              />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ fontSize: '14px', fontWeight: 'bold', color: theme.colors.text.primary, margin: '0 0 2px 0' }}>
+                                  {user.name || 'Sem nome'}
+                                </p>
+                                <p
+                                  style={{
+                                    fontSize: '11px',
+                                    color: theme.colors.text.muted,
+                                    margin: 0,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {user.email}
+                                </p>
+                              </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                               <div
                                 style={{
                                   padding: '4px 8px',
@@ -3713,12 +3928,13 @@ export function Admin() {
                                   {user.xp || 0} XP
                                 </span>
                               </div>
-                              <span style={{ fontSize: '10px', color: theme.colors.text.muted }}>
-                                {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                              <span style={{ fontSize: '9px', color: statusColor, minWidth: '50px', textAlign: 'right' }}>
+                                {lastSeenLabel}
                               </span>
                             </div>
                           </motion.div>
-                        ))}
+                          )
+                        })}
                     </div>
                   )
                 ) : (
@@ -4182,6 +4398,114 @@ export function Admin() {
           'Encerrar a transmissão ao vivo',
           'Redirecionar participantes para Pós-Evento',
           'Não pode ser desfeito facilmente',
+        ]}
+      />
+
+      {/* Confirmation Modal - Test Event */}
+      <ConfirmationModal
+        isOpen={showTestModal}
+        onClose={() => setShowTestModal(false)}
+        onConfirm={handleSetupTestEvent}
+        title="🧪 Configurar Evento de Teste"
+        message="Isso vai alterar as datas do evento para começar em 1 minuto."
+        confirmText="Sim, configurar teste"
+        cancelText="Cancelar"
+        type="warning"
+        details={[
+          'Define ao_vivo_unlock_date para daqui a 1 minuto',
+          'Habilita a aba Ao Vivo (ao_vivo_enabled)',
+          'Define status como offline',
+          '⚠️ Não use durante o evento real!',
+        ]}
+      />
+
+      {/* Confirmation Modal - Reset Event */}
+      <ConfirmationModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        onConfirm={handleResetEvent}
+        title="🔄 Resetar Estado do Evento"
+        message="Isso vai resetar o evento como se nunca tivesse sido iniciado."
+        confirmText="Sim, resetar evento"
+        cancelText="Cancelar"
+        type="danger"
+        details={[
+          'Status volta para offline',
+          'Módulo atual volta para 0',
+          'Limpa event_started_at e event_finished_at',
+          'Remove oferta, NPS, intervalo',
+          'Mantém configurações de datas das abas',
+          '⚠️ Não use durante o evento real!',
+        ]}
+      />
+
+      {/* Confirmation Modal - NPS */}
+      <ConfirmationModal
+        isOpen={showNPSModal !== null}
+        onClose={() => setShowNPSModal(null)}
+        onConfirm={async () => {
+          if (!showNPSModal) return
+          const isAlreadyActive = dbEventState?.nps_active === showNPSModal
+          if (isAlreadyActive) {
+            await clearNPS()
+            setAdminToast({ message: 'NPS desativado', type: 'success' })
+          } else {
+            await triggerNPS(showNPSModal)
+            setAdminToast({
+              message: `NPS ${showNPSModal === 'day1' ? 'Dia 1' : 'Evento'} ativado! Overlay aparecerá para todos os participantes.`,
+              type: 'success',
+            })
+          }
+          setTimeout(() => setAdminToast(null), 4000)
+          setShowNPSModal(null)
+        }}
+        title={
+          dbEventState?.nps_active === showNPSModal
+            ? `Desativar NPS ${showNPSModal === 'day1' ? 'Dia 1' : 'Evento'}?`
+            : `Solicitar NPS ${showNPSModal === 'day1' ? 'Dia 1' : 'Evento'}?`
+        }
+        message={
+          dbEventState?.nps_active === showNPSModal
+            ? 'O overlay de NPS será removido para quem ainda não respondeu.'
+            : 'Um overlay bloqueante aparecerá na tela de todos os participantes até que respondam.'
+        }
+        confirmText={dbEventState?.nps_active === showNPSModal ? 'Sim, desativar' : 'Sim, solicitar NPS'}
+        cancelText="Cancelar"
+        type={dbEventState?.nps_active === showNPSModal ? 'warning' : 'info'}
+        details={
+          dbEventState?.nps_active === showNPSModal
+            ? ['Remove o overlay de NPS', 'Quem já respondeu mantém o XP']
+            : [
+                'Overlay full-screen não fechável',
+                'Participante só continua após responder',
+                `+30 XP ao responder`,
+                'Aparece via realtime para todos conectados',
+              ]
+        }
+      />
+
+      {/* Confirmation Modal - Clear Notifications */}
+      <ConfirmationModal
+        isOpen={showClearNotificationsModal}
+        onClose={() => setShowClearNotificationsModal(false)}
+        onConfirm={async () => {
+          const { error } = await deleteAllNotifications()
+          if (error) {
+            setAdminToast({ message: 'Erro ao limpar avisos', type: 'warning' })
+          } else {
+            setAdminToast({ message: 'Todos os avisos foram apagados', type: 'success' })
+          }
+          setTimeout(() => setAdminToast(null), 4000)
+        }}
+        title="Limpar Todos os Avisos"
+        message="Tem certeza que deseja apagar TODOS os avisos? Esta ação não pode ser desfeita."
+        confirmText="Sim, apagar todos"
+        cancelText="Cancelar"
+        type="danger"
+        details={[
+          'Todos os avisos serão removidos permanentemente',
+          'Participantes não verão mais nenhum aviso anterior',
+          'Esta ação não pode ser desfeita',
         ]}
       />
 

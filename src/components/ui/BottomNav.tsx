@@ -16,6 +16,7 @@ interface NavItem {
   icon: ReactNode
   badge?: string
   status?: string
+  isAccessible?: boolean // Se a aba está acessível (não travada)
 }
 
 interface BottomNavProps {
@@ -52,7 +53,7 @@ export function BottomNav({ items, activeId, onSelect }: BottomNavProps) {
       >
         {items.map((item, index) => {
           const isActive = item.id === activeId
-          const isLocked = index > activeIndex
+          const isLocked = item.isAccessible === false // Usa propriedade real de acesso
           const isCompleted = index < activeIndex
 
           return (
@@ -89,34 +90,42 @@ export function BottomNav({ items, activeId, onSelect }: BottomNavProps) {
               {/* Step Number Badge - Above the button */}
               <div
                 style={{
-                  width: '22px',
-                  height: '22px',
+                  width: '28px',
+                  height: '28px',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '10px',
+                  fontSize: '12px',
                   fontWeight: 'bold',
                   marginBottom: '6px',
-                  background: isCompleted
-                    ? theme.colors.accent.cyan.DEFAULT
+                  background: isLocked
+                    ? 'rgba(100, 116, 139, 0.2)' // TRAVADO: cinza escuro
+                    : isCompleted
+                    ? theme.colors.accent.cyan.DEFAULT // COMPLETO: ciano
                     : isActive
-                    ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.9) 0%, rgba(124, 58, 237, 0.9) 100%)'
-                    : 'rgba(30, 35, 45, 0.8)',
-                  border: isCompleted
+                    ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.9) 0%, rgba(124, 58, 237, 0.9) 100%)' // ATIVO: roxo
+                    : 'rgba(34, 211, 238, 0.2)', // LIBERADO: ciano suave
+                  border: isLocked
+                    ? '2px solid rgba(100, 116, 139, 0.4)' // TRAVADO: borda cinza
+                    : isCompleted
                     ? `2px solid ${theme.colors.accent.cyan.DEFAULT}`
                     : isActive
-                    ? '2px solid rgba(168, 85, 247, 0.6)'
-                    : '2px solid rgba(100, 116, 139, 0.3)',
-                  color: isCompleted || isActive ? '#fff' : theme.colors.text.muted,
-                  boxShadow: isActive
-                    ? '0 0 12px rgba(168, 85, 247, 0.6)'
+                    ? '2px solid rgba(168, 85, 247, 0.8)'
+                    : '2px solid rgba(34, 211, 238, 0.6)', // LIBERADO: borda ciano
+                  color: isLocked
+                    ? 'rgba(100, 116, 139, 0.8)' // TRAVADO: texto cinza
+                    : '#fff', // LIBERADO/ATIVO: texto branco
+                  boxShadow: isLocked
+                    ? 'none' // TRAVADO: sem brilho
+                    : isActive
+                    ? '0 0 16px rgba(168, 85, 247, 0.8)'
                     : isCompleted
-                    ? `0 0 8px ${theme.colors.accent.cyan.DEFAULT}`
-                    : 'none',
+                    ? `0 0 12px ${theme.colors.accent.cyan.DEFAULT}`
+                    : '0 0 8px rgba(34, 211, 238, 0.4)', // LIBERADO: brilho ciano suave
                 }}
               >
-                {isLocked ? <Lock size={10} /> : index + 1}
+                {isLocked ? <Lock size={14} /> : index + 1}
               </div>
 
               {/* Nav Button */}
@@ -187,11 +196,11 @@ export function BottomNav({ items, activeId, onSelect }: BottomNavProps) {
                         transform: 'translateX(-50%)',
                         fontSize: '6px',
                         fontWeight: 'bold',
-                        color: '#FF4444',
-                        background: 'rgba(255, 68, 68, 0.15)',
+                        color: item.badge === 'LIVE' ? '#FF4444' : '#22D3EE',
+                        background: item.badge === 'LIVE' ? 'rgba(255, 68, 68, 0.15)' : 'rgba(34, 211, 238, 0.15)',
                         padding: '1px 4px',
                         borderRadius: '2px',
-                        border: '1px solid rgba(255, 68, 68, 0.4)',
+                        border: item.badge === 'LIVE' ? '1px solid rgba(255, 68, 68, 0.4)' : '1px solid rgba(34, 211, 238, 0.4)',
                         letterSpacing: '0.05em',
                         whiteSpace: 'nowrap',
                       }}
@@ -226,7 +235,7 @@ export function BottomNav({ items, activeId, onSelect }: BottomNavProps) {
                     style={{
                       fontSize: '7px',
                       fontWeight: theme.typography.fontWeight.medium,
-                      color: item.status.toLowerCase().includes('liberado')
+                      color: (item.status.toLowerCase().includes('liberado') || item.status.toLowerCase().includes('em breve'))
                         ? theme.colors.accent.cyan.DEFAULT
                         : theme.colors.text.muted,
                       letterSpacing: '0.03em',

@@ -72,6 +72,21 @@ export type EventState = {
   current_module: number
   offer_released: boolean
   ai_enabled: boolean
+  // Tab access control
+  pre_evento_enabled: boolean
+  pre_evento_unlock_date: string
+  pre_evento_lock_date: string | null
+  ao_vivo_enabled: boolean
+  ao_vivo_unlock_date: string
+  ao_vivo_lock_date: string | null
+  pos_evento_enabled: boolean
+  pos_evento_unlock_date: string
+  pos_evento_lock_date: string | null
+  // Other fields
+  offer_visible: boolean
+  lunch_active: boolean
+  lunch_started_at: string | null
+  lunch_duration_minutes: number | null
   updated_at: string
 }
 
@@ -94,4 +109,14 @@ export type Purchase = {
   price: number | null
   status: string
   purchased_at: string
+}
+
+export type XPLedgerEntry = {
+  id: string
+  user_id: string
+  action: string
+  xp_amount: number
+  description: string | null
+  metadata: Record<string, unknown>
+  created_at: string
 }

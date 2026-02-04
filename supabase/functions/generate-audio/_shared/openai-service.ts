@@ -4,7 +4,7 @@
  */
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
-const OPENAI_MODEL = 'o1-mini'
+const OPENAI_MODEL = 'gpt-4o-mini'
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
 
 interface OpenAIMessage {

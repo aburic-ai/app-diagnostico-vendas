@@ -315,7 +315,7 @@ serve(async (req) => {
         script_generated: finalScript,
         elevenlabs_voice_id: Deno.env.get('ELEVENLABS_VOICE_ID'),
         elevenlabs_request_id: audioResult.requestId,
-        openai_model: 'o1-mini',
+        openai_model: 'gpt-4o-mini',
         openai_request_id: scriptResult.requestId,
         status: 'completed',
         completed_at: new Date().toISOString(),

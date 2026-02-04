@@ -280,6 +280,42 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 </div>
               </div>
 
+              {/* Total XP */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  padding: '14px',
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  borderRadius: '12px',
+                  marginBottom: '24px',
+                }}
+              >
+                <Zap size={22} color={theme.colors.gold.DEFAULT} />
+                <span
+                  style={{
+                    fontFamily: theme.typography.fontFamily.orbitron,
+                    fontSize: '20px',
+                    fontWeight: 'bold',
+                    color: theme.colors.gold.DEFAULT,
+                  }}
+                >
+                  {profile.xp || 0}
+                </span>
+                <span
+                  style={{
+                    fontSize: '13px',
+                    color: theme.colors.text.secondary,
+                    fontWeight: 500,
+                  }}
+                >
+                  XP acumulados
+                </span>
+              </div>
+
               {/* Photo Upload */}
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
                 <motion.button

@@ -55,19 +55,21 @@ const PRODUCT_MAP = {
 }
 
 /**
- * Validar signature do webhook Hotmart
- * Documentação: https://developers.hotmart.com/docs/pt-BR/v1/webhooks/overview/
+ * Validar Hottok do webhook Hotmart
+ * A Hotmart envia o token fixo no header X-Hotmart-Hottok
  */
-function validateSignature(signature: string | null, body: string): boolean {
-  // TODO: Implementar validação HMAC-SHA256 conforme doc Hotmart
-  // Por enquanto, aceitar se o header existe
-  if (!signature || !HOTMART_SECRET) {
-    console.warn('⚠️ Webhook signature validation disabled (missing secret)')
+function validateSignature(signature: string | null, _body: string): boolean {
+  if (!HOTMART_SECRET) {
+    console.warn('⚠️ HOTMART_WEBHOOK_SECRET not configured, skipping validation')
     return true
   }
 
-  // Validação placeholder - SUBSTITUIR por HMAC real
-  return signature === HOTMART_SECRET || signature.length > 10
+  if (!signature) {
+    console.error('❌ Missing X-Hotmart-Hottok header')
+    return false
+  }
+
+  return signature === HOTMART_SECRET
 }
 
 /**
@@ -162,10 +164,15 @@ async function handlePurchaseComplete(supabase: any, data: any) {
   }
 
   // 5. Inserir registro de compra
-  // Montar telefone completo: DDI + telefone (ex: "55 11999999999")
+  // Formatar telefone em E.164: +DDI + DDD + número
+  // Hotmart envia: checkout_phone = "11992211204" (DDD+número)
+  // DDI pode vir em phone_local_code, phone.ddi, ou checkout_phone_code (varia)
+  const ddi = buyer.phone_local_code || buyer.phone?.ddi || '55'
   const buyerPhone = buyer.checkout_phone
-    ? `${buyer.checkout_phone_code || ''} ${buyer.checkout_phone}`.trim()
+    ? `+${ddi}${buyer.checkout_phone}`
     : null
+
+  console.log(`📱 Phone: raw=${buyer.checkout_phone} | code=${buyer.checkout_phone_code} | ddi=${ddi} | formatted=${buyerPhone}`)
 
   const { error: purchaseError } = await supabase
     .from('purchases')
@@ -176,6 +183,7 @@ async function handlePurchaseComplete(supabase: any, data: any) {
       price: purchase.price?.value || null,
       full_price: purchase.full_price?.value || null,
       buyer_name: buyerName,
+      buyer_email: email,
       buyer_document: cpfCnpj,
       buyer_phone: buyerPhone,
       status: 'approved',

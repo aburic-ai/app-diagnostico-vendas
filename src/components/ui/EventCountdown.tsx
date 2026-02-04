@@ -4,9 +4,51 @@
  */
 
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Calendar, Clock, Radio, Zap, Star } from 'lucide-react'
 import { theme } from '../../styles/theme'
+
+// Confetti component
+function Confetti() {
+  const confettiCount = 50
+  const confettiColors = ['#22D3EE', '#A855F7', '#F59E0B', '#EF4444', '#10B981']
+
+  return (
+    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'hidden', pointerEvents: 'none', zIndex: 10 }}>
+      {Array.from({ length: confettiCount }).map((_, i) => {
+        const randomX = Math.random() * 100
+        const randomDelay = Math.random() * 2
+        const randomDuration = 3 + Math.random() * 2
+        const randomRotation = Math.random() * 360
+        const randomColor = confettiColors[Math.floor(Math.random() * confettiColors.length)]
+
+        return (
+          <motion.div
+            key={i}
+            initial={{ y: -20, x: `${randomX}vw`, rotate: 0, opacity: 1 }}
+            animate={{
+              y: '110vh',
+              rotate: randomRotation + 720,
+              opacity: 0,
+            }}
+            transition={{
+              duration: randomDuration,
+              delay: randomDelay,
+              ease: 'linear',
+            }}
+            style={{
+              position: 'absolute',
+              width: '10px',
+              height: '10px',
+              backgroundColor: randomColor,
+              borderRadius: '2px',
+            }}
+          />
+        )
+      })}
+    </div>
+  )
+}
 
 interface EventCountdownProps {
   targetDate: Date | string
@@ -133,65 +175,122 @@ export function EventCountdown({
         </h1>
       </div>
 
-      {/* Countdown Timer */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '16px',
-          marginBottom: '40px',
-          maxWidth: '500px',
-          width: '100%',
-        }}
-      >
-        {[
-          { value: timeLeft.days, label: 'Dias' },
-          { value: timeLeft.hours, label: 'Horas' },
-          { value: timeLeft.minutes, label: 'Min' },
-          { value: timeLeft.seconds, label: 'Seg' },
-        ].map((item, index) => (
-          <motion.div
-            key={item.label}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: index * 0.1 }}
+      {/* Countdown Timer ou Mensagem de Evento Iniciando */}
+      {timeLeft.total === 0 ? (
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          style={{
+            textAlign: 'center',
+            marginBottom: '40px',
+            maxWidth: '500px',
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {/* Confetes animados */}
+          <Confetti />
+
+          <div
             style={{
-              background: 'rgba(15, 17, 21, 0.8)',
-              border: '1px solid rgba(168, 85, 247, 0.3)',
-              borderRadius: '16px',
-              padding: '20px 12px',
-              textAlign: 'center',
+              padding: '40px 20px',
+              background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%)',
+              border: '2px solid rgba(34, 211, 238, 0.5)',
+              borderRadius: '20px',
+              boxShadow: '0 0 30px rgba(34, 211, 238, 0.3)',
+              position: 'relative',
+              zIndex: 20,
             }}
           >
-            <motion.div
-              key={item.value}
-              initial={{ scale: 1.2 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 0.3 }}
+            <motion.h2
+              initial={{ scale: 0.8 }}
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 1, repeat: Infinity, repeatType: 'reverse' }}
               style={{
                 fontFamily: theme.typography.fontFamily.orbitron,
-                fontSize: '32px',
+                fontSize: '28px',
                 fontWeight: 'bold',
-                color: theme.colors.accent.purple.light,
-                marginBottom: '8px',
-                textShadow: `0 0 20px ${theme.colors.accent.purple.DEFAULT}40`,
+                color: theme.colors.accent.cyan.DEFAULT,
+                marginBottom: '16px',
+                letterSpacing: '0.1em',
+                textShadow: `0 0 20px ${theme.colors.accent.cyan.DEFAULT}`,
               }}
             >
-              {formatNumber(item.value)}
-            </motion.div>
-            <div
+              🔴 EVENTO NO AR
+            </motion.h2>
+            <p
               style={{
-                fontSize: '10px',
-                color: theme.colors.text.muted,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
+                fontSize: '14px',
+                color: theme.colors.text.secondary,
+                lineHeight: '1.6',
+                margin: 0,
               }}
             >
-              {item.label}
-            </div>
-          </motion.div>
-        ))}
-      </div>
+              Clique na aba <strong style={{ color: theme.colors.accent.purple.light }}>AO VIVO</strong> abaixo
+            </p>
+          </div>
+        </motion.div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '16px',
+            marginBottom: '40px',
+            maxWidth: '500px',
+            width: '100%',
+          }}
+        >
+          {[
+            { value: timeLeft.days, label: 'Dias' },
+            { value: timeLeft.hours, label: 'Horas' },
+            { value: timeLeft.minutes, label: 'Min' },
+            { value: timeLeft.seconds, label: 'Seg' },
+          ].map((item, index) => (
+            <motion.div
+              key={item.label}
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: index * 0.1 }}
+              style={{
+                background: 'rgba(15, 17, 21, 0.8)',
+                border: '1px solid rgba(168, 85, 247, 0.3)',
+                borderRadius: '16px',
+                padding: '20px 12px',
+                textAlign: 'center',
+              }}
+            >
+              <motion.div
+                key={item.value}
+                initial={{ scale: 1.2 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.3 }}
+                style={{
+                  fontFamily: theme.typography.fontFamily.orbitron,
+                  fontSize: '32px',
+                  fontWeight: 'bold',
+                  color: theme.colors.accent.purple.light,
+                  marginBottom: '8px',
+                  textShadow: `0 0 20px ${theme.colors.accent.purple.DEFAULT}40`,
+                }}
+              >
+                {formatNumber(item.value)}
+              </motion.div>
+              <div
+                style={{
+                  fontSize: '10px',
+                  color: theme.colors.text.muted,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                {item.label}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* Event Info - Simplificado */}
       <div

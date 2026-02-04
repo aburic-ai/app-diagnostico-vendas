@@ -32,6 +32,7 @@ import {
   NotificationDrawer,
   PageHeader,
   ProfileModal,
+  LiveEventModal,
 } from '../components/ui'
 import type { IMPACTData, ActionItem } from '../components/ui'
 import { useNotifications } from '../hooks/useNotifications'
@@ -75,7 +76,7 @@ export function PosEvento() {
   const { profile: userProfile, user } = useAuth()
   useHeartbeat() // Atualiza last_seen_at a cada 30s
   const { completeStep } = useUserProgress()
-  const { eventState, isPosEventoAccessible, isAdmin } = useEventState()
+  const { eventState, isAoVivoAccessible, isPosEventoAccessible, isAdmin } = useEventState()
   const { getDiagnosticByDay, loading: diagnosticLoading } = useDiagnostic()
   const { projections, loading: loadingProjections, error: errorProjections } = useScenarioProjection()
   const location = useLocation()
@@ -274,8 +275,15 @@ export function PosEvento() {
     }
   }, [generatedActions])
 
-  // Dia atual (simulado - seria calculado pela data real)
-  const currentDay = 1
+  // Dia atual - calculado a partir da data de liberação do pós-evento
+  const currentDay = (() => {
+    if (!eventState?.pos_evento_unlock_date) return 1
+    const unlockDate = new Date(eventState.pos_evento_unlock_date)
+    const now = new Date()
+    const diffMs = now.getTime() - unlockDate.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    return Math.max(1, Math.min(7, diffDays + 1))
+  })()
 
   // Scroll to section (avisos clickables)
   useEffect(() => {
@@ -378,11 +386,49 @@ export function PosEvento() {
     }
   }
 
+  // Dynamic nav items baseado no estado do evento
+  const isLive = eventState?.status === 'live'
+
   const navItems = [
-    { id: 'preparacao', label: 'Preparação', icon: <Rocket size={20} />, status: 'Liberado' },
-    { id: 'aovivo', label: 'Ao Vivo', icon: <Radio size={20} />, badge: 'LIVE', status: 'Liberado' },
-    { id: 'posevento', label: 'Pós Evento', icon: <Target size={20} />, status: 'Liberado' },
+    {
+      id: 'preparacao',
+      label: 'Preparação',
+      icon: <Rocket size={20} />,
+      status: 'Liberado',
+      isAccessible: true
+    },
+    {
+      id: 'aovivo',
+      label: 'Ao Vivo',
+      icon: <Radio size={20} />,
+      badge: isLive ? 'LIVE' : (eventState?.status === 'offline' ? 'EM BREVE' : undefined),
+      status: isLive ? 'Liberado' : (eventState?.status === 'offline' ? 'Em Breve' : 'Liberado'),
+      isAccessible: true
+    },
+    {
+      id: 'posevento',
+      label: 'Pós Evento',
+      icon: <Target size={20} />,
+      status: isPosEventoAccessible() ? 'Liberado' :
+        eventState?.pos_evento_unlock_date ?
+          `Libera ${new Date(eventState.pos_evento_unlock_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` :
+          'Bloqueado',
+      isAccessible: isPosEventoAccessible()
+    },
   ]
+
+  // Handler de navegação entre abas
+  const handleNavigation = (tabId: string) => {
+    const routes: Record<string, string> = {
+      preparacao: '/pre-evento',
+      aovivo: '/ao-vivo',
+      posevento: '/pos-evento',
+    }
+
+    if (routes[tabId]) {
+      navigate(routes[tabId])
+    }
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -429,7 +475,7 @@ export function PosEvento() {
             Esta aba será liberada automaticamente após o evento ao vivo. Aguarde a liberação.
           </p>
         </div>
-        <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+        <BottomNav items={navItems} activeId={activeNav} onSelect={handleNavigation} />
       </PageWrapper>
     )
   }
@@ -440,6 +486,9 @@ export function PosEvento() {
       showAnimatedBackground={true}
       showOverlay={false}
     >
+      {/* Live Event Modal - aparece quando evento está ao vivo */}
+      <LiveEventModal isLive={isLive} />
+
       {/* Scrollable Content */}
       <div
         style={{
@@ -647,7 +696,7 @@ export function PosEvento() {
                 dataDay2={diagnosticDataDay2}
                 score={score}
                 gargalo={gargalo}
-                onDownload={() => console.log('Baixar PDF')}
+
               />
             ) : (
               // DIAGNÓSTICO NÃO REALIZADO
@@ -851,7 +900,7 @@ export function PosEvento() {
       />
 
       {/* ==================== BOTTOM NAVIGATION ==================== */}
-      <BottomNav items={navItems} activeId={activeNav} onSelect={setActiveNav} />
+      <BottomNav items={navItems} activeId={activeNav} onSelect={handleNavigation} />
     </PageWrapper>
   )
 }

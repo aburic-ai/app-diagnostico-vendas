@@ -39,6 +39,9 @@ export interface EventState {
   pos_evento_enabled: boolean
   pos_evento_unlock_date: string | null
   pos_evento_lock_date: string | null
+
+  // NPS Control
+  nps_active: 'day1' | 'final' | null
 }
 
 export function useEventState() {
@@ -122,6 +125,7 @@ export function useEventState() {
         current_day: 1,
         current_module: 0,
         ai_enabled: true,
+        pre_evento_enabled: true,
       })
       .select()
       .single()
@@ -170,6 +174,8 @@ export function useEventState() {
     return updateEventState({
       status: 'live',
       event_started_at: new Date().toISOString(),
+      ao_vivo_enabled: true, // Libera aba Ao Vivo automaticamente
+      pre_evento_lock_date: new Date().toISOString(), // Bloqueia aba Pré-evento quando evento inicia
     })
   }
 
@@ -185,6 +191,9 @@ export function useEventState() {
     return updateEventState({
       status: 'finished',
       event_finished_at: new Date().toISOString(),
+      pos_evento_enabled: true,
+      pos_evento_lock_date: null, // Limpar lock date para garantir acesso
+      ao_vivo_lock_date: null, // Manter ao vivo acessível pós-evento
     })
   }
 
@@ -253,6 +262,35 @@ export function useEventState() {
     }
   }
 
+  // NPS helpers
+  const triggerNPS = async (type: 'day1' | 'final') => {
+    return updateEventState({ nps_active: type })
+  }
+
+  const clearNPS = async () => {
+    return updateEventState({ nps_active: null })
+  }
+
+  // Reset evento para estado pré-início (para testes)
+  const resetEvent = async () => {
+    return updateEventState({
+      status: 'offline',
+      current_module: 0,
+      event_started_at: null,
+      event_finished_at: null,
+      offer_visible: false,
+      offer_unlocked: false,
+      lunch_active: false,
+      lunch_started_at: null,
+      lunch_duration_minutes: 60,
+      nps_active: null,
+      ao_vivo_enabled: true,
+      ao_vivo_lock_date: null,
+      pre_evento_enabled: true,
+      pre_evento_lock_date: null,
+    })
+  }
+
   // ============================================
   // TAB ACCESS CONTROL HELPERS
   // ============================================
@@ -294,7 +332,7 @@ export function useEventState() {
   const isPreEventoAccessible = (): boolean => {
     if (!eventState) return false
     return isTabAccessible(
-      eventState.pre_evento_enabled,
+      eventState.pre_evento_enabled ?? true,
       eventState.pre_evento_unlock_date,
       eventState.pre_evento_lock_date
     )
@@ -340,6 +378,9 @@ export function useEventState() {
     startActivity,
     endActivity,
     toggleActivity,
+    triggerNPS,
+    clearNPS,
+    resetEvent,
     refresh: loadEventState,
     // Tab access control
     isPreEventoAccessible,

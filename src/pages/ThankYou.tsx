@@ -127,7 +127,7 @@ const validatePurchase = async (
     // Tentar por transaction_id primeiro
     const { data: purchaseByTransaction, error: purchaseError } = await supabase
       .from('purchases')
-      .select('id, user_id, buyer_name, buyer_phone, status, refunded_at, product_slug')
+      .select('id, user_id, buyer_name, buyer_email, buyer_phone, status, refunded_at, product_slug')
       .eq('transaction_id', identifier)
       .single()
 
@@ -140,8 +140,11 @@ const validatePurchase = async (
     if (purchaseByTransaction && !purchaseError) {
       purchase = purchaseByTransaction
 
-      // Buscar email do profile
-      if (purchase.user_id) {
+      // Email direto da purchase (sem depender de join com profiles/RLS)
+      if (purchase.buyer_email) {
+        buyerEmail = purchase.buyer_email
+      } else if (purchase.user_id) {
+        // Fallback: tentar via profile (pode falhar por RLS com anon key)
         const { data: profile } = await supabase
           .from('profiles')
           .select('email')
@@ -153,26 +156,40 @@ const validatePurchase = async (
         }
       }
     } else {
-      // Se não encontrar, tentar por email via profile
+      // Se não encontrar por transaction, tentar por email via purchases
       console.log('[ThankYou] Compra não encontrada por transaction, tentando por email...')
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('email', identifier)
+      const { data: purchaseByEmail } = await supabase
+        .from('purchases')
+        .select('id, user_id, buyer_name, buyer_email, buyer_phone, status, refunded_at, product_slug')
+        .eq('buyer_email', identifier)
+        .order('purchased_at', { ascending: false })
+        .limit(1)
         .single()
 
-      if (profile) {
-        buyerEmail = profile.email
-
-        const { data: purchaseByEmail } = await supabase
-          .from('purchases')
-          .select('id, user_id, buyer_name, buyer_phone, status, refunded_at, product_slug')
-          .eq('user_id', profile.id)
-          .order('purchased_at', { ascending: false })
-          .limit(1)
+      if (purchaseByEmail) {
+        purchase = purchaseByEmail
+        buyerEmail = purchaseByEmail.buyer_email
+      } else {
+        // Fallback final: tentar via profile (pode falhar por RLS)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('email', identifier)
           .single()
 
-        purchase = purchaseByEmail
+        if (profile) {
+          buyerEmail = profile.email
+
+          const { data: purchaseByUserId } = await supabase
+            .from('purchases')
+            .select('id, user_id, buyer_name, buyer_email, buyer_phone, status, refunded_at, product_slug')
+            .eq('user_id', profile.id)
+            .order('purchased_at', { ascending: false })
+            .limit(1)
+            .single()
+
+          purchase = purchaseByUserId
+        }
       }
     }
 
@@ -477,7 +494,8 @@ export function ThankYou() {
       console.log('[ThankYou] Salvando survey...')
       const { error: surveyError } = await supabase.from('survey_responses').insert({
         transaction_id: identifier,
-        email: email || null,
+        email: email || validation.buyerEmail || null,
+        user_id: validation.userId || null,
         survey_data: surveyData,
       })
 
@@ -490,13 +508,13 @@ export function ThankYou() {
       // 1.5. Notificar GHL sobre survey completado (trigger workflow de áudio)
       try {
         console.log('[ThankYou] Notificando GHL sobre survey completado...')
-        const ghlWebhookUrl = 'https://services.leadconnectorhq.com/hooks/R2mu3tVVjKvafx2O2wlw/webhook-trigger/uMAGh6b3u7aHWBn2sH6f'
+        const ghlWebhookUrl = 'https://services.leadconnectorhq.com/hooks/R2mu3tVvjKvefxzO2otw/webhook-trigger/uMAGh6b3u7aHWBn2sH6f'
 
         // Estrutura exata que o GHL espera para Find/Create Contact
         const webhookPayload = {
           buyer: {
             name: validation.buyerName || buyerName || '',
-            email: email || '',
+            email: email || validation.buyerEmail || '',
             checkout_phone: validation.buyerPhone || '',
           },
           transaction_id: identifier || '',
@@ -523,33 +541,43 @@ export function ThankYou() {
       console.log('[ThankYou] Criando conta no Auth...')
       let newUserCreated = false
 
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: email || '',
+      const userEmail = email || validation.buyerEmail || ''
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: userEmail,
         password,
       })
 
-      // Se erro for "User already registered", resetar senha e fazer login
-      if (signUpError && signUpError.message.includes('already registered')) {
+      // Detectar se usuário já existe:
+      // 1. Erro explícito "already registered" (confirm email OFF)
+      // 2. signUp retorna user com identities vazio (confirm email ON)
+      const userAlreadyExists =
+        (signUpError && signUpError.message.includes('already registered')) ||
+        (signUpData?.user && (!signUpData.user.identities || signUpData.user.identities.length === 0))
+
+      if (userAlreadyExists) {
         console.log('[ThankYou] Conta já existe, resetando senha...')
 
         // Chamar Edge Function para resetar a senha
-        const { error: resetError } = await supabase.functions.invoke('reset-user-password', {
+        console.log('[ThankYou] Chamando reset-user-password para:', userEmail)
+        const { data: resetData, error: resetError } = await supabase.functions.invoke('reset-user-password', {
           body: {
-            email: email || '',
+            email: userEmail,
             newPassword: password,
           },
         })
 
+        console.log('[ThankYou] Reset response:', { data: resetData, error: resetError })
+
         if (resetError) {
-          console.error('[ThankYou] Erro ao resetar senha:', resetError)
-          throw new Error('Erro ao atualizar senha. Tente novamente.')
+          console.error('[ThankYou] Erro ao resetar senha:', JSON.stringify(resetError))
+          throw new Error(`Erro ao atualizar senha: ${resetError.message || JSON.stringify(resetError)}`)
         }
 
         console.log('[ThankYou] ✅ Senha atualizada! Fazendo login...')
 
         // Fazer login com a nova senha
         const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email || '',
+          email: userEmail,
           password,
         })
 
@@ -578,45 +606,43 @@ export function ThankYou() {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('email', email)
+        .eq('email', userEmail)
         .single()
 
       if (profileError) {
         console.error('[ThankYou] Erro ao buscar profile:', profileError)
       } else if (profile) {
-        // Verificar se já completou o protocolo (para não duplicar XP)
-        const alreadyCompleted = profile.completed_steps?.includes('protocol-survey')
+        // Registrar XP do protocolo no ledger (trigger sincroniza profiles automaticamente)
+        console.log('[ThankYou] Creditando +30 XP do protocolo via ledger...')
 
-        if (!alreadyCompleted) {
-          console.log('[ThankYou] Creditando +30 XP do protocolo...')
+        const { error: ledgerError } = await supabase
+          .from('xp_ledger')
+          .insert({
+            user_id: profile.id,
+            action: 'protocol-survey',
+            xp_amount: 30,
+            description: 'Protocolo de Iniciacao completo',
+            metadata: { source: 'ThankYou' },
+          })
 
-          // Atualizar com XP e step completo
-          const newSteps = [...(profile.completed_steps || []), 'protocol-survey']
-          const newXP = (profile.xp || 0) + 30
-
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({
-              completed_steps: newSteps,
-              xp: newXP,
-            })
-            .eq('id', profile.id)
-
-          if (updateError) {
-            console.error('[ThankYou] Erro ao atualizar XP:', updateError)
+        if (ledgerError) {
+          if (ledgerError.code === '23505') {
+            console.log('[ThankYou] Protocolo já completado anteriormente')
           } else {
-            console.log('[ThankYou] ✅ +30 XP creditados! (Protocolo de Iniciação completo)')
+            console.error('[ThankYou] Erro ao registrar XP:', ledgerError)
           }
         } else {
-          console.log('[ThankYou] Protocolo já completado anteriormente')
+          console.log('[ThankYou] +30 XP creditados! (Protocolo de Iniciacao completo)')
         }
       }
 
       // 4. Ir para WhatsApp (obrigatório: entrar e voltar para acessar sistema)
       setStep('whatsapp')
-    } catch (error) {
+    } catch (error: any) {
       console.error('[ThankYou] Erro ao salvar dados:', error)
-      setPasswordError('Erro ao criar conta. Tente novamente.')
+      console.error('[ThankYou] Error message:', error?.message)
+      console.error('[ThankYou] Error stack:', error?.stack)
+      setPasswordError(error?.message || 'Erro ao criar conta. Tente novamente.')
     } finally {
       setIsSubmitting(false)
     }

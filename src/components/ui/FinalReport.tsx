@@ -6,7 +6,7 @@
  */
 
 import { motion } from 'framer-motion'
-import { FileDown, TrendingDown, AlertTriangle } from 'lucide-react'
+import { TrendingDown, AlertTriangle } from 'lucide-react'
 import { theme } from '../../styles/theme'
 import type { IMPACTData } from './RadarChart'
 
@@ -23,8 +23,6 @@ interface FinalReportProps {
     letra: string
     valor: number
   }
-  /** Callback ao baixar relatório */
-  onDownload?: () => void
 }
 
 // Mini radar chart simplificado com suporte a dois dias
@@ -157,7 +155,6 @@ export function FinalReport({
   dataDay2,
   score,
   gargalo,
-  onDownload,
 }: FinalReportProps) {
   const getScoreStatus = (s: number) => {
     if (s < 30) return { label: 'CRÍTICO', color: '#EF4444' }
@@ -212,36 +209,6 @@ export function FinalReport({
           </p>
         </div>
 
-        {/* Download Button */}
-        {onDownload && (
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={onDownload}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 12px',
-              background: 'rgba(34, 211, 238, 0.1)',
-              border: '1px solid rgba(34, 211, 238, 0.3)',
-              borderRadius: '8px',
-              cursor: 'pointer',
-            }}
-          >
-            <FileDown size={14} color={theme.colors.accent.cyan.DEFAULT} />
-            <span
-              style={{
-                fontSize: '9px',
-                fontWeight: theme.typography.fontWeight.bold,
-                color: theme.colors.accent.cyan.DEFAULT,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}
-            >
-              PDF
-            </span>
-          </motion.button>
-        )}
       </div>
 
       {/* Main Content */}

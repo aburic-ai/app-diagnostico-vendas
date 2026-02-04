@@ -1,8 +1,9 @@
 /**
  * Hook para gerenciar progresso do usuário (XP, badges, completed_steps)
  *
- * Atualiza a tabela profiles com XP e completed_steps
- * Usado por: PreEvento, AoVivo, PosEvento
+ * WRITES to xp_ledger table (source of truth)
+ * Database trigger syncs profiles.xp and profiles.completed_steps automatically
+ * READS from profiles table (denormalized cache, updated by trigger + realtime)
  */
 
 import { useState } from 'react'
@@ -20,28 +21,37 @@ export function useUserProgress() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
-  // Adicionar XP ao usuário
+  // Adicionar XP ao usuário (para XP avulso, não vinculado a step)
   const addXP = async (amount: number, reason?: string) => {
     if (!user || !profile) {
       return { error: new Error('User not authenticated') }
     }
 
+    const action = reason || `manual-xp-${Date.now()}`
+
     try {
       setLoading(true)
-      const newXP = (profile.xp || 0) + amount
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ xp: newXP })
-        .eq('id', user.id)
+      const { error: insertError } = await supabase
+        .from('xp_ledger')
+        .insert({
+          user_id: user.id,
+          action,
+          xp_amount: amount,
+          description: reason || 'Manual XP addition',
+          metadata: { source: 'addXP' },
+        })
 
-      if (error) throw error
+      if (insertError) {
+        if (insertError.code === '23505') {
+          console.log(`XP action "${action}" already recorded`)
+          return { error: null }
+        }
+        throw insertError
+      }
 
-      console.log(`✨ +${amount} XP${reason ? ` (${reason})` : ''}`)
-
-      // Refresh profile to get updated XP
+      console.log(`+${amount} XP${reason ? ` (${reason})` : ''}`)
       await refreshProfile()
-
       return { error: null }
     } catch (err) {
       console.error('Error adding XP:', err)
@@ -61,35 +71,31 @@ export function useUserProgress() {
     try {
       setLoading(true)
 
-      // Verificar se já completou
-      const currentSteps = profile.completed_steps || []
-      if (currentSteps.includes(stepId)) {
-        console.log(`Step ${stepId} already completed`)
-        return { error: null, alreadyCompleted: true }
-      }
-
-      const updatedSteps = [...currentSteps, stepId]
-      const newXP = (profile.xp || 0) + xpReward
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          completed_steps: updatedSteps,
-          xp: newXP,
+      const { error: insertError } = await supabase
+        .from('xp_ledger')
+        .insert({
+          user_id: user.id,
+          action: stepId,
+          xp_amount: xpReward,
+          description: `Step completed: ${stepId}`,
+          metadata: { source: 'completeStep' },
         })
-        .eq('id', user.id)
 
-      if (error) throw error
+      if (insertError) {
+        if (insertError.code === '23505') {
+          console.log(`Step ${stepId} already completed`)
+          return { error: null, alreadyCompleted: true }
+        }
+        throw insertError
+      }
 
       if (xpReward > 0) {
-        console.log(`✅ Completed: ${stepId} (+${xpReward} XP)`)
+        console.log(`Completed: ${stepId} (+${xpReward} XP)`)
       } else {
-        console.log(`✅ Completed: ${stepId}`)
+        console.log(`Completed: ${stepId}`)
       }
 
-      // Refresh profile to get updated data
       await refreshProfile()
-
       return { error: null, alreadyCompleted: false }
     } catch (err) {
       console.error('Error completing step:', err)
@@ -124,27 +130,28 @@ export function useUserProgress() {
     try {
       setLoading(true)
 
-      // Verificar se já tem o badge
-      const currentBadges = (profile.completed_steps || []).filter(s => s.startsWith('badge:'))
-      if (currentBadges.includes(`badge:${badgeId}`)) {
-        console.log(`Badge ${badgeId} already earned`)
-        return { error: null, alreadyHas: true }
+      const action = `badge:${badgeId}`
+
+      const { error: insertError } = await supabase
+        .from('xp_ledger')
+        .insert({
+          user_id: user.id,
+          action,
+          xp_amount: 0,
+          description: `Badge earned: ${badgeId}`,
+          metadata: { source: 'addBadge', badge_id: badgeId },
+        })
+
+      if (insertError) {
+        if (insertError.code === '23505') {
+          console.log(`Badge ${badgeId} already earned`)
+          return { error: null, alreadyHas: true }
+        }
+        throw insertError
       }
 
-      const updatedSteps = [...(profile.completed_steps || []), `badge:${badgeId}`]
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({ completed_steps: updatedSteps })
-        .eq('id', user.id)
-
-      if (error) throw error
-
-      console.log(`🏆 Badge earned: ${badgeId}`)
-
-      // Refresh profile to get updated data
+      console.log(`Badge earned: ${badgeId}`)
       await refreshProfile()
-
       return { error: null, alreadyHas: false }
     } catch (err) {
       console.error('Error adding badge:', err)

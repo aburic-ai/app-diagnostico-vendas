@@ -1,45 +1,60 @@
 /**
- * NPSForm - Formulário de NPS clássico
+ * NPSForm - Pesquisa de Satisfação
  *
- * Escala de 0-10 com pergunta padrão de NPS
- * Duas variantes: NPS Dia 1 e NPS Evento Final
+ * Escala de 0-10 (NPS internamente, mas sem jargão para o participante)
+ * Duas variantes: Dia 1 e Evento Final
  * Concede XP ao participante ao preencher
+ * Renderiza via Portal no body para evitar problemas com transform de pais
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Star, X, Zap, Send, Check } from 'lucide-react'
+import { MessageCircleHeart, Zap, Send, Check } from 'lucide-react'
 import { theme } from '../../styles/theme'
 import { XP_CONFIG } from '../../config/xp-system'
 
 type NPSType = 'day1' | 'final'
 
 interface NPSFormProps {
-  /** Tipo do NPS */
   type: NPSType
-  /** Se está aberto */
   isOpen: boolean
-  /** Callback ao fechar */
   onClose: () => void
-  /** Callback ao enviar */
   onSubmit: (score: number, feedback: string, type: NPSType) => void
-  /** XP concedido */
   xpReward?: number
-  /** Se é obrigatório (não pode fechar sem responder) */
   mandatory?: boolean
 }
 
-const npsConfig: Record<NPSType, { title: string; question: string; xp: number }> = {
+const npsConfig: Record<NPSType, { title: string; question: string; contextHint: string; xp: number }> = {
   day1: {
-    title: 'NPS - DIA 1',
-    question: 'De 0 a 10, o quanto você recomendaria o primeiro dia da Imersão para um amigo?',
+    title: 'O QUANTO ESSE PRIMEIRO DIA VALEU A PENA?',
+    question: 'Em uma escala de 0 a 10, o quanto esse primeiro dia foi valioso a ponto de você recomendá-lo a um colega ou amigo?',
+    contextHint: 'A nota 9 ou 10 indica que a experiência foi excelente e recomendável. Use a escala que melhor representa o que você sentiu.',
     xp: XP_CONFIG.EVENT.NPS_DAY1,
   },
   final: {
-    title: 'NPS - EVENTO COMPLETO',
-    question: 'De 0 a 10, o quanto você recomendaria a Imersão Diagnóstico de Vendas para um amigo?',
+    title: 'O QUANTO A IMERSÃO VALEU A PENA?',
+    question: 'Em uma escala de 0 a 10, o quanto a Imersão Diagnóstico de Vendas foi valiosa a ponto de você recomendá-la a um colega ou amigo?',
+    contextHint: 'A nota 9 ou 10 indica que a experiência foi excelente e recomendável. Use a escala que melhor representa o que você sentiu.',
     xp: XP_CONFIG.EVENT.NPS_FINAL,
   },
+}
+
+const getScoreFeedback = (score: number): { message: string; emoji: string } => {
+  if (score <= 3) return { message: 'Lamentamos que sua experiência não tenha sido boa', emoji: '😔' }
+  if (score <= 5) return { message: 'Obrigado pelo feedback honesto', emoji: '🤔' }
+  if (score <= 6) return { message: 'Valorizamos sua sinceridade', emoji: '🙂' }
+  if (score <= 8) return { message: 'Bom saber que está gostando!', emoji: '😊' }
+  return { message: 'Incrível! Ficamos felizes que está amando!', emoji: '🤩' }
+}
+
+const getFeedbackPlaceholder = (score: number | null, type: NPSType): string => {
+  if (score === null) return 'O ponto mais forte (ou mais fraco) foi...'
+  if (score <= 6) return 'O ponto mais fraco foi...'
+  if (score <= 8) return 'O ponto mais forte (ou mais fraco) foi...'
+  return type === 'day1'
+    ? 'O que mais te marcou nesse primeiro dia foi...'
+    : 'O que mais te marcou na imersão foi...'
 }
 
 export function NPSForm({
@@ -53,6 +68,14 @@ export function NPSForm({
   const [selectedScore, setSelectedScore] = useState<number | null>(null)
   const [feedback, setFeedback] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+
+  // Manter modal visível internamente mesmo se o parent mudar isOpen
+  useEffect(() => {
+    if (isOpen && !submitted) {
+      setInternalOpen(true)
+    }
+  }, [isOpen, submitted])
 
   const config = npsConfig[type]
   const finalXP = xpReward ?? config.xp
@@ -61,174 +84,163 @@ export function NPSForm({
     if (selectedScore === null) return
     onSubmit(selectedScore, feedback, type)
     setSubmitted(true)
+    // Manter a mensagem de sucesso visível por pelo menos 2.5s
     setTimeout(() => {
+      setInternalOpen(false)
       onClose()
-      // Reset state after close
       setTimeout(() => {
         setSelectedScore(null)
         setFeedback('')
         setSubmitted(false)
       }, 300)
-    }, 2000)
+    }, 2500)
   }
 
   const getScoreColor = (score: number) => {
-    if (score <= 6) return '#EF4444' // Detractor - Red
-    if (score <= 8) return '#F59E0B' // Passive - Yellow
-    return '#22C55E' // Promoter - Green
+    if (score <= 6) return '#EF4444'
+    if (score <= 8) return '#F59E0B'
+    return '#22C55E'
   }
 
-  const getScoreLabel = (score: number) => {
-    if (score <= 6) return 'Detrator'
-    if (score <= 8) return 'Neutro'
-    return 'Promotor'
-  }
+  const NPS_Z_INDEX = 9999
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
+      {internalOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: NPS_Z_INDEX,
+            background: 'linear-gradient(180deg, rgba(5, 8, 15, 0.99) 0%, rgba(10, 12, 18, 1) 100%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          {/* Scrollable content wrapper */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={mandatory ? undefined : onClose}
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            transition={{ delay: 0.1 }}
             style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.9)',
-              zIndex: theme.zIndex.modal - 1,
-              backdropFilter: 'blur(12px)',
-              cursor: mandatory ? 'default' : 'pointer',
-            }}
-          />
-
-          {/* Modal */}
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            style={{
-              position: 'fixed',
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 'calc(100% - 32px)',
-              maxWidth: '380px',
-              background: 'linear-gradient(135deg, rgba(15, 17, 21, 0.98) 0%, rgba(10, 12, 18, 0.99) 100%)',
-              border: '1px solid rgba(168, 85, 247, 0.3)',
-              borderRadius: '20px',
-              padding: '24px',
-              zIndex: theme.zIndex.modal,
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+              width: '100%',
+              maxWidth: '520px',
+              padding: '32px 24px',
+              margin: 'auto',
             }}
           >
             {!submitted ? (
               <>
                 {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '12px',
-                        background: 'rgba(168, 85, 247, 0.2)',
-                        border: '1px solid rgba(168, 85, 247, 0.4)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Star size={20} color={theme.colors.accent.purple.light} />
-                    </div>
-                    <div>
-                      <h3
-                        style={{
-                          fontFamily: theme.typography.fontFamily.orbitron,
-                          fontSize: '14px',
-                          fontWeight: theme.typography.fontWeight.bold,
-                          color: theme.colors.accent.purple.light,
-                          letterSpacing: '0.05em',
-                          margin: 0,
-                        }}
-                      >
-                        {config.title}
-                      </h3>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                        <Zap size={12} color={theme.colors.gold.DEFAULT} />
-                        <span style={{ fontSize: '10px', color: theme.colors.gold.DEFAULT, fontWeight: 'bold' }}>
-                          +{finalXP} XP
-                        </span>
-                      </div>
-                    </div>
+                <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+                  <div
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '20px',
+                      background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(124, 58, 237, 0.15) 100%)',
+                      border: '1px solid rgba(168, 85, 247, 0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 18px',
+                      boxShadow: '0 0 40px rgba(168, 85, 247, 0.2)',
+                    }}
+                  >
+                    <MessageCircleHeart size={32} color={theme.colors.accent.purple.light} />
                   </div>
-                  {!mandatory && (
-                    <motion.button
-                      whileTap={{ scale: 0.9 }}
-                      onClick={onClose}
-                      style={{
-                        background: 'rgba(100, 116, 139, 0.2)',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '8px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <X size={18} color={theme.colors.text.muted} />
-                    </motion.button>
-                  )}
+                  <h3
+                    style={{
+                      fontFamily: theme.typography.fontFamily.orbitron,
+                      fontSize: '18px',
+                      fontWeight: theme.typography.fontWeight.bold,
+                      color: theme.colors.text.primary,
+                      letterSpacing: '0.08em',
+                      margin: '0 0 8px 0',
+                    }}
+                  >
+                    {config.title}
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <Zap size={16} color={theme.colors.gold.DEFAULT} />
+                    <span style={{ fontSize: '13px', color: theme.colors.gold.DEFAULT, fontWeight: 'bold' }}>
+                      +{finalXP} XP por contribuir com a melhoria da experiência
+                    </span>
+                  </div>
                 </div>
 
                 {/* Question */}
                 <p
                   style={{
-                    fontSize: '14px',
+                    fontSize: '16px',
                     color: theme.colors.text.primary,
-                    lineHeight: 1.5,
-                    marginBottom: '20px',
+                    lineHeight: 1.6,
+                    marginBottom: '28px',
+                    textAlign: 'center',
                   }}
                 >
                   {config.question}
                 </p>
 
+                {/* Context hint */}
+                <p
+                  style={{
+                    fontSize: '13px',
+                    color: theme.colors.text.muted,
+                    lineHeight: 1.5,
+                    marginBottom: '20px',
+                    textAlign: 'center',
+                    fontStyle: 'italic',
+                  }}
+                >
+                  {config.contextHint}
+                </p>
+
                 {/* Score Selection */}
-                <div style={{ marginBottom: '20px' }}>
+                <div style={{ marginBottom: '24px' }}>
                   <div
                     style={{
                       display: 'grid',
                       gridTemplateColumns: 'repeat(11, 1fr)',
-                      gap: '4px',
+                      gap: '6px',
                     }}
                   >
                     {Array.from({ length: 11 }).map((_, i) => {
                       const isSelected = selectedScore === i
                       const scoreColor = getScoreColor(i)
+                      const hintOpacity = i <= 6 ? 0.06 : i <= 8 ? 0.06 : 0.08
+                      const hintColor = getScoreColor(i)
                       return (
                         <motion.button
                           key={i}
                           whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.95 }}
+                          whileTap={{ scale: 0.9 }}
                           onClick={() => setSelectedScore(i)}
                           style={{
                             width: '100%',
                             aspectRatio: '1',
-                            borderRadius: '8px',
-                            background: isSelected ? scoreColor : 'rgba(100, 116, 139, 0.15)',
-                            border: `2px solid ${isSelected ? scoreColor : 'rgba(100, 116, 139, 0.2)'}`,
+                            borderRadius: '10px',
+                            background: isSelected
+                              ? scoreColor
+                              : `${hintColor}${Math.round(hintOpacity * 255).toString(16).padStart(2, '0')}`,
+                            border: `2px solid ${isSelected ? scoreColor : 'rgba(100, 116, 139, 0.25)'}`,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontFamily: theme.typography.fontFamily.orbitron,
-                            fontSize: '12px',
+                            fontSize: '14px',
                             fontWeight: 'bold',
                             color: isSelected ? '#fff' : theme.colors.text.secondary,
-                            boxShadow: isSelected ? `0 0 15px ${scoreColor}50` : 'none',
+                            boxShadow: isSelected ? `0 0 20px ${scoreColor}60` : 'none',
                             transition: 'all 0.2s ease',
                           }}
                         >
@@ -237,66 +249,79 @@ export function NPSForm({
                       )
                     })}
                   </div>
+
+                  {/* Scale labels */}
                   <div
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      marginTop: '8px',
-                      fontSize: '9px',
+                      marginTop: '10px',
+                      fontSize: '11px',
                       color: theme.colors.text.muted,
                     }}
                   >
-                    <span>Nada provável</span>
-                    <span>Muito provável</span>
+                    <span>Nenhuma chance</span>
+                    <span>Com certeza!</span>
                   </div>
+
+                  {/* Score feedback contextual */}
                   {selectedScore !== null && (
                     <motion.div
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
                       style={{
-                        marginTop: '12px',
-                        padding: '8px 12px',
-                        background: `${getScoreColor(selectedScore)}15`,
-                        border: `1px solid ${getScoreColor(selectedScore)}40`,
-                        borderRadius: '8px',
+                        marginTop: '14px',
+                        padding: '12px 16px',
+                        background: `${getScoreColor(selectedScore)}12`,
+                        border: `1px solid ${getScoreColor(selectedScore)}30`,
+                        borderRadius: '12px',
                         textAlign: 'center',
                       }}
                     >
-                      <span style={{ fontSize: '11px', color: getScoreColor(selectedScore), fontWeight: 'bold' }}>
-                        {getScoreLabel(selectedScore)} ({selectedScore}/10)
+                      <span style={{ fontSize: '14px', color: getScoreColor(selectedScore) }}>
+                        {getScoreFeedback(selectedScore).emoji} {getScoreFeedback(selectedScore).message}
                       </span>
                     </motion.div>
                   )}
                 </div>
 
                 {/* Feedback */}
-                <div style={{ marginBottom: '20px' }}>
+                <div style={{ marginBottom: '24px' }}>
                   <label
                     style={{
                       display: 'block',
-                      fontSize: '11px',
+                      fontSize: '14px',
                       color: theme.colors.text.secondary,
-                      marginBottom: '8px',
+                      marginBottom: '10px',
+                      fontWeight: 500,
                     }}
                   >
-                    O que motivou sua nota? (opcional)
+                    O que mais influenciou essa nota?
                   </label>
                   <textarea
                     value={feedback}
                     onChange={(e) => setFeedback(e.target.value)}
-                    placeholder="Conte-nos mais sobre sua experiência..."
+                    placeholder={getFeedbackPlaceholder(selectedScore, type)}
                     rows={3}
                     style={{
                       width: '100%',
-                      padding: '12px',
+                      padding: '14px',
                       background: 'rgba(100, 116, 139, 0.1)',
-                      border: '1px solid rgba(100, 116, 139, 0.2)',
-                      borderRadius: '10px',
+                      border: '1px solid rgba(100, 116, 139, 0.25)',
+                      borderRadius: '12px',
                       color: theme.colors.text.primary,
-                      fontSize: '13px',
+                      fontSize: '15px',
                       resize: 'none',
                       outline: 'none',
                       fontFamily: 'inherit',
+                      lineHeight: 1.5,
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'rgba(168, 85, 247, 0.4)'
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'rgba(100, 116, 139, 0.25)'
                     }}
                   />
                 </div>
@@ -309,24 +334,25 @@ export function NPSForm({
                   disabled={selectedScore === null}
                   style={{
                     width: '100%',
-                    padding: '14px 20px',
+                    padding: '16px 24px',
                     background: selectedScore !== null
                       ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.9) 0%, rgba(124, 58, 237, 0.9) 100%)'
                       : 'rgba(100, 116, 139, 0.2)',
                     border: `1px solid ${selectedScore !== null ? 'rgba(168, 85, 247, 0.5)' : 'rgba(100, 116, 139, 0.2)'}`,
-                    borderRadius: '12px',
+                    borderRadius: '14px',
                     cursor: selectedScore !== null ? 'pointer' : 'not-allowed',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px',
+                    gap: '10px',
                     color: selectedScore !== null ? '#fff' : theme.colors.text.muted,
                     fontWeight: 'bold',
-                    fontSize: '14px',
+                    fontSize: '16px',
+                    boxShadow: selectedScore !== null ? '0 4px 24px rgba(168, 85, 247, 0.3)' : 'none',
                   }}
                 >
-                  <Send size={18} />
-                  ENVIAR AVALIAÇÃO
+                  <Send size={20} />
+                  CONCLUIR AVALIAÇÃO
                 </motion.button>
               </>
             ) : (
@@ -339,47 +365,47 @@ export function NPSForm({
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: '20px 0',
+                  padding: '40px 0',
                 }}
               >
                 <motion.div
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ duration: 0.5 }}
                   style={{
-                    width: '60px',
-                    height: '60px',
+                    width: '80px',
+                    height: '80px',
                     borderRadius: '50%',
                     background: 'rgba(34, 197, 94, 0.2)',
                     border: '2px solid #22C55E',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: '16px',
-                    boxShadow: '0 0 30px rgba(34, 197, 94, 0.3)',
+                    marginBottom: '20px',
+                    boxShadow: '0 0 40px rgba(34, 197, 94, 0.3)',
                   }}
                 >
-                  <Check size={30} color="#22C55E" />
+                  <Check size={40} color="#22C55E" />
                 </motion.div>
                 <h3
                   style={{
                     fontFamily: theme.typography.fontFamily.orbitron,
-                    fontSize: '16px',
+                    fontSize: '20px',
                     fontWeight: 'bold',
                     color: '#22C55E',
-                    marginBottom: '8px',
+                    marginBottom: '10px',
                   }}
                 >
                   OBRIGADO!
                 </h3>
                 <p
                   style={{
-                    fontSize: '13px',
+                    fontSize: '15px',
                     color: theme.colors.text.secondary,
                     textAlign: 'center',
-                    marginBottom: '16px',
+                    marginBottom: '20px',
                   }}
                 >
-                  Sua avaliação foi registrada
+                  Sua avaliação foi registrada com sucesso
                 </p>
                 <motion.div
                   initial={{ y: 10, opacity: 0 }}
@@ -388,18 +414,18 @@ export function NPSForm({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '10px 20px',
+                    gap: '8px',
+                    padding: '12px 24px',
                     background: 'rgba(245, 158, 11, 0.2)',
                     border: '1px solid rgba(245, 158, 11, 0.4)',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                   }}
                 >
-                  <Zap size={18} color={theme.colors.gold.DEFAULT} />
+                  <Zap size={20} color={theme.colors.gold.DEFAULT} />
                   <span
                     style={{
                       fontFamily: theme.typography.fontFamily.orbitron,
-                      fontSize: '14px',
+                      fontSize: '16px',
                       fontWeight: 'bold',
                       color: theme.colors.gold.DEFAULT,
                     }}
@@ -410,8 +436,9 @@ export function NPSForm({
               </motion.div>
             )}
           </motion.div>
-        </>
+        </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

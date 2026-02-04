@@ -20,6 +20,19 @@ export interface Message {
   tokens_used?: number
 }
 
+// UUID v4 generator compatible with iOS Safari
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  // Fallback for browsers without crypto.randomUUID (iOS Safari < 15.4)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 interface UseAIChatProps {
   event_day: number
   module_id: number
@@ -43,11 +56,15 @@ export function useAIChat({ event_day, module_id }: UseAIChatProps) {
     }
 
     const initConversation = async () => {
-      console.log('[useAIChat] Initializing conversation for', { user_id: user.id, event_day, module_id })
+      console.log('[useAIChat] ===== INIT START =====')
+      console.log('[useAIChat] User ID:', user.id)
+      console.log('[useAIChat] Event Day:', event_day)
+      console.log('[useAIChat] Module ID:', module_id)
 
       try {
         // Try to find the LAST active conversation (ignoring day/module)
         // This allows conversation to persist across modules and days
+        console.log('[useAIChat] STEP 1: Searching for existing conversation...')
         const { data: existingList, error: existingError } = await supabase
           .from('chat_conversations')
           .select('id')
@@ -56,23 +73,29 @@ export function useAIChat({ event_day, module_id }: UseAIChatProps) {
           .order('created_at', { ascending: false })
           .limit(1)
 
+        console.log('[useAIChat] STEP 1 RESULT:', {
+          existingList,
+          hasError: !!existingError,
+          errorDetails: existingError
+        })
+
         if (existingError) {
-          console.error('[useAIChat] Error finding conversation:', existingError)
+          console.error('[useAIChat] ❌ Error finding conversation:', existingError)
           throw existingError
         }
 
         const existing = existingList && existingList.length > 0 ? existingList[0] : null
+        console.log('[useAIChat] Existing conversation?', existing ? `YES (${existing.id})` : 'NO')
 
         if (existing) {
-          console.log('[useAIChat] Found existing conversation:', existing.id)
+          console.log('[useAIChat] ✅ Found existing conversation:', existing.id)
           setConversationId(existing.id)
-          // Load messages AFTER setting conversation ID
-          console.log('[useAIChat] Loading existing messages...')
+          console.log('[useAIChat] STEP 2: Loading messages for conversation:', existing.id)
           await loadMessages(existing.id)
-          console.log('[useAIChat] Messages loaded successfully')
+          console.log('[useAIChat] ✅ Messages loaded successfully')
         } else {
           // Create new conversation
-          console.log('[useAIChat] Creating new conversation')
+          console.log('[useAIChat] STEP 2: Creating NEW conversation...')
           const { data: newConv, error: newConvError } = await supabase
             .from('chat_conversations')
             .insert({
@@ -83,17 +106,29 @@ export function useAIChat({ event_day, module_id }: UseAIChatProps) {
             .select('id')
             .single()
 
+          console.log('[useAIChat] STEP 2 RESULT:', {
+            newConv,
+            hasError: !!newConvError,
+            errorDetails: newConvError
+          })
+
           if (newConvError) {
-            console.error('[useAIChat] Error creating conversation:', newConvError)
+            console.error('[useAIChat] ❌ Error creating conversation:', newConvError)
             throw newConvError
           }
 
           if (newConv) {
-            console.log('[useAIChat] Created new conversation:', newConv.id)
+            console.log('[useAIChat] ✅ Created new conversation:', newConv.id)
             setConversationId(newConv.id)
+          } else {
+            console.error('[useAIChat] ❌ CRITICAL: newConv is null/undefined!')
+            throw new Error('Failed to create conversation: no data returned')
           }
         }
+
+        console.log('[useAIChat] ===== INIT SUCCESS =====')
       } catch (err) {
+        console.error('[useAIChat] ===== INIT FAILED =====')
         console.error('[useAIChat] Init error:', err)
         const errorMessage = err instanceof Error ? err.message : 'Erro ao inicializar chat'
         setError(errorMessage)
@@ -144,24 +179,35 @@ export function useAIChat({ event_day, module_id }: UseAIChatProps) {
   // ============================================
 
   const sendMessage = async (content: string) => {
+    console.log('[useAIChat] ===== SEND MESSAGE ATTEMPT =====')
+    console.log('[useAIChat] User:', user?.id)
+    console.log('[useAIChat] ConversationId:', conversationId)
+    console.log('[useAIChat] Content length:', content.trim().length)
+
     if (!user || !conversationId || !content.trim()) {
-      console.warn('[useAIChat] Cannot send message:', {
+      console.error('[useAIChat] ❌ Cannot send message:', {
         hasUser: !!user,
         conversationId,
         hasContent: !!content.trim()
       })
-      setError('Erro: usuário ou conversa não inicializada')
+
+      let errorMsg = 'Erro: '
+      if (!user) errorMsg += 'usuário não autenticado'
+      else if (!conversationId) errorMsg += 'conversa não inicializada (conversationId é null). Recarregue a página.'
+      else errorMsg += 'mensagem vazia'
+
+      setError(errorMsg)
       return
     }
 
-    console.log('[useAIChat] Sending message:', content.substring(0, 50) + '...')
+    console.log('[useAIChat] ✅ All checks passed, sending message:', content.substring(0, 50) + '...')
 
     setLoading(true)
     setError(null)
 
     // Optimistic update - add user message immediately
     const userMessage: Message = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
@@ -170,27 +216,34 @@ export function useAIChat({ event_day, module_id }: UseAIChatProps) {
 
     try {
       // Verificar autenticação
+      console.log('[useAIChat] 🔐 Step 1: Getting session...')
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('[useAIChat] ✅ Step 1: Session obtained:', !!session)
+
       if (!session) {
         throw new Error('Usuário não autenticado')
       }
 
       // Call Edge Function via direct fetch (mesmo padrão de useActionPlan)
-      console.log('[useAIChat] Calling chat-completion with:', {
+      console.log('[useAIChat] 🚀 Step 2: Calling chat-completion with:', {
         user_id: user.id,
         conversation_id: conversationId,
         event_day,
         module_id,
       })
 
-      const response = await fetch(
+      console.log('[useAIChat] 📡 Step 3: Fetching:', `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-completion`)
+
+      // iOS Safari-compatible timeout using Promise.race
+      console.log('[useAIChat] 🏁 Step 4: Creating fetch promise...')
+      const fetchPromise = fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-completion`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             user_id: user.id,
@@ -202,20 +255,36 @@ export function useAIChat({ event_day, module_id }: UseAIChatProps) {
         }
       )
 
+      const timeoutPromise = new Promise<Response>((_, reject) => {
+        setTimeout(() => {
+          console.error('[useAIChat] Request timeout after 30s')
+          reject(new Error('TIMEOUT'))
+        }, 30000) // 30 segundos
+      })
+
+      console.log('[useAIChat] ⏳ Step 5: Waiting for response (max 30s)...')
+      const response = await Promise.race([fetchPromise, timeoutPromise])
+      console.log('[useAIChat] ✅ Step 6: Response received!')
+
+      console.log('[useAIChat] Response status:', response.status)
+      console.log('[useAIChat] Response ok:', response.ok)
+
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('[useAIChat] Edge Function error:', errorText)
-        throw new Error(`Erro ao enviar mensagem: ${response.status}`)
+        console.error('[useAIChat] Edge Function error response:', errorText)
+        console.error('[useAIChat] Response headers:', Object.fromEntries(response.headers.entries()))
+        throw new Error(`Erro ao enviar mensagem: ${response.status} - ${errorText}`)
       }
 
       const data = await response.json()
+      console.log('[useAIChat] Response data:', data)
 
       if (data.success) {
         console.log('[useAIChat] Received response, tokens:', data.tokens_used)
 
         // Add assistant response
         const assistantMessage: Message = {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           role: 'assistant',
           content: data.message,
           timestamp: new Date(),
@@ -223,16 +292,33 @@ export function useAIChat({ event_day, module_id }: UseAIChatProps) {
         }
         setMessages(prev => [...prev, assistantMessage])
       } else {
+        console.error('[useAIChat] Response not successful:', data)
         throw new Error(data.error || 'Erro ao enviar mensagem')
       }
     } catch (err: any) {
-      console.error('[useAIChat] Send error:', err)
-      const errorMessage = err.message || err.toString() || 'Erro ao enviar mensagem'
+      console.error('[useAIChat] Send error details:', {
+        name: err.name,
+        message: err.message,
+        type: typeof err,
+        constructor: err.constructor?.name,
+        fullError: err
+      })
+
+      // Tratamento específico para timeout
+      let errorMessage = err.message || err.toString() || 'Erro ao enviar mensagem'
+
+      if (errorMessage.includes('TIMEOUT')) {
+        errorMessage = 'TIMEOUT (30s): A requisição demorou muito.\n\nPossíveis causas:\n• OpenAI API está lenta\n• Edge Function travou\n• Conexão de rede instável\n\nTente novamente ou recarregue a página.'
+        console.error('[useAIChat] TIMEOUT DETECTED')
+      }
+
+      console.error('[useAIChat] Final error message:', errorMessage)
       setError(errorMessage)
 
       // Remove optimistic user message on error
       setMessages(prev => prev.filter(m => m.id !== userMessage.id))
     } finally {
+      console.log('[useAIChat] Finally block - setting loading to false')
       setLoading(false)
     }
   }

@@ -51,19 +51,30 @@ export function useNotifications() {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'notifications'
         },
         (payload) => {
-          console.log('🔔 [useNotifications] New notification received:', payload)
-          const newNotif = payload.new as Notification
-          setNotifications(prev => [newNotif, ...prev])
+          console.log('🔔 [useNotifications] Change:', payload.eventType)
 
-          // Incrementar unread count se não estiver na lista read_by
-          if (!newNotif.read_by?.includes(user.id)) {
-            setUnreadCount(prev => prev + 1)
-            console.log('🔔 [useNotifications] Unread count incremented')
+          if (payload.eventType === 'INSERT') {
+            const newNotif = payload.new as Notification
+            setNotifications(prev => [newNotif, ...prev])
+
+            if (!newNotif.read_by?.includes(user.id)) {
+              setUnreadCount(prev => prev + 1)
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as any)?.id
+            if (deletedId) {
+              setNotifications(prev => {
+                const updated = prev.filter(n => n.id !== deletedId)
+                const unread = updated.filter(n => !n.read_by?.includes(user!.id))
+                setUnreadCount(unread.length)
+                return updated
+              })
+            }
           }
         }
       )
@@ -243,6 +254,32 @@ export function useNotifications() {
     return notifications.filter(n => !n.read_by?.includes(user.id))
   }
 
+  // Deletar todas as notificações (admin only)
+  const deleteAllNotifications = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000')
+        .select('id')
+
+      if (error) throw error
+
+      if (!data || data.length === 0) {
+        console.warn('⚠️ Nenhuma notificação foi deletada - verifique RLS policies no Supabase')
+        return { error: new Error('Nenhum aviso foi removido. Verifique as permissões de DELETE na tabela notifications no Supabase.') }
+      }
+
+      setNotifications([])
+      setUnreadCount(0)
+      console.log(`✅ ${data.length} notifications deleted`)
+      return { error: null }
+    } catch (err) {
+      console.error('❌ Error deleting notifications:', err)
+      return { error: err as Error }
+    }
+  }
+
   return {
     notifications,
     loading,
@@ -251,6 +288,7 @@ export function useNotifications() {
     markAsRead,
     markAllAsRead,
     createNotification,
+    deleteAllNotifications,
     isRead,
     getUnreadNotifications,
     refresh: loadNotifications,

@@ -1,7 +1,7 @@
 # 📊 RELATÓRIO DE PROGRESSO - Tarefas Implementadas
 
-**Data:** 2026-02-02
-**Status:** Em andamento (usuário ausente temporariamente)
+**Data:** 2026-02-04
+**Status:** Em andamento - Preparação para evento 28/02
 
 ---
 
@@ -101,82 +101,41 @@ SELECT * FROM nps_responses ORDER BY created_at DESC;
 
 ---
 
-## 🔄 TASK 2: ADMIN CONTROLE DE EVENTO - PENDENTE
+## ✅ TASK 2: ADMIN CONTROLE DE EVENTO - COMPLETO
 
-### Problemas identificados:
-1. ❌ Mostra "ao vivo" na tela sem Admin clicar "iniciar"
-2. ❌ Mostra etapa "IMPACT na prática" sem Admin selecionar
-3. ❌ Estado do Admin não persiste ao fechar/reabrir
-
-### O que precisa ser feito:
-
-#### A. Criar Tabela `event_state` para Persistência
-```sql
-CREATE TABLE event_state (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  status TEXT CHECK (status IN ('offline', 'live', 'paused', 'finished')),
-  current_day INTEGER CHECK (current_day IN (1, 2)),
-  current_module INTEGER,
-  offer_unlocked BOOLEAN DEFAULT false,
-  offer_visible BOOLEAN DEFAULT false,
-  ai_enabled BOOLEAN DEFAULT false,
-  lunch_started_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-#### B. Modificar Admin para:
-- Carregar estado do banco ao abrir
-- Salvar estado no banco a cada mudança
-- Sincronizar com outras páginas em tempo real
-
-#### C. Modificar Páginas (AoVivo, PosEvento) para:
-- Ler estado do banco, não de constantes hardcoded
-- Reagir a mudanças em tempo real (Supabase Realtime)
+### Implementado:
+- ✅ Tabela `event_state` criada com todos os campos necessários
+- ✅ Admin carrega e salva estado no banco em tempo real
+- ✅ Páginas (AoVivo, PosEvento, PreEvento) leem estado do banco via Supabase Realtime
+- ✅ Controle de acesso às abas via unlock_date / lock_date
+- ✅ Toggle manual com prioridade máxima
+- ✅ Admin bypass completo
+- ✅ Sincronização de dia Admin-Participante
+- ✅ Botões de status mutuamente exclusivos
+- ✅ Modal customizada para horário de almoço
 
 ---
 
-## 🎁 TASK 3: OFERTA IMPACT - PENDENTE
+## ✅ TASK 3: OFERTA IMPACT - COMPLETO
 
-### O que precisa ser feito:
-
-#### A. Controle via Admin
-- Botão "Liberar Oferta" → salva `offer_unlocked = true` no banco
-- Botão "Fechar Oferta" → salva `offer_visible = false` no banco
-
-#### B. Mostrar em Múltiplas Páginas
-- AoVivo: mostrar modal de oferta quando `offer_unlocked = true`
-- PosEvento: mostrar seção de oferta quando `offer_unlocked = true`
-- Persiste até Admin clicar "Fechar"
-
-#### C. Sincronização Realtime
-- Subscription para mudanças em `event_state`
-- Modal aparece instantaneamente quando Admin libera
-- Modal desaparece quando Admin fecha
+### Implementado:
+- ✅ Botão "Liberar Oferta" no Admin salva `offer_unlocked = true` no banco
+- ✅ Botão "Fechar Oferta" salva `offer_visible = false`
+- ✅ Links da oferta salvos como JSONB no campo `offer_links`
+- ✅ UTM tracking configurado para links Hotmart
+- ✅ Sincronização realtime via Supabase subscription
 
 ---
 
-## 💾 TASK 4: VERIFICAR PERSISTÊNCIA DE DADOS - PENDENTE
+## ✅ TASK 4: VERIFICAR PERSISTÊNCIA DE DADOS - COMPLETO
 
-### Checklist de Verificação:
-
-#### Diagnóstico (Sliders IMPACT)
-- [ ] Verificar se `diagnostic_entries` está salvando corretamente
-- [ ] Testar: usuário move sliders → fecha app → reabre → sliders devem estar na mesma posição
-- [ ] Confirmar que dados estão disponíveis para IA usar
-
-#### Progresso do Usuário
-- [ ] Verificar se `completed_steps` está atualizando
-- [ ] Verificar se `xp` está sendo incrementado corretamente
-- [ ] Testar: usuário completa step → recarrega → step deve continuar completo
-
-#### Survey de Calibragem
-- [ ] Verificar se `survey_responses` está salvando
-- [ ] Confirmar que dados são carregados corretamente na próxima sessão
-
-#### NPS Responses
-- [ ] ✅ Já implementado e testado
-- [ ] Verificar via SQL que respostas estão sendo salvas
+### Verificado:
+- ✅ `diagnostic_entries` salvando corretamente
+- ✅ `completed_steps` atualizando
+- ✅ `xp` sendo incrementado corretamente
+- ✅ `survey_responses` salvando
+- ✅ `nps_responses` implementado e testado
+- ✅ `last_seen_at` atualizando a cada 30 segundos
 
 ---
 
@@ -194,47 +153,33 @@ CREATE TABLE event_state (
 
 ## 🎯 PRÓXIMOS PASSOS (ORDEM DE PRIORIDADE)
 
-### 1. Executar Migration NPS (5 min)
-```bash
-# No Supabase SQL Editor:
-# 1. Copiar conteúdo de supabase-migrations-nps-responses.sql
-# 2. Executar SQL
-# 3. Verificar que tabela foi criada com: SELECT * FROM nps_responses;
-```
+### 1. Validação Final Pré-Evento
+- Testar todos os fluxos end-to-end com usuários reais
+- Verificar que countdown mostra data correta do evento (28/02)
+- Confirmar que aulas bônus destravam em 12/02
 
-### 2. Testar NPS End-to-End (10 min)
-```
-1. Admin → clicar "NPS DIA 1"
-2. AoVivo → modal deve aparecer travando tela
-3. Escolher score 9 → ver label "Promotor (9-10)"
-4. Ver pergunta mudar: "Que ótimo! O que mais te impressionou..."
-5. Preencher feedback e enviar
-6. Verificar SQL: SELECT * FROM nps_responses WHERE user_id = 'seu-id';
-7. Confirmar +30 XP foi dado
-```
+### 2. Personalização do Plano de Ação IA
+- Ajustar prompt da Edge Function `generate-action-plan` para gerar planos menos genéricos
+- Reduzir exemplos prescritivos que resultam em planos idênticos entre usuários
 
-### 3. Implementar Event State Persistence (2-3h)
-- Criar tabela `event_state`
-- Modificar Admin para salvar/carregar estado
-- Sincronizar AoVivo/PosEvento com banco
+### 3. RLS Policy DELETE para Notifications
+- Verificar se policy DELETE existe na tabela `notifications` no Supabase
+- Se não, criar policy para permitir DELETE por admins
 
-### 4. Implementar Controle de Oferta (1-2h)
-- Adicionar campos de oferta em `event_state`
-- Criar lógica de show/hide baseada no banco
-- Testar em múltiplas páginas
-
-### 5. Verificar Persistência Geral (1h)
-- Testar todos os fluxos de dados
-- Confirmar que tudo salva e carrega corretamente
-- Documentar qualquer issue encontrado
+### 4. Google Sheets Integration (Pós-Evento)
+- Setup Google Cloud Service Account
+- Edge Function `/sync-google-sheets`
+- Cron Job para sincronização
 
 ---
 
 ## 🐛 ISSUES CONHECIDOS
 
-1. ❌ Admin não persiste estado (Task 2)
-2. ❌ Oferta não sincroniza entre Admin e páginas (Task 3)
-3. ⚠️ Precisa verificar se diagnostic sliders salvam (Task 4)
+1. ⚠️ Plano de ação IA gera planos muito similares entre usuários com mesmo gargalo
+2. ⚠️ RLS policy DELETE pode estar faltando na tabela notifications
+3. ✅ ~~Admin não persiste estado~~ → RESOLVIDO (event_state + Realtime)
+4. ✅ ~~Oferta não sincroniza~~ → RESOLVIDO (offer_links JSONB + Realtime)
+5. ✅ ~~Diagnostic sliders não salvam~~ → RESOLVIDO (diagnostic_entries)
 
 ---
 
@@ -246,7 +191,16 @@ CREATE TABLE event_state (
 4. ✅ **Persistência NPS** - respostas salvas com constraint UNIQUE
 5. ✅ **View de análise** - cálculo automático de NPS Score
 6. ✅ **Error handling** - feedback ao usuário se algo falhar
+7. ✅ **Sistema de Presença** - heartbeat 30s, status online/idle/offline
+8. ✅ **Admin filtros** - filtrar por online, ordenar por XP ou atividade
+9. ✅ **Plano 7 dias visual** - todos os dias visíveis com blur/lock em futuros
+10. ✅ **Purchase links** - Hotmart checkout com UTM tracking
+11. ✅ **Aulas trancadas** - liberação por data (12/02)
+12. ✅ **Msg contextual** - "Fase Concluída" após evento iniciar
+13. ✅ **LiveEventModal** - redirecionamento automático ao vivo
+14. ✅ **Compressão de imagem** - auto-compress no upload
+15. ✅ **Countdown dinâmico** - baseado em event_state do banco
 
 ---
 
-**Última atualização:** 2026-02-02 (aguardando retorno do usuário)
+**Última atualização:** 2026-02-04

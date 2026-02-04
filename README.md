@@ -21,7 +21,10 @@ Este aplicativo **não é** um curso, comunidade ou repositório de conteúdo.
 | TypeScript | Tipagem estática |
 | Framer Motion | Animações |
 | Lucide React | Ícones |
-| Vercel | Deploy |
+| Supabase | Auth, Database, Realtime, Storage, Edge Functions |
+| Vercel | Deploy frontend |
+| OpenAI GPT-4o-mini | Geração de plano de ação personalizado |
+| ElevenLabs | Áudio personalizado via TTS |
 
 ## Rotas do App
 
@@ -41,15 +44,34 @@ Este aplicativo **não é** um curso, comunidade ou repositório de conteúdo.
 ```
 src/
 ├── components/
-│   └── ui/           # Componentes reutilizáveis
+│   └── ui/              # Componentes reutilizáveis (20+)
+├── config/
+│   └── xp-system.ts     # Sistema de XP centralizado (1000 XP total)
+├── contexts/
+│   └── AuthContext.tsx   # Context de autenticação Supabase
 ├── data/
-│   ├── modules.ts    # 17 módulos do evento (0-16)
+│   ├── modules.ts       # 17 módulos do evento (0-16)
 │   └── survey-config.ts # Pesquisa de calibragem (Single Source of Truth)
+├── hooks/
+│   ├── useAuth.ts           # Autenticação
+│   ├── useHeartbeat.ts      # Presença em tempo real (30s)
+│   ├── useEventState.ts     # Estado do evento + controle de abas
+│   ├── useUserProgress.ts   # XP e steps completados
+│   ├── useNotifications.ts  # Notificações realtime
+│   ├── useActionPlan.ts     # Plano de ação 7 dias (IA)
+│   ├── useAIChat.ts         # Chat com IA
+│   └── useDiagnosticScore.ts # Score IMPACT
 ├── lib/
-│   └── whatsapp-message.ts # Gerador de prompt WhatsApp (IA)
-├── pages/            # Páginas da aplicação
-├── styles/           # Theme tokens
-└── App.tsx           # Rotas
+│   ├── supabase.ts          # Cliente Supabase
+│   └── whatsapp-message.ts  # Gerador de prompt WhatsApp (IA)
+├── pages/               # Páginas da aplicação
+├── styles/              # Theme tokens
+└── App.tsx              # Rotas
+supabase/
+└── functions/
+    ├── hotmart-webhook/       # Webhook Hotmart
+    ├── generate-audio/        # Áudio personalizado (ElevenLabs)
+    └── generate-action-plan/  # Plano de ação (GPT-4o-mini)
 ```
 
 ## Componentes UI
@@ -62,11 +84,18 @@ src/
 | Card | Container glassmorphism |
 | Input | Input com borda gradiente |
 | RadarChart | Gráfico radar IMPACT |
-| Countdown | Timer regressivo |
+| Countdown | Timer regressivo dinâmico (event_state) |
 | ProgressBar | Barra de progresso com glow |
-| BottomNav | Navegação sequencial |
+| BottomNav | Navegação sequencial com status |
 | LiveTicker | Status do evento ao vivo |
 | DiagnosticSlider | Slider de diagnóstico |
+| ActionPlan | Plano 7 dias com blur/lock em futuros |
+| FinalReport | Relatório final com mini radar |
+| NPSForm | Formulário NPS bloqueante |
+| AIChatInterface | Chat com assistente IA |
+| AvatarButton | Botão avatar com foto |
+| NotificationDrawer | Drawer de notificações |
+| LiveEventModal | Modal de redirecionamento ao vivo |
 
 ## Scripts
 
@@ -94,41 +123,40 @@ git push origin main
 
 ## Documentação Adicional
 
-### 📝 Atualizações e Mudanças
-- [CHANGELOG.md](./CHANGELOG.md) - 📝 Histórico completo de mudanças e versões
+> **Navegação centralizada:** [03-DOCS-INDEX.md](./03-DOCS-INDEX.md)
 
-### Design e Arquitetura
-- [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) - Sistema de design completo
-- [PLANO_COMPLETO_INFRAESTRUTURA.md](./PLANO_COMPLETO_INFRAESTRUTURA.md) - Arquitetura e backend
+### Visão Geral
+- [02-CHANGELOG.md](./02-CHANGELOG.md) - Histórico completo de mudanças (v2.4.0)
+- [CHANGELOG.md](./CHANGELOG.md) - Changelog resumido (legacy)
+- [PROGRESS-REPORT.md](./PROGRESS-REPORT.md) - Relatório de progresso
 
-### Segurança e Validação
-- [SECURITY-VALIDATION.md](./SECURITY-VALIDATION.md) - 🔒 Sistema de validação de compras (CRÍTICO)
-- [DEPLOY-SECURITY.md](./DEPLOY-SECURITY.md) - 🚀 Guia rápido de deploy da validação
+### Core Features
+- [10-DIAGNOSTIC-SCORE-CALCULATION.md](./10-DIAGNOSTIC-SCORE-CALCULATION.md) - Score IMPACT e gargalo
+- [11-TAB-ACCESS-CONTROL.md](./11-TAB-ACCESS-CONTROL.md) - Controle de acesso às abas
+- [12-AUDIO-SYSTEM.md](./12-AUDIO-SYSTEM.md) - Áudio personalizado (OpenAI + ElevenLabs)
 
-### Integrações e Deploy
-- [DEPLOY-WEBHOOK.md](./DEPLOY-WEBHOOK.md) - Deploy do webhook Hotmart
-- [HOTMART-WEBHOOK-DOCS.md](./HOTMART-WEBHOOK-DOCS.md) - Documentação do webhook Hotmart
+### Arquitetura e Banco de Dados
+- [30-SUPABASE-SCHEMA-REFERENCE.md](./30-SUPABASE-SCHEMA-REFERENCE.md) - Schema do banco
+- [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) - Sistema de design
 
-### 🎙️ Áudio Personalizado via IA (NOVO)
-- [IMPLEMENTACAO-AUDIO-RESUMO.md](./IMPLEMENTACAO-AUDIO-RESUMO.md) - ✅ Resumo completo da implementação
-- [FLUXO_AUDIO_BOASVINDAS.md](./FLUXO_AUDIO_BOASVINDAS.md) - Arquitetura e fluxo do sistema
-- [GHL-WORKFLOW-2-VARIAVEIS.md](./GHL-WORKFLOW-2-VARIAVEIS.md) - 📋 Variáveis para copiar/colar no GHL
-- [GUIA-SETUP-GHL-AUDIO.md](./GUIA-SETUP-GHL-AUDIO.md) - Setup passo-a-passo do Go High Level
-- `test-generate-audio.sh` - Script de teste da Edge Function
+### Guias para Desenvolvedores
+- [50-QUICK-START-NEW-DEVS.md](./50-QUICK-START-NEW-DEVS.md) - Onboarding rápido
+- [52-TROUBLESHOOTING-GUIDE.md](./52-TROUBLESHOOTING-GUIDE.md) - Solução de problemas
+- [53-DEPLOYMENT-GUIDE.md](./53-DEPLOYMENT-GUIDE.md) - Guia de deployment
 
-### Migrations SQL
-- `supabase-validation-function.sql` - Função de validação de compradores
-- `supabase-migrations-access-requests.sql` - Tabela de solicitações de acesso
-- `supabase-migrations-survey-audio-files.sql` - Sistema de áudio personalizado via IA
-- `fix-survey-responses-rls-v2.sql` - Row Level Security atualizado
-- `supabase-migrations-purchases-v3.sql` - Campo manual_approval
-- `supabase-migrations-purchases-v2.sql` - Campos de comprador (nome, documento, telefone)
+### Segurança e Integrações
+- [SECURITY-VALIDATION.md](./SECURITY-VALIDATION.md) - Validação de compras
+- [HOTMART-WEBHOOK-DOCS.md](./HOTMART-WEBHOOK-DOCS.md) - Webhook Hotmart
 
 ## Evento
 
 - **Data:** 28/02/2026 e 01/03/2026
 - **Horário:** 09:30
 - **Participantes esperados:** ~1000
+
+## Versão Atual
+
+**v2.4.0** (2026-02-04) - Event Prep & UX Polish
 
 ---
 
