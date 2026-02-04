@@ -476,6 +476,19 @@ export function Admin() {
     })
   }, [dbEventState])
 
+  // Load event data from event_state
+  useEffect(() => {
+    if (!dbEventState) return
+
+    setEventData({
+      edition: dbEventState.edition || 'Fevereiro 2026',
+      day1Date: dbEventState.day1_date || '2026-02-28',
+      day1Time: dbEventState.day1_time || '09:30',
+      day2Date: dbEventState.day2_date || '2026-03-01',
+      day2Time: dbEventState.day2_time || '09:30',
+    })
+  }, [dbEventState])
+
   // Save tab release settings to event_state
   const saveTabSettings = async () => {
     const formatToISO = (date: string, time: string): string | null => {
@@ -493,6 +506,12 @@ export function Admin() {
       pos_evento_enabled: tabRelease.posEvento.enabled,
       pos_evento_unlock_date: formatToISO(tabRelease.posEvento.unlockDate, tabRelease.posEvento.unlockTime),
       pos_evento_lock_date: formatToISO(tabRelease.posEvento.lockDate, tabRelease.posEvento.lockTime),
+      // Event Data
+      edition: eventData.edition,
+      day1_date: eventData.day1Date,
+      day1_time: eventData.day1Time,
+      day2_date: eventData.day2Date,
+      day2_time: eventData.day2Time,
     }
 
     const { error } = await updateEventState(updates)

@@ -42,6 +42,13 @@ export interface EventState {
 
   // NPS Control
   nps_active: 'day1' | 'final' | null
+
+  // Event Data (editable from admin)
+  edition: string | null
+  day1_date: string | null
+  day1_time: string | null
+  day2_date: string | null
+  day2_time: string | null
 }
 
 export function useEventState() {
@@ -287,14 +294,20 @@ export function useEventState() {
       nps_active: null,
       // Abas: restaurar datas padrão
       pre_evento_enabled: true,
-      pre_evento_unlock_date: '2026-02-03T18:11:00-03:00',
+      pre_evento_unlock_date: '2026-02-03T00:00:00-03:00',
       pre_evento_lock_date: '2026-02-28T09:40:00-03:00',
-      ao_vivo_enabled: true,
-      ao_vivo_unlock_date: '2026-02-02T10:11:00-03:00',
+      ao_vivo_enabled: false,
+      ao_vivo_unlock_date: '2026-02-28T09:30:00-03:00',
       ao_vivo_lock_date: '2026-03-01T19:00:00-03:00',
       pos_evento_enabled: true,
       pos_evento_unlock_date: '2026-03-02T07:00:00-03:00',
       pos_evento_lock_date: '2026-03-30T00:00:00-03:00',
+      // Event Data: restaurar padrão
+      edition: 'Fevereiro 2026',
+      day1_date: '2026-02-28',
+      day1_time: '09:30',
+      day2_date: '2026-03-01',
+      day2_time: '09:30',
     })
   }
 
