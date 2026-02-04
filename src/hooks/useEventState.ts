@@ -275,6 +275,7 @@ export function useEventState() {
   const resetEvent = async () => {
     return updateEventState({
       status: 'offline',
+      current_day: 1,
       current_module: 0,
       event_started_at: null,
       event_finished_at: null,
@@ -284,10 +285,16 @@ export function useEventState() {
       lunch_started_at: null,
       lunch_duration_minutes: 60,
       nps_active: null,
-      ao_vivo_enabled: true,
-      ao_vivo_lock_date: null,
+      // Abas: restaurar datas padrão
       pre_evento_enabled: true,
-      pre_evento_lock_date: null,
+      pre_evento_unlock_date: '2026-02-03T18:11:00-03:00',
+      pre_evento_lock_date: '2026-02-28T09:40:00-03:00',
+      ao_vivo_enabled: true,
+      ao_vivo_unlock_date: '2026-02-02T10:11:00-03:00',
+      ao_vivo_lock_date: '2026-03-01T19:00:00-03:00',
+      pos_evento_enabled: true,
+      pos_evento_unlock_date: '2026-03-02T07:00:00-03:00',
+      pos_evento_lock_date: '2026-03-30T00:00:00-03:00',
     })
   }
 

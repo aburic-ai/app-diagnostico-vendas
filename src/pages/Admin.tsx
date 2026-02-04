@@ -4430,11 +4430,10 @@ export function Admin() {
         cancelText="Cancelar"
         type="danger"
         details={[
-          'Status volta para offline',
-          'Módulo atual volta para 0',
+          'Status volta para offline, Dia 1, Módulo 0',
           'Limpa event_started_at e event_finished_at',
           'Remove oferta, NPS, intervalo',
-          'Mantém configurações de datas das abas',
+          'Restaura datas das abas (Prep 03/02, AoVivo 02/02, Pós 02/03)',
           '⚠️ Não use durante o evento real!',
         ]}
       />
