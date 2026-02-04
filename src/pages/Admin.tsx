@@ -659,6 +659,13 @@ export function Admin() {
 
   const handleResetEvent = async () => {
     await resetEvent()
+
+    // Limpar avisos existentes e criar avisos padrão
+    await deleteAllNotifications()
+    await createNotification('info', 'Complete seu perfil', 'Você ganhará 30 pontos')
+    await createNotification('info', 'Aulas bônus', 'Confira a liberação')
+    await createNotification('info', 'Confira os opcionais', 'Dossiê do seu negócio e a gravação do evento')
+
     console.log('🔄 Evento resetado para estado pré-início')
     setAdminToast({
       message: 'Evento resetado! Status: offline, módulo: 0, como se nunca tivesse iniciado.',
