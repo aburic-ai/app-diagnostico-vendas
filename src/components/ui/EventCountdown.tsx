@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Calendar, Clock, Radio, Zap, Star } from 'lucide-react'
 import { theme } from '../../styles/theme'
 

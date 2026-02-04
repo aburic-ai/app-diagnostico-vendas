@@ -5,7 +5,6 @@
  * e opção de download do relatório
  */
 
-import { motion } from 'framer-motion'
 import { TrendingDown, AlertTriangle } from 'lucide-react'
 import { theme } from '../../styles/theme'
 import type { IMPACTData } from './RadarChart'

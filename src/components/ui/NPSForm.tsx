@@ -63,7 +63,7 @@ export function NPSForm({
   onClose,
   onSubmit,
   xpReward,
-  mandatory = true,
+  mandatory: _mandatory = true,
 }: NPSFormProps) {
   const [selectedScore, setSelectedScore] = useState<number | null>(null)
   const [feedback, setFeedback] = useState('')

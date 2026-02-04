@@ -76,7 +76,7 @@ export function PosEvento() {
   const { profile: userProfile, user } = useAuth()
   useHeartbeat() // Atualiza last_seen_at a cada 30s
   const { completeStep } = useUserProgress()
-  const { eventState, isAoVivoAccessible, isPosEventoAccessible, isAdmin } = useEventState()
+  const { eventState, isPosEventoAccessible, isAdmin } = useEventState()
   const { getDiagnosticByDay, loading: diagnosticLoading } = useDiagnostic()
   const { projections, loading: loadingProjections, error: errorProjections } = useScenarioProjection()
   const location = useLocation()
@@ -101,7 +101,7 @@ export function PosEvento() {
   const impactOfferRef = useRef<HTMLDivElement>(null)
   const actionPlanRef = useRef<HTMLDivElement>(null)
 
-  const [activeNav, setActiveNav] = useState('posevento')
+  const [activeNav] = useState('posevento')
   const [showAlert, setShowAlert] = useState(true)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)

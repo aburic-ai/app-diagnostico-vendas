@@ -26,7 +26,6 @@ import {
   Star,
   Crown,
   Ticket,
-  Clock,
   Pause,
   Coffee,
   CheckSquare,
@@ -109,13 +108,13 @@ export function AoVivo() {
   useHeartbeat() // Atualiza last_seen_at a cada 30s
   const { getDiagnosticByDay, saveDiagnostic, loading: diagnosticLoading } = useDiagnostic()
   const { completeStep, isStepCompleted } = useUserProgress()
-  const { eventState, isAoVivoAccessible, isPosEventoAccessible, isAdmin } = useEventState()
+  const { eventState, isPosEventoAccessible, isAdmin } = useEventState()
   const location = useLocation()
 
   // Refs para scroll to section (avisos clickables)
   const diagnosticSlidersRef = useRef<HTMLDivElement>(null)
 
-  const [activeNav, setActiveNav] = useState('aovivo')
+  const [activeNav] = useState('aovivo')
   const [selectedDay, setSelectedDay] = useState<1 | 2>((eventState?.current_day === 2 ? 2 : 1) as 1 | 2)
   const [showSliders, setShowSliders] = useState(true)
 

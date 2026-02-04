@@ -129,7 +129,7 @@ export function PreEvento() {
   useHeartbeat() // Atualiza last_seen_at a cada 30s
   const { xp, completedSteps, completeStep, isStepCompleted } = useUserProgress()
   const { eventState, isPreEventoAccessible, isAoVivoAccessible, isPosEventoAccessible, isAdmin } = useEventState()
-  const [activeNav, setActiveNav] = useState('preparacao')
+  const [activeNav] = useState('preparacao')
   const [showSchedule, setShowSchedule] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
@@ -202,15 +202,21 @@ export function PreEvento() {
     if (!eventState) return new Date('2026-02-28T09:30:00') // Fallback
 
     const now = new Date()
-    const preEventoUnlock = new Date(eventState.pre_evento_unlock_date)
 
-    // Se ainda não liberou o Pré-Evento, mostrar countdown para ele
-    if (now < preEventoUnlock) {
-      return preEventoUnlock
+    if (eventState.pre_evento_unlock_date) {
+      const preEventoUnlock = new Date(eventState.pre_evento_unlock_date)
+      // Se ainda não liberou o Pré-Evento, mostrar countdown para ele
+      if (now < preEventoUnlock) {
+        return preEventoUnlock
+      }
     }
 
     // Se já liberou, mostrar countdown para Ao Vivo
-    return new Date(eventState.ao_vivo_unlock_date)
+    if (eventState.ao_vivo_unlock_date) {
+      return new Date(eventState.ao_vivo_unlock_date)
+    }
+
+    return new Date('2026-02-28T09:30:00') // Fallback
   }, [eventState])
 
   // Dynamic nav items baseado no estado do evento
