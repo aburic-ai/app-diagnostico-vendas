@@ -24,6 +24,8 @@ import {
   Lock,
   AlertCircle,
   Loader2,
+  LogIn,
+  RefreshCw,
 } from 'lucide-react'
 
 import { PageWrapper, Card, Button, Input } from '../components/ui'
@@ -45,7 +47,7 @@ type Step = 'verification' | 'access-denied' | 'pending-review' | 'survey' | 'wh
 
 type VerificationStatus = 'checking' | 'not_found' | 'found'
 
-const WHATSAPP_LINK = 'https://chat.whatsapp.com/GRUPO_EXCLUSIVO'
+const WHATSAPP_LINK = 'https://chat.whatsapp.com/Hnm8ZUR1pfzEYNvd3Pb2gV'
 const SUPPORT_WHATSAPP = '+5511942230050'
 
 // ============================================
@@ -277,6 +279,8 @@ export function ThankYou() {
   const [passwordError, setPasswordError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [buyerName, setBuyerName] = useState<string>('')  // Nome do comprador
+  const [hasPreviousSurvey, setHasPreviousSurvey] = useState(false) // Já preencheu a calibragem antes?
+  const [checkingSurvey, setCheckingSurvey] = useState(false) // Verificando se já preencheu
 
   // Get transaction from URL on mount
   useEffect(() => {
@@ -316,6 +320,8 @@ export function ThankYou() {
         setBuyerName(validation.buyerName || '')
         if (validation.buyerEmail) {
           setEmail(validation.buyerEmail) // Salvar email da compra
+          // Verificar se já preencheu a calibragem antes
+          await checkExistingSurvey(validation.buyerEmail)
         }
         // User found
         setVerificationStatus('found')
@@ -384,8 +390,38 @@ export function ThankYou() {
 
     // ✅ Comprador válido - continuar
     setBuyerName(validation.buyerName || '')
+
+    // Verificar se já preencheu a calibragem antes
+    await checkExistingSurvey(email)
+
     // User found
     setVerificationStatus('found')
+  }
+
+  // Verificar se já existe survey_response para esse email
+  const checkExistingSurvey = async (checkEmail: string) => {
+    if (!checkEmail) return
+
+    setCheckingSurvey(true)
+    try {
+      const { data, error } = await supabase
+        .from('survey_responses')
+        .select('id')
+        .eq('email', checkEmail.toLowerCase())
+        .maybeSingle()
+
+      if (!error && data) {
+        console.log('[ThankYou] ✅ Survey anterior encontrado para:', checkEmail)
+        setHasPreviousSurvey(true)
+      } else {
+        setHasPreviousSurvey(false)
+      }
+    } catch (err) {
+      console.error('[ThankYou] Erro ao verificar survey existente:', err)
+      setHasPreviousSurvey(false)
+    } finally {
+      setCheckingSurvey(false)
+    }
   }
 
   // ❌ REMOVIDO: handleManualProceed (skip verification) - vulnerabilidade de segurança
@@ -541,6 +577,20 @@ export function ThankYou() {
         })
 
         console.log('[ThankYou] ✅ GHL notificado!')
+
+        // Aguardar GHL processar e buscar contact_id
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        console.log('[ThankYou] Buscando contact_id no GHL...')
+        const { data: ghlData } = await supabase.functions.invoke('ghl-lookup-contact', {
+          body: { email: email || validation.buyerEmail || '' },
+        })
+
+        if (ghlData?.contact_id) {
+          console.log('[ThankYou] ✅ GHL contact_id:', ghlData.contact_id)
+          // Salvar no profile (será feito após criar a conta)
+          ;(window as any).__ghlContactId = ghlData.contact_id
+        }
       } catch (ghlError) {
         // Não bloqueia o fluxo se GHL falhar
         console.warn('[ThankYou] ⚠️ Erro ao notificar GHL:', ghlError)
@@ -621,6 +671,17 @@ export function ThankYou() {
       if (profileError) {
         console.error('[ThankYou] Erro ao buscar profile:', profileError)
       } else if (profile) {
+        // Salvar ghl_contact_id se disponível
+        const ghlContactId = (window as any).__ghlContactId
+        if (ghlContactId) {
+          console.log('[ThankYou] Salvando ghl_contact_id no profile:', ghlContactId)
+          await supabase
+            .from('profiles')
+            .update({ ghl_contact_id: ghlContactId })
+            .eq('id', profile.id)
+          delete (window as any).__ghlContactId
+        }
+
         // Registrar XP do protocolo no ledger (trigger sincroniza profiles automaticamente)
         console.log('[ThankYou] Creditando +30 XP do protocolo via ledger...')
 
@@ -1138,17 +1199,122 @@ export function ThankYou() {
               </Card>
 
               {/* Button - Separated at the bottom when purchase found */}
-              {verificationStatus === 'found' && (
+              {verificationStatus === 'found' && !checkingSurvey && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
+                  style={{ marginTop: '8px' }}
+                >
+                  {hasPreviousSurvey ? (
+                    // Já preencheu antes - mostrar opções
+                    <Card variant="default">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '12px',
+                            background: 'rgba(34, 211, 238, 0.08)',
+                            border: '1px solid rgba(34, 211, 238, 0.25)',
+                            borderRadius: '10px',
+                          }}
+                        >
+                          <CheckCircle size={20} color={theme.colors.accent.cyan.DEFAULT} style={{ flexShrink: 0 }} />
+                          <div>
+                            <p
+                              style={{
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                                color: theme.colors.accent.cyan.DEFAULT,
+                                margin: 0,
+                              }}
+                            >
+                              Sua calibragem já foi preenchida!
+                            </p>
+                            <p
+                              style={{
+                                fontSize: '12px',
+                                color: theme.colors.text.secondary,
+                                margin: 0,
+                                marginTop: '4px',
+                              }}
+                            >
+                              Deseja preencher novamente ou ir direto para o login?
+                            </p>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <motion.button
+                            onClick={() => setStep('survey')}
+                            whileTap={{ scale: 0.98 }}
+                            style={{
+                              flex: 1,
+                              padding: '14px 16px',
+                              background: 'rgba(15, 17, 21, 0.6)',
+                              border: '1px solid rgba(100, 120, 150, 0.3)',
+                              borderRadius: '12px',
+                              color: theme.colors.text.secondary,
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                            }}
+                          >
+                            <RefreshCw size={16} />
+                            Refazer
+                          </motion.button>
+
+                          <motion.button
+                            onClick={() => window.location.href = '/login'}
+                            whileTap={{ scale: 0.98 }}
+                            style={{
+                              flex: 1,
+                              padding: '14px 16px',
+                              background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(124, 58, 237, 0.2) 100%)',
+                              border: '1px solid rgba(168, 85, 247, 0.5)',
+                              borderRadius: '12px',
+                              color: theme.colors.text.primary,
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                            }}
+                          >
+                            <LogIn size={16} />
+                            Ir para Login
+                          </motion.button>
+                        </div>
+                      </div>
+                    </Card>
+                  ) : (
+                    // Primeira vez - botão normal
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <Button onClick={() => setStep('survey')}>
+                        INICIAR CALIBRAGEM
+                        <ChevronRight size={18} />
+                      </Button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Loading while checking survey */}
+              {verificationStatus === 'found' && checkingSurvey && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
                   style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}
                 >
-                  <Button onClick={() => setStep('survey')}>
-                    INICIAR CALIBRAGEM
-                    <ChevronRight size={18} />
-                  </Button>
+                  <Loader2 size={24} color={theme.colors.accent.purple.light} style={{ animation: 'spin 1s linear infinite' }} />
                 </motion.div>
               )}
             </motion.div>
@@ -1253,6 +1419,22 @@ export function ThankYou() {
                     }}
                   >
                     {SURVEY_INTRO.subtitle}
+                  </p>
+                  {/* Mensagem de tranquilização */}
+                  <p
+                    style={{
+                      fontSize: '12px',
+                      color: theme.colors.accent.cyan.DEFAULT,
+                      lineHeight: 1.5,
+                      margin: 0,
+                      marginTop: '10px',
+                      padding: '10px 12px',
+                      background: 'rgba(34, 211, 238, 0.08)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(34, 211, 238, 0.15)',
+                    }}
+                  >
+                    💡 {SURVEY_INTRO.reassurance}
                   </p>
                 </div>
               )}

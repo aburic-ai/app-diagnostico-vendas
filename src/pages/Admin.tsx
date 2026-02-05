@@ -250,7 +250,6 @@ export function Admin() {
   const [notifMessage, setNotifMessage] = useState('')
   const [notifAction, setNotifAction] = useState('')
   const [sentNotifications, setSentNotifications] = useState<ToastNotification[]>([])
-  const [adminToast, setAdminToast] = useState<{ message: string; type: 'info' | 'warning' | 'success' } | null>(null)
 
   // Navigation Config (Avisos Clickables)
   const [actionType, setActionType] = useState<'none' | 'internal' | 'external'>('none')
@@ -286,6 +285,34 @@ export function Admin() {
   const [usersTab, setUsersTab] = useState<'all' | 'pending'>('all')
   const [usersFilter, setUsersFilter] = useState<'all' | 'online'>('all')
   const [usersSort, setUsersSortOption] = useState<'xp' | 'lastSeen'>('xp')
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    type: 'danger' | 'warning' | 'info'
+    onConfirm: () => void
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'warning',
+    onConfirm: () => {},
+  })
+
+  // Toast notification state
+  const [adminToast, setAdminToast] = useState<{
+    message: string
+    type: 'info' | 'warning' | 'success'
+  } | null>(null)
+
+  const showToast = (type: 'success' | 'error' | 'info', _title: string, message: string) => {
+    // Map error to warning for display consistency
+    const displayType = type === 'error' ? 'warning' : type
+    setAdminToast({ message, type: displayType })
+    setTimeout(() => setAdminToast(null), 5000)
+  }
 
   // Calculate minutes remaining until lunch return
   const calculateLunchMinutes = () => {
@@ -936,7 +963,7 @@ export function Admin() {
 
       if (error) {
         console.error('❌ [Admin] Erro ao enviar notificação:', error)
-        alert(`Erro ao enviar notificação: ${error.message || 'Erro desconhecido'}`)
+        showToast('error', 'Erro', `Erro ao enviar notificação: ${error.message || 'Erro desconhecido'}`)
         return
       }
 
@@ -968,7 +995,7 @@ export function Admin() {
       console.log('✅ [Admin] Notificação enviada com sucesso!')
     } catch (err) {
       console.error('❌ [Admin] Erro inesperado:', err)
-      alert(`Erro inesperado: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+      showToast('error', 'Erro', `Erro inesperado: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
     }
 
     // Auto-hide preview
@@ -4022,25 +4049,31 @@ export function Admin() {
                             <motion.button
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
-                              onClick={async () => {
-                                if (!confirm(`Aprovar acesso para ${request.email}?`)) return
+                              onClick={() => {
+                                setConfirmModal({
+                                  isOpen: true,
+                                  title: 'Aprovar Acesso',
+                                  message: `Confirma aprovação de acesso para ${request.email}?`,
+                                  type: 'info',
+                                  onConfirm: async () => {
+                                    const { error } = await supabase
+                                      .from('access_requests')
+                                      .update({
+                                        status: 'approved',
+                                        reviewed_at: new Date().toISOString(),
+                                        reviewed_by: user?.id,
+                                      })
+                                      .eq('id', request.id)
 
-                                const { error } = await supabase
-                                  .from('access_requests')
-                                  .update({
-                                    status: 'approved',
-                                    reviewed_at: new Date().toISOString(),
-                                    reviewed_by: user?.id,
-                                  })
-                                  .eq('id', request.id)
+                                    if (error) {
+                                      showToast('error', 'Erro', 'Erro ao aprovar: ' + error.message)
+                                      return
+                                    }
 
-                                if (error) {
-                                  alert('Erro ao aprovar: ' + error.message)
-                                  return
-                                }
-
-                                setAccessRequests(prev => prev.filter(r => r.id !== request.id))
-                                alert('✅ Acesso aprovado!')
+                                    setAccessRequests(prev => prev.filter(r => r.id !== request.id))
+                                    showToast('success', 'Sucesso', 'Acesso aprovado!')
+                                  },
+                                })
                               }}
                               style={{
                                 flex: 1,
@@ -4059,25 +4092,31 @@ export function Admin() {
                             <motion.button
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
-                              onClick={async () => {
-                                if (!confirm(`Rejeitar acesso para ${request.email}?`)) return
+                              onClick={() => {
+                                setConfirmModal({
+                                  isOpen: true,
+                                  title: 'Rejeitar Acesso',
+                                  message: `Confirma rejeição de acesso para ${request.email}?`,
+                                  type: 'danger',
+                                  onConfirm: async () => {
+                                    const { error } = await supabase
+                                      .from('access_requests')
+                                      .update({
+                                        status: 'rejected',
+                                        reviewed_at: new Date().toISOString(),
+                                        reviewed_by: user?.id,
+                                      })
+                                      .eq('id', request.id)
 
-                                const { error } = await supabase
-                                  .from('access_requests')
-                                  .update({
-                                    status: 'rejected',
-                                    reviewed_at: new Date().toISOString(),
-                                    reviewed_by: user?.id,
-                                  })
-                                  .eq('id', request.id)
+                                    if (error) {
+                                      showToast('error', 'Erro', 'Erro ao rejeitar: ' + error.message)
+                                      return
+                                    }
 
-                                if (error) {
-                                  alert('Erro ao rejeitar: ' + error.message)
-                                  return
-                                }
-
-                                setAccessRequests(prev => prev.filter(r => r.id !== request.id))
-                                alert('❌ Acesso rejeitado.')
+                                    setAccessRequests(prev => prev.filter(r => r.id !== request.id))
+                                    showToast('info', 'Rejeitado', 'Acesso rejeitado.')
+                                  },
+                                })
                               }}
                               style={{
                                 flex: 1,
@@ -4134,30 +4173,43 @@ export function Admin() {
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={async () => {
+                      onClick={() => {
                         if (!newPassword || newPassword.length < 6) {
-                          alert('Senha deve ter no mínimo 6 caracteres')
+                          showToast('error', 'Erro', 'Senha deve ter no mínimo 6 caracteres')
                           return
                         }
 
-                        if (!confirm(`Trocar senha do usuário ${selectedUser.email}?`)) return
+                        const emailToReset = selectedUser.email
+                        const passwordToSet = newPassword
 
-                        try {
-                          const { error } = await supabase.auth.admin.updateUserById(selectedUser.id, {
-                            password: newPassword,
-                          })
+                        setConfirmModal({
+                          isOpen: true,
+                          title: 'Trocar Senha',
+                          message: `Confirma troca de senha para ${emailToReset}?`,
+                          type: 'warning',
+                          onConfirm: async () => {
+                            try {
+                              // Usar Edge Function para resetar senha (tem service_role)
+                              const { data, error } = await supabase.functions.invoke('reset-user-password', {
+                                body: {
+                                  email: emailToReset,
+                                  newPassword: passwordToSet,
+                                },
+                              })
 
-                          if (error) {
-                            alert('❌ Erro ao trocar senha: ' + error.message)
-                            return
-                          }
+                              if (error || data?.error) {
+                                showToast('error', 'Erro', 'Erro ao trocar senha: ' + (error?.message || data?.error))
+                                return
+                              }
 
-                          alert(`✅ Senha alterada com sucesso!\n\nEmail: ${selectedUser.email}\nNova senha: ${newPassword}\n\nInforme ao usuário por WhatsApp.`)
-                          setNewPassword('')
-                          setSelectedUser(null)
-                        } catch (err: any) {
-                          alert('❌ Erro: ' + err.message)
-                        }
+                              showToast('success', 'Sucesso', `Senha alterada! Email: ${emailToReset} | Nova senha: ${passwordToSet}`)
+                              setNewPassword('')
+                              setSelectedUser(null)
+                            } catch (err: any) {
+                              showToast('error', 'Erro', 'Erro: ' + err.message)
+                            }
+                          },
+                        })
                       }}
                       style={{
                         padding: '10px 20px',
@@ -4532,6 +4584,18 @@ export function Admin() {
           'Participantes não verão mais nenhum aviso anterior',
           'Esta ação não pode ser desfeita',
         ]}
+      />
+
+      {/* Generic Confirmation Modal for access requests and password reset */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        confirmText="Confirmar"
+        cancelText="Cancelar"
       />
 
       {/* CSS for pulse animation */}
