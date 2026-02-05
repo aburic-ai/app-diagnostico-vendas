@@ -97,7 +97,7 @@ Vi que voce garantiu sua vaga na Imersao Diagnostico de Vendas. Decisao importan
 
 Antes do evento, quero que voce assista ao Dossie de Inteligencia. Sao 7 padroes que travam vendas e que a maioria dos empresarios nem percebe. Vai mudar sua forma de enxergar seu processo comercial.
 
-Nos dias 28/02 e 01/03, tenha o app aberto. Ele vai ser seu painel de controle durante toda a imersao.
+Nos dias 07/03 e 08/03, tenha o app aberto. Ele vai ser seu painel de controle durante toda a imersao.
 
 Nos vemos la.
 

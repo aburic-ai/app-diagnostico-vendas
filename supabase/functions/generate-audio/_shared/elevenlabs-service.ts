@@ -5,8 +5,9 @@
 
 const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY')
 const ELEVENLABS_VOICE_ID = Deno.env.get('ELEVENLABS_VOICE_ID') || 'K0Yk2ESZ2dsYv9RrtThg'
-const ELEVENLABS_MODEL = 'eleven_turbo_v3' // Melhor modelo para voz clonada + emotion tags
-const ELEVENLABS_API_URL = `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`
+const ELEVENLABS_MODEL = 'eleven_v3' // Modelo mais expressivo, suporte nativo a emotion tags em colchetes
+// output_format=opus_48000_128 → Opus em OGG container → WhatsApp exibe como áudio nativo
+const ELEVENLABS_API_URL = `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}?output_format=opus_48000_128`
 
 interface VoiceSettings {
   stability: number
@@ -57,7 +58,7 @@ export async function convertTextToSpeech(text: string): Promise<{
     const response = await fetch(ELEVENLABS_API_URL, {
       method: 'POST',
       headers: {
-        'Accept': 'audio/mpeg',
+        'Accept': 'audio/ogg',
         'Content-Type': 'application/json',
         'xi-api-key': ELEVENLABS_API_KEY,
       },

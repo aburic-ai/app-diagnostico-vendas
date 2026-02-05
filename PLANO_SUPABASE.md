@@ -442,7 +442,7 @@ O usuario depois cria senha na ThankYou page (`/obrigado`).
 - **Repositorio:** GitHub (aburic-ai)
 - **Stack:** React + Vite + TypeScript + Framer Motion
 - **Deploy:** Vercel (auto-deploy via GitHub)
-- **Evento:** 28/02/2026 e 01/03/2026
+- **Evento:** 07/03/2026 e 08/03/2026
 - **Participantes:** ~1000
 - **Documentacao completa:** `PLANO_COMPLETO_INFRAESTRUTURA.md`
 - **Design system:** `DESIGN_SYSTEM.md`

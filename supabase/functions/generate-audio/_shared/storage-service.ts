@@ -26,7 +26,7 @@ export async function uploadAudio(
     // Gerar nome único do arquivo
     const timestamp = Date.now()
     const sanitizedEmail = email.replace(/[^a-z0-9]/gi, '-').toLowerCase()
-    const fileName = `${userId}/${timestamp}-${sanitizedEmail}.mp3`
+    const fileName = `${userId}/${timestamp}-${sanitizedEmail}.ogg`
 
     console.log('[Storage] Fazendo upload do áudio...')
     console.log('[Storage] Bucket:', BUCKET_NAME)
@@ -37,7 +37,7 @@ export async function uploadAudio(
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
       .upload(fileName, audioBuffer, {
-        contentType: 'audio/mpeg',
+        contentType: 'audio/mpeg', // Bucket só aceita audio/mpeg; conteúdo real é Opus, extensão é .ogg
         upsert: false, // Não sobrescrever (cada áudio é único)
       })
 

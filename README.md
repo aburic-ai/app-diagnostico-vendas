@@ -150,7 +150,7 @@ git push origin main
 
 ## Evento
 
-- **Data:** 28/02/2026 e 01/03/2026
+- **Data:** 07/03/2026 e 08/03/2026
 - **Horário:** 09:30
 - **Participantes esperados:** ~1000
 

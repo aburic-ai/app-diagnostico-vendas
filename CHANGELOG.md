@@ -557,7 +557,7 @@ supabase functions deploy hotmart-webhook
 
 **Última revisão:** 2026-02-04
 **Versão atual:** 2.4.0
-**Próxima milestone:** Evento 28/02 - Validação final + Google Sheets
+**Próxima milestone:** Evento 07/03 - Validação final + Google Sheets
 
 ---
 

@@ -1,10 +1,10 @@
 # 12. SISTEMA DE ÁUDIO PERSONALIZADO
 
-**Última Atualização:** 2026-02-03
+**Última Atualização:** 2026-02-04
 **Arquivos de Implementação:**
 - Edge Function: `supabase/functions/generate-audio/`
 - Migration: `supabase-migrations-survey-audio-files.sql`
-- Status: ✅ Backend Completo | ⏳ Aguardando configuração GHL completa
+- Status: ✅ Backend Completo + Integração GHL via API | ⏳ Aguardando teste E2E
 
 ---
 
@@ -94,18 +94,21 @@ Após a compra da Imersão Diagnóstico de Vendas, o participante preenche uma p
 │    ┌─────────────────────────────────────────────────────┐      │
 │    │ EDGE FUNCTION: generate-audio                       │      │
 │    │ 1. Busca survey_responses (8 questões)              │      │
-│    │ 2. OpenAI o1-mini → Script personalizado            │      │
-│    │ 3. ElevenLabs TTS → MP3 (voz André + emotion tags)  │      │
+│    │ 2. OpenAI gpt-4o-mini → Script personalizado        │      │
+│    │ 3. ElevenLabs TTS (eleven_v3) → MP3                 │      │
+│    │    (voz André + emotion tags)                       │      │
 │    │ 4. Upload → Supabase Storage                        │      │
-│    │ 5. Retorna: { audio_url, script }                   │      │
+│    │ 5. PUT GHL API → Atualiza custom fields             │      │
+│    │    do contato diretamente via API                   │      │
+│    │ 6. Retorna: { audio_url, script }                   │      │
 │    └─────────────────────────────────────────────────────┘      │
 │                                                     │            │
 │ 3. Recebe response ←────────────────────────────────┘            │
-│ 4. Update Contact (salva audio_url + script em custom fields)   │
-│ 5. Send WhatsApp Template: "imersao_diagnostico_pos_pesquisa_v01"│
+│    (custom fields JÁ foram atualizados pela Edge Function)      │
+│ 4. Send WhatsApp Template: "imersao_diagnostico_pos_pesquisa_v01"│
 │    "Protocolo recebido. Áudio pronto. Responda ok..."           │
-│ 6. Wait for Reply ("ok")                                        │
-│ 7. Send WhatsApp Message (Free-form, Audio)                     │
+│ 5. Wait for Reply ("ok")                                        │
+│ 6. Send WhatsApp Message (Free-form, Audio)                     │
 │    "Salve {{nome}}, ouça antes de qualquer outra coisa: [ÁUDIO]"│
 └──────────────────────────────────────────────────────────────────┘
                  │
@@ -115,6 +118,11 @@ Após a compra da Imersão Diagnóstico de Vendas, o participante preenche uma p
 │ Duração: 1-2 minutos                                            │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+> **MUDANÇA IMPORTANTE (2026-02-04):** A Edge Function agora atualiza os custom fields
+> do contato no GHL diretamente via API (`ghl-service.ts`), eliminando a necessidade do
+> step "Update Contact" no Workflow 2 do GHL. Isso resolve o problema de timeout do GHL
+> (que não esperava os ~30-60s de processamento).
 
 ---
 
@@ -139,7 +147,7 @@ Leva 3 minutos. Vale cada segundo — é ele que torna a imersão única pra voc
 
 **Variáveis:**
 - `{{1}}` = Primeiro nome do contato
-- `{{custom_values.imersao_diagnostico_entrada}}` = Data do evento (ex: "28/02 e 01/03")
+- `{{custom_values.imersao_diagnostico_entrada}}` = Data do evento (ex: "07/03 e 08/03")
 - `{{custom_values.imersao_diagnostico_link_app}}` = Link do app/painel
 
 ---
@@ -283,7 +291,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 **⚠️ IMPORTANTE - Variáveis GHL:**
 - ✅ USE: `{{body.buyer.email}}` (NÃO `{{contact.email}}`)
 - ✅ USE: `{{body.transaction_id}}` (NÃO `{{body.buyer.transaction_id}}`)
-- ✅ USE: `{{contact.id}}` (após Find Contact action)
+- ✅ USE: `{{contact.id}}` (após Find Contact action) — necessário para a Edge Function atualizar o contato via API
 
 **Timeout Recomendado:** 60 segundos (ou 90s com margem)
 
@@ -296,6 +304,11 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
   "duration_seconds": 90
 }
 ```
+
+> **NOTA (2026-02-04):** A Edge Function agora atualiza os custom fields do contato
+> diretamente via API do GHL (usando `ghl_contact_id`). Portanto, o step "Update Contact"
+> no workflow do GHL **NÃO é mais necessário**. Os custom fields `audio_diagnosticovendas_url`
+> e `imdiagnosticovendas_audio_script` serão preenchidos automaticamente pela Edge Function.
 
 ---
 
@@ -331,21 +344,12 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 ---
 
-#### Action 2: Update Contact Field
+#### ~~Action 2: Update Contact Field~~ — REMOVIDO (2026-02-04)
 
-**Descobrir nome da variável:**
-1. Clique em "Insert Variable" (`{x}` icon)
-2. Procure pela resposta do webhook anterior (pode ser "webhook_response", "Webhook", ou "response")
-3. Use o que aparecer no autocomplete
-
-**Configure 2 fields:**
-
-| Field Name | Value (descobrir variável correta) |
-|------------|-------------------------------------|
-| `audio_diagnosticovendas_url` | `{{webhook_response.audio_url}}` ou `{{Webhook.audio_url}}` |
-| `imdiagnosticovendas_audio_script` | `{{webhook_response.script}}` ou `{{Webhook.script}}` |
-
-**⚠️ IMPORTANTE:** Nomes dos custom fields devem existir previamente no GHL (ver seção "Configuração GHL Passo-a-Passo" abaixo).
+> Este step **não é mais necessário**. A Edge Function atualiza os custom fields
+> diretamente via API do GHL usando o `ghl_contact_id` passado no payload.
+> Os campos `audio_diagnosticovendas_url` e `imdiagnosticovendas_audio_script`
+> são preenchidos automaticamente pelo `ghl-service.ts`.
 
 ---
 
@@ -355,25 +359,11 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 #### Branch A: Success (áudio gerado)
 
-**3.1 Update Contact**
+> **NOTA (2026-02-04):** O step "Update Contact" foi removido deste branch.
+> Os custom fields agora são atualizados diretamente pela Edge Function via
+> `ghl-service.ts`. Não é mais necessário parsear a resposta HTTP no GHL.
 
-**⚠️ VERIFICAR VARIÁVEL NO GHL:**
-No GHL, clique em "Insert Variable" para descobrir o nome correto da resposta do webhook.
-
-**Opções possíveis:**
-- `{{webhook_response.audio_url}}` (mais comum)
-- `{{Webhook.audio_url}}` (se o GHL usar nome da ação)
-- `{{response.audio_url}}` (alternativa)
-
-**Configure:**
-- **Field:** `audio_diagnosticovendas_url` → `{{webhook_response.audio_url}}` (ou variável correta)
-- **Field:** `imdiagnosticovendas_audio_script` → `{{webhook_response.script}}` (ou variável correta)
-
-**IMPORTANTE:** Os nomes dos custom fields devem ser EXATAMENTE:
-- `audio_diagnosticovendas_url` (sem "im" no início)
-- `imdiagnosticovendas_audio_script` (com "im" no início)
-
-**3.2 Check Session Window (If/Else)**
+**3.1 Check Session Window (If/Else)**
 
 **Condição:** Verificar se user já respondeu "ok" no Workflow 1
 
@@ -487,15 +477,14 @@ Enquanto isso, acesse seu painel: [link]
 
 ### Modelo e Configuração
 
-**Modelo:** `o1-mini` (não gpt-4, não o1-preview)
-**Razão:** Custo 80% menor que o1-preview, qualidade suficiente para análise de survey
+**Modelo:** `gpt-4o-mini`
+**Razão:** Rápido, barato, qualidade suficiente para análise de survey
 
 **Configuração:**
 ```javascript
 {
-  model: 'o1-mini',
+  model: 'gpt-4o-mini',
   messages: [{ role: 'user', content: prompt }],
-  // o1-mini não suporta temperature, max_tokens é implícito
 }
 ```
 
@@ -620,8 +609,8 @@ Chega lá com tudo anotado.
 ### Configuração da Voz
 
 **Voice ID:** `K0Yk2ESZ2dsYv9RrtThg` (voz clonada do André Buric)
-**Modelo:** `eleven_turbo_v3`
-**Razão:** Mais rápido (~2-3s), suporta emotion tags, PT-BR nativo
+**Modelo:** `eleven_v3`
+**Razão:** Mais expressivo, suporte nativo a emotion tags em colchetes, PT-BR nativo
 
 **Voice Settings:**
 ```javascript
@@ -639,32 +628,40 @@ Chega lá com tudo anotado.
 
 | Modelo | Velocidade | Qualidade | Emotion Tags | PT-BR Nativo |
 |--------|-----------|-----------|--------------|--------------|
+| `eleven_v3` | ~3-5s | Superior | ✅ Nativo (colchetes) | ✅ Sim |
 | `eleven_turbo_v3` | ✅ ~2-3s | Boa | ✅ Sim | ✅ Sim |
 | `eleven_multilingual_v2` | ~5-8s | Superior | ✅ Sim | ✅ Sim |
-| `eleven_monolingual_v1` | ~3-5s | Média | ❌ Não | ❌ Inglês apenas |
 
-**Escolha:** `eleven_turbo_v3` ✅ (melhor custo-benefício)
+**Escolha:** `eleven_v3` ✅ (melhor qualidade de expressão vocal)
 
 ---
 
 ### Implementação (_shared/elevenlabs-service.ts)
 
 ```typescript
-const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY')!
-const ELEVENLABS_VOICE_ID = Deno.env.get('ELEVENLABS_VOICE_ID')!
+const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY')
+const ELEVENLABS_VOICE_ID = Deno.env.get('ELEVENLABS_VOICE_ID') || 'K0Yk2ESZ2dsYv9RrtThg'
+const ELEVENLABS_MODEL = 'eleven_v3'
 
-export async function textToSpeech(text: string): Promise<Blob> {
+export async function convertTextToSpeech(text: string): Promise<{
+  success: boolean
+  audioBuffer?: Uint8Array
+  requestId?: string
+  duration?: number
+  error?: string
+}> {
   const response = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`,
     {
       method: 'POST',
       headers: {
+        'Accept': 'audio/mpeg',
         'Content-Type': 'application/json',
         'xi-api-key': ELEVENLABS_API_KEY,
       },
       body: JSON.stringify({
         text,
-        model_id: 'eleven_turbo_v3',
+        model_id: ELEVENLABS_MODEL,
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75,
@@ -674,12 +671,7 @@ export async function textToSpeech(text: string): Promise<Blob> {
       }),
     }
   )
-
-  if (!response.ok) {
-    throw new Error(`ElevenLabs error: ${response.status}`)
-  }
-
-  return response.blob()
+  // Retorna { success, audioBuffer, requestId, duration }
 }
 ```
 
@@ -691,82 +683,96 @@ export async function textToSpeech(text: string): Promise<Blob> {
 
 ```
 supabase/functions/generate-audio/
-├── index.ts                    # Handler principal
+├── index.ts                    # Handler principal (13 steps)
 ├── _shared/
-│   ├── openai-service.ts       # OpenAI o1-mini
-│   ├── elevenlabs-service.ts   # ElevenLabs TTS
-│   └── storage-service.ts      # Supabase Storage
+│   ├── openai-service.ts       # OpenAI gpt-4o-mini
+│   ├── elevenlabs-service.ts   # ElevenLabs TTS (eleven_v3)
+│   ├── storage-service.ts      # Supabase Storage
+│   └── ghl-service.ts          # GHL API - atualiza custom fields
 └── prompts/
     └── audio-script.ts         # Template do prompt
 ```
 
 ---
 
-### Handler Principal (index.ts)
+### Handler Principal (index.ts) — Fluxo de 13 Steps
 
 ```typescript
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { generateScript } from './_shared/openai-service.ts'
-import { textToSpeech } from './_shared/elevenlabs-service.ts'
-import { uploadAudio } from './_shared/storage-service.ts'
+import { generateScript, sanitizeScriptForTTS } from './_shared/openai-service.ts'
+import { convertTextToSpeech, validateTextLength } from './_shared/elevenlabs-service.ts'
+import { uploadAudio, checkBucketHealth } from './_shared/storage-service.ts'
+import { updateContactCustomFields } from './_shared/ghl-service.ts'
+import { generateAudioPrompt, getFallbackScript } from './prompts/audio-script.ts'
 
 serve(async (req) => {
-  try {
-    const { email, transaction_id } = await req.json()
-
-    // 1. Buscar survey
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
-
-    const { data: survey } = await supabase
-      .from('survey_responses')
-      .select('*')
-      .eq('email', email)
-      .or(`transaction_id.eq.${transaction_id}`)
-      .single()
-
-    if (!survey) {
-      throw new Error('Survey não encontrado')
-    }
-
-    // 2. Gerar script via OpenAI
-    const script = await generateScript(survey)
-
-    // 3. Converter para áudio via ElevenLabs
-    const audioBlob = await textToSpeech(script)
-
-    // 4. Upload para Storage
-    const audioUrl = await uploadAudio(supabase, audioBlob, email)
-
-    // 5. Salvar registro
-    await supabase.from('survey_audio_files').insert({
-      survey_response_id: survey.id,
-      user_id: survey.user_id,
-      email: survey.email,
-      script_generated: script,
-      audio_url: audioUrl,
-      status: 'completed',
-    })
-
-    // 6. Retornar para GHL
-    return new Response(
-      JSON.stringify({
-        success: true,
-        audio_url: audioUrl,
-        message_text: script,
-      }),
-      { headers: { 'Content-Type': 'application/json' } }
-    )
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
+  // 1. Parsear payload { email, transaction_id, ghl_contact_id }
+  // 2. Criar cliente Supabase (service role)
+  // 3. Verificar bucket de storage
+  // 4. Buscar survey_response (por transaction_id ou email)
+  // 5. Idempotência: se áudio já existe, retorna cache
+  //    → Também chama updateContactCustomFields() no cache hit
+  // 6. Criar registro em survey_audio_files (status=processing)
+  // 7. Gerar prompt personalizado
+  // 8. Gerar script via OpenAI gpt-4o-mini (fallback se falhar)
+  // 9. Converter para áudio via ElevenLabs eleven_v3
+  // 10. Upload MP3 para Supabase Storage
+  // 11. Atualizar registro (status=completed)
+  // 12. Atualizar custom fields no GHL via API direta
+  //     → PUT /contacts/{contactId} com audio_url + script
+  // 13. Retornar { success, audio_url, script, duration_seconds }
 })
+```
+
+**Ponto-chave — Step 12 (GHL Update Direto):**
+
+A Edge Function agora chama a API do GHL diretamente para atualizar os custom fields,
+ao invés de depender do Workflow do GHL para parsear a resposta HTTP. Isso resolve o
+problema de timeout do GHL, que não conseguia esperar os ~30-60s de processamento.
+
+```typescript
+// Step 12 - Após gerar e salvar áudio
+if (ghl_contact_id) {
+  const ghlResult = await updateContactCustomFields(
+    ghl_contact_id,
+    uploadResult.publicUrl,
+    finalScript
+  )
+}
+```
+
+### GHL Service (ghl-service.ts) — NOVO
+
+```typescript
+const GHL_API_KEY = Deno.env.get('GHL_API_KEY')
+const GHL_API_BASE = 'https://services.leadconnectorhq.com'
+
+// Custom field keys - devem bater com o configurado no GHL
+const CUSTOM_FIELD_AUDIO_URL = 'audio_diagnosticovendas_url'
+const CUSTOM_FIELD_AUDIO_SCRIPT = 'imdiagnosticovendas_audio_script'
+
+export async function updateContactCustomFields(
+  contactId: string,
+  audioUrl: string,
+  script: string
+): Promise<{ success: boolean; error?: string }> {
+  const response = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${GHL_API_KEY}`,
+      'Content-Type': 'application/json',
+      'Version': '2021-07-28',
+    },
+    body: JSON.stringify({
+      customFields: [
+        { key: CUSTOM_FIELD_AUDIO_URL, field_value: audioUrl },
+        { key: CUSTOM_FIELD_AUDIO_SCRIPT, field_value: script },
+      ],
+    }),
+  })
+  // ...
+}
 ```
 
 ---
@@ -816,32 +822,45 @@ CREATE INDEX idx_survey_audio_status ON public.survey_audio_files(status);
 
 ### Variáveis de Ambiente
 
-**Configurado no Supabase (via CLI):**
+**Configurado no Supabase (via Dashboard > Edge Functions > Manage Secrets):**
 
 ```bash
 # OpenAI
-supabase secrets set OPENAI_API_KEY="sk-proj-r-_onE..."
+OPENAI_API_KEY=sk-proj-r-_onE...
 
 # ElevenLabs
-supabase secrets set ELEVENLABS_API_KEY="sk_88880a4e..."
-supabase secrets set ELEVENLABS_VOICE_ID="K0Yk2ESZ2dsYv9RrtThg"
+ELEVENLABS_API_KEY=sk_88880a4e...
+ELEVENLABS_VOICE_ID=K0Yk2ESZ2dsYv9RrtThg
+
+# GHL (Go High Level) — NOVO (2026-02-04)
+GHL_API_KEY=pit-xxxxxxxx...
 ```
+
+**Como obter a GHL_API_KEY:**
+1. GHL Dashboard > Settings > Integrations > Private Integrations
+2. Criar integração (ex: "Supabase Audio")
+3. Scope necessário: **`contacts.write`** (apenas este)
+4. Copiar a API Key gerada
+5. Adicionar no Supabase: Dashboard > Edge Functions > Manage Secrets
+   - Name: `GHL_API_KEY`
+   - Value: a API Key copiada
 
 ---
 
 ### Performance e Custos
 
 **Tempo estimado:** 30-45 segundos totais
-- OpenAI o1-mini: ~15-20s (gerar script)
-- ElevenLabs TTS: ~10-15s (converter para áudio)
+- OpenAI gpt-4o-mini: ~5-10s (gerar script)
+- ElevenLabs eleven_v3: ~10-15s (converter para áudio)
 - Upload Storage: ~5s
+- GHL API update: ~1-2s
 
 **Custos por Áudio:**
 
 | Serviço | Cálculo | Custo |
 |---------|---------|-------|
-| OpenAI o1-mini | ~700 tokens (450 in + 250 out) | $0.01 |
-| ElevenLabs eleven_turbo_v3 | ~600 chars × $0.30/1000 | $0.18 |
+| OpenAI gpt-4o-mini | ~700 tokens (450 in + 250 out) | ~$0.005 |
+| ElevenLabs eleven_v3 | ~600 chars × $0.30/1000 | $0.18 |
 | Supabase Storage | Free tier (até 1GB) | $0.00 |
 | GHL WhatsApp | Incluído no plano | $0.00 |
 | **TOTAL** | | **$0.19 por usuário** |
@@ -860,9 +879,10 @@ supabase secrets set ELEVENLABS_VOICE_ID="K0Yk2ESZ2dsYv9RrtThg"
 ### Pré-requisitos
 
 ✅ Edge Function deployada no Supabase
-✅ Secrets configuradas (OpenAI, ElevenLabs)
+✅ Secrets configuradas (OpenAI, ElevenLabs, **GHL_API_KEY**)
 ✅ WhatsApp conectado no GHL
 ✅ Webhook Hotmart apontando para o GHL
+✅ Private Integration criada no GHL (scope: `contacts.write`)
 
 ---
 
@@ -1212,17 +1232,64 @@ LIMIT 10;
 
 ### Erro: Custom Fields não atualizam
 
-**Sintoma:** Workflow executa mas `audio_diagnosticovendas_url` continua vazio
+**Sintoma:** Áudio gerado mas `audio_diagnosticovendas_url` continua vazio no contato.
+A API GHL retorna `{"succeded":true}` mas os campos ficam vazios.
 
-**Causas possíveis:**
-1. ❌ Variável errada: `{{webhook.audio_url}}` ao invés de `{{webhook_response.audio_url}}`
-2. ❌ Nome do custom field errado (typo)
-3. ❌ Webhook retornou erro mas GHL continuou
+**Causas possíveis (com ghl-service.ts — 2026-02-04):**
+1. ❌ `GHL_API_KEY` não configurada no Supabase Secrets
+2. ❌ API Key expirada ou inválida
+3. ❌ Scope `contacts.write` não habilitado na Private Integration
+4. ❌ Custom field keys no código (`ghl-service.ts:10-11`) não batem com o GHL
+5. ❌ `ghl_contact_id` não passado no payload do webhook
+6. ❌ **GOTCHA: Usando prefixo `contact.` na key** (ver abaixo)
 
 **Solução:**
-- Clicar em "Insert Variable" e usar autocomplete do GHL
-- Verificar logs do workflow: resposta do webhook deve ter `success: true`
-- Verificar custom field existe com nome EXATO: `audio_diagnosticovendas_url`
+- Verificar logs da Edge Function: procurar por `[GHL]` nos logs
+- Verificar se `GHL_API_KEY` está configurada: Dashboard > Edge Functions > Manage Secrets
+- Verificar custom fields no GHL: `audio_diagnosticovendas_url` e `imdiagnosticovendas_audio_script`
+- Verificar que o Workflow envia `ghl_contact_id: {{contact.id}}` no payload
+
+---
+
+### ⚠️ GOTCHA CRÍTICO: Prefixo `contact.` no payload da API
+
+**O GHL mostra as keys dos custom fields na UI com o formato `{{ contact.nome_do_campo }}`.
+Mas isso é apenas a sintaxe de merge tags para templates e workflows.**
+
+**Na API (PUT /contacts/{id}), o `contact.` NÃO deve ser incluído no payload.**
+
+A API aceita silenciosamente (retorna `{"succeded":true}`) mas **NÃO atualiza o campo**.
+
+```
+❌ ERRADO (API aceita mas NÃO atualiza):
+{ "key": "contact.audio_diagnosticovendas_url", "field_value": "..." }
+
+❌ TAMBÉM NÃO FUNCIONA (API aceita mas NÃO atualiza):
+{ "key": "audio_diagnosticovendas_url", "field_value": "..." }
+
+✅ ÚNICO FORMATO QUE FUNCIONA — usar UUID interno do campo:
+{ "id": "h1uZ8V3KiGr1iUCcR0ib", "field_value": "..." }
+```
+
+**IMPORTANTE: A propriedade `key` NÃO funciona na prática.** Apesar da documentação oficial
+do GHL mencionar `key` como opção, nos nossos testes apenas o `id` (UUID interno) atualiza
+o campo de fato. A API aceita silenciosamente `key` e retorna sucesso sem atualizar nada.
+
+**Formato que funciona na API v2 para customFields:**
+```json
+{
+  "customFields": [
+    { "id": "UUID_DO_CAMPO", "field_value": "valor" }
+  ]
+}
+```
+
+Para descobrir os UUIDs dos campos, usar:
+`GET /locations/{locationId}/customFields?model=contact`
+
+O `ghl-service.ts` faz isso automaticamente via `resolveCustomFieldIds()` antes de cada update.
+
+**Referência:** [GHL API - Update Contact](https://marketplace.gohighlevel.com/docs/ghl/contacts/update-contact/index.html)
 
 ---
 
@@ -1260,10 +1327,11 @@ LIMIT 10;
 
 ### 1. Quanto tempo demora para gerar o áudio?
 
-**Resposta:** ~30-45 segundos totais
-- OpenAI o1-mini: ~15-20s (gerar script)
-- ElevenLabs TTS: ~10-15s (converter para áudio)
+**Resposta:** ~20-35 segundos totais
+- OpenAI gpt-4o-mini: ~5-10s (gerar script)
+- ElevenLabs eleven_v3: ~10-15s (converter para áudio)
 - Upload Storage: ~5s
+- GHL API update: ~1-2s
 
 **Recomendação no GHL:** Timeout de 60s na HTTP Request.
 
@@ -1271,13 +1339,10 @@ LIMIT 10;
 
 ### 2. O áudio chega como link ou como voice message?
 
-**Resposta:** Voice message nativo! 🎯
+**Resposta:** Ainda em investigação (2026-02-04). Ver seção **17. DIÁRIO DE DEBUG: ENVIO WHATSAPP NATIVO**.
 
-**Importante:** No GHL, ao configurar "Send WhatsApp Message", escolher:
-- **Type:** Audio (NÃO Document)
-- **URL:** `{{contact.audio_imdiagnvendas_url}}`
-
-Isso faz o WhatsApp exibir como bolha de áudio (não como anexo).
+O áudio é gerado em **OGG Opus** (formato correto para WhatsApp), mas o envio como voice message nativo
+via GHL API ainda não foi resolvido. Múltiplas abordagens foram testadas — ver detalhes na seção 17.
 
 ---
 
@@ -1415,17 +1480,181 @@ Para ativar suas análises personalizadas, responda: ok
 
 ---
 
-## 16. ARQUIVOS RELACIONADOS
+## 17. DIÁRIO DE DEBUG: ENVIO WHATSAPP NATIVO (2026-02-04)
+
+> **Contexto:** O áudio é gerado com sucesso (OGG Opus), salvo no Supabase Storage, e o custom field
+> `audio_diagnosticovendas_url` é atualizado no contato do GHL. O problema é **como enviar esse áudio
+> como voice message nativo no WhatsApp** (bolinha verde de play) em vez de link clicável.
+
+### O que já foi feito
+
+#### 1. Formato do áudio: MP3 → OGG Opus (RESOLVIDO)
+- **elevenlabs-service.ts**: `output_format=opus_48000_128` + `Accept: audio/ogg`
+- **storage-service.ts**: extensão `.ogg`, contentType `audio/mpeg` (bucket só aceita esse MIME)
+- **Resultado**: Áudio regenerado com sucesso em OGG Opus (18.4s, ~100KB)
+- **URL de teste**: `https://yvjzkhxczbxidtdmkafx.supabase.co/storage/v1/object/public/survey-audios/4f7b0ba6-2ae1-4080-acea-7fb800c3bb69/1770231030050-andre-buric-gmail-com.ogg`
+
+#### 2. Parâmetro `force` no generate-audio (RESOLVIDO)
+- **generate-audio/index.ts**: Adicionado `force` no payload para pular cache de idempotência
+- Permite regenerar áudio sem precisar deletar o registro anterior
+
+#### 3. Edge Function send-whatsapp-audio (REESCRITA)
+- **send-whatsapp-audio/index.ts**: Reescrita completa com:
+  - Download do áudio do Supabase Storage
+  - Upload para o CDN do GHL via `POST /conversations/messages/upload`
+  - 3 tentativas de envio com payloads diferentes
+  - Auto-detecção de formato (OGG vs MP3)
+- **Deployada** em produção
+
+#### 4. ghl-service.ts: sendWhatsAppAudio() (CRIADA)
+- Função para enviar áudio via GHL Conversations API
+- Usa `attachments: [audioUrl]` — NÃO é chamada de nenhum lugar atualmente
+- Existe como alternativa à Edge Function send-whatsapp-audio
+
+### O que foi testado e FALHOU
+
+#### Tentativa A: `messageType: "Audio"` (string)
+```json
+{
+  "type": "WhatsApp",
+  "contactId": "...",
+  "messageType": "Audio",
+  "attachments": ["https://...audio.ogg"]
+}
+```
+**Resultado**: HTTP 422 — `"messageType must be a number conforming to the specified constraints"`
+
+**Descoberta**: O campo `messageType` é numérico e NÃO faz parte do request body do endpoint
+`POST /conversations/messages`. Ele existe apenas nas RESPOSTAS da API (GET). A documentação
+oficial do GHL não lista `messageType` como parâmetro de envio.
+
+#### Tentativa B: Mesma coisa com URL do Supabase direto
+**Resultado**: Mesmo 422
+
+#### Tentativa C: `attachments` sem `messageType` (URL do GHL após upload)
+```json
+{
+  "type": "WhatsApp",
+  "contactId": "...",
+  "attachments": ["https://storage.leadconnectorhq.com/..."]
+}
+```
+**Resultado**: HTTP 400 — Twilio `ERR_BAD_REQUEST`
+
+#### Tentativa D: `attachments` com URL do Supabase (sem upload pro GHL)
+**Resultado**: Mesmo Twilio 400
+
+#### Tentativa E: `message` com URL (funciona, mas ruim)
+```json
+{
+  "type": "WhatsApp",
+  "contactId": "...",
+  "message": "https://...audio.ogg"
+}
+```
+**Resultado**: Funciona, mas chega como **link clicável** — NÃO como áudio nativo. UX horrível.
+
+### O que a pesquisa revelou
+
+1. **GHL Conversations API `attachments` tem bug conhecido** — confirmado pela comunidade n8n.
+   Mídia via WhatsApp com `attachments: [url]` falha silenciosamente ou retorna Twilio 400.
+
+2. **O campo `messageType` NÃO existe no request body** — existe apenas nas respostas.
+   O SDK oficial (`@gnosticdev/highlevel-sdk`) confirma que o `SendMessageBodyDto` aceita:
+   `type`, `contactId`, `message`, `attachments`, `templateId`, etc. Sem `messageType`.
+
+3. **Formatos de `type` aceitos**: `'SMS' | 'Email' | 'WhatsApp' | 'IG' | 'FB' | 'Custom' | 'Live_Chat'`
+   Não existe `type: 'Audio'` ou similar.
+
+4. **Recomendação da comunidade**: Usar a ação nativa **"WhatsApp: Media"** do GHL Workflow
+   em vez da API. O Workflow tem integração interna com Twilio que funciona.
+
+### Hipótese principal: GHL não aceita URLs externas como attachment
+
+O GHL pode exigir que o arquivo esteja no **próprio CDN** (`storage.leadconnectorhq.com`).
+A URL do Supabase é externa e pode ser rejeitada.
+
+**Endpoint de upload de mídia do GHL** (diferente do upload de conversação):
+```
+POST https://services.leadconnectorhq.com/medias/upload-file
+Content-Type: multipart/form-data
+
+- file: (binário do .ogg)
+- name: "audio.ogg"
+- fileType: "audio/ogg"
+```
+Retorna URL interna do GHL. **AINDA NÃO TESTADO.**
+
+### O que falta testar (próximos passos)
+
+| # | Abordagem | Esforço | Confiança |
+|---|-----------|---------|-----------|
+| 1 | **GHL Workflow: WhatsApp Media action** com `{{contact.audio_diagnosticovendas_url}}` | Baixo (config no GHL) | Média |
+| 2 | **Upload via `/medias/upload-file`** + envio com URL interna do GHL | Médio (código) | Média-Alta |
+| 3 | **GHL Workflow: WhatsApp Media** com custom field File Upload (`imdiagnosticovendas_audio_file`) | Baixo (config no GHL) | Média |
+| 4 | **Meta WhatsApp Business API** diretamente (bypass GHL) | Alto (nova integração) | Alta |
+
+#### Abordagem 1: GHL Workflow nativo (testar primeiro)
+No GHL Workflow, após o contato responder "ok":
+- Ação: **Send WhatsApp** (ou **WhatsApp: Media**)
+- Attachment/Media: `{{contact.audio_diagnosticovendas_url}}`
+- Se funcionar = resolvido, sem código adicional
+
+#### Abordagem 2: Upload para CDN do GHL via API
+Modificar `send-whatsapp-audio` ou `generate-audio` para:
+1. Baixar áudio do Supabase
+2. Upload via `POST /medias/upload-file` (diferente do `/conversations/messages/upload`)
+3. Salvar URL interna do GHL no custom field
+4. Enviar via `attachments` com a URL do GHL
+
+#### Abordagem 3: Custom field File Upload
+- Criado campo `imdiagnosticovendas_audio_file` (tipo File Upload) no GHL
+- Testar se o Workflow WhatsApp: Media action aceita esse campo como fonte de mídia
+- Se sim, atualizar `ghl-service.ts` para popular esse campo também
+
+#### Abordagem 4: Meta API direta (último recurso)
+- Integrar diretamente com a WhatsApp Business API da Meta
+- Bypass completo do GHL para envio de mídia
+- Mais trabalho mas resultado garantido
+
+### Estado dos arquivos (2026-02-04)
+
+| Arquivo | Status | Notas |
+|---------|--------|-------|
+| `elevenlabs-service.ts` | Deployado | OGG Opus (`opus_48000_128`) |
+| `storage-service.ts` | Deployado | `.ogg`, MIME `audio/mpeg` (workaround bucket) |
+| `generate-audio/index.ts` | Deployado | Param `force` para regenerar |
+| `ghl-service.ts` | Deployado | `resolveCustomFieldIds()`, `sendWhatsAppAudio()` (não usada) |
+| `send-whatsapp-audio/index.ts` | Deployado | 3 tentativas, todas falharam |
+| `audio-script.ts` | Sem mudanças | Prompt de geração OK |
+
+### Dados de teste
+
+- **Supabase project ref**: `yvjzkhxczbxidtdmkafx`
+- **GHL Location ID**: `R2mu3tVvjKvefxzO2otw`
+- **GHL Contact ID (teste)**: `YoxAcHrCogry28qpxfAV`
+- **Email de teste**: `andre.buric@gmail.com`
+- **Áudio gerado (OGG)**: URL salva no custom field `audio_diagnosticovendas_url` do contato
+- **Custom fields GHL**: `audio_diagnosticovendas_url` (texto), `imdiagnosticovendas_audio_script` (texto), `imdiagnosticovendas_audio_file` (File Upload — novo, vazio)
+- **Deploy cmd**: `npx supabase functions deploy <function-name> --project-ref yvjzkhxczbxidtdmkafx`
+
+---
+
+## 18. ARQUIVOS RELACIONADOS
 
 ### Migrations
 - `supabase-migrations-survey-audio-files.sql` - Tabela + Storage bucket
 
-### Edge Functions
-- `supabase/functions/generate-audio/index.ts` - Handler principal
-- `supabase/functions/generate-audio/prompts/audio-script.ts` - Template de prompt
-- `supabase/functions/generate-audio/_shared/openai-service.ts` - OpenAI integration
-- `supabase/functions/generate-audio/_shared/elevenlabs-service.ts` - ElevenLabs TTS
-- `supabase/functions/generate-audio/_shared/storage-service.ts` - Upload Storage
+### Edge Functions — generate-audio
+- `supabase/functions/generate-audio/index.ts` - Handler principal (13 steps, param `force`)
+- `supabase/functions/generate-audio/prompts/audio-script.ts` - Template de prompt OpenAI
+- `supabase/functions/generate-audio/_shared/openai-service.ts` - OpenAI gpt-4o-mini
+- `supabase/functions/generate-audio/_shared/elevenlabs-service.ts` - ElevenLabs TTS (eleven_v3, OGG Opus)
+- `supabase/functions/generate-audio/_shared/storage-service.ts` - Upload Storage (OGG, MIME audio/mpeg)
+- `supabase/functions/generate-audio/_shared/ghl-service.ts` - GHL API (custom fields + WhatsApp send)
+
+### Edge Functions — send-whatsapp-audio
+- `supabase/functions/send-whatsapp-audio/index.ts` - Envio WhatsApp via GHL (3 tentativas, todas falharam 2026-02-04)
 
 ### Documentação
 - Este arquivo: [12-AUDIO-SYSTEM.md](./12-AUDIO-SYSTEM.md)
@@ -1441,15 +1670,32 @@ Para ativar suas análises personalizadas, responda: ok
 - [x] Migration SQL executada
 - [x] Tabela `survey_audio_files` criada
 - [x] Storage bucket `survey-audios` criado
-- [x] Edge Function implementada
-- [x] Edge Function deployada
-- [x] Secrets configuradas (OpenAI + ElevenLabs)
-- [x] Teste de conectividade OK
-- [x] Documentação completa
+- [x] Edge Function `generate-audio` implementada e deployada (2026-02-04)
+- [x] Edge Function `send-whatsapp-audio` implementada e deployada (2026-02-04)
+- [x] Secrets configuradas (OpenAI + ElevenLabs + GHL_API_KEY + GHL_LOCATION_ID)
+- [x] Integração GHL via API (ghl-service.ts) — atualiza custom fields com UUID
+- [x] Formato OGG Opus (ElevenLabs `opus_48000_128`) para áudio nativo WhatsApp
+- [x] Parâmetro `force` para regenerar áudios
+- [x] Teste de geração OK (áudio gerado e salvo no Supabase)
 
-### Frontend (GHL) ⏳ PENDENTE
-- [x] Custom Fields criados
-- [x] Workflow 2 configurado
+### Integração GHL ✅ COMPLETO
+- [x] Custom Fields criados (`audio_diagnosticovendas_url`, `imdiagnosticovendas_audio_script`)
+- [x] Custom Field File Upload criado (`imdiagnosticovendas_audio_file`) — ainda não populado
+- [x] Private Integration criada (scope: `contacts.write`)
+- [x] GHL_API_KEY adicionada como secret no Supabase
+- [x] Edge Function atualiza custom fields diretamente via API (resolve UUIDs automaticamente)
+
+### Envio WhatsApp ❌ BLOQUEADO
+- [x] Áudio gerado em OGG Opus (formato correto para WhatsApp nativo)
+- [x] URL do áudio salva no custom field do contato GHL
+- [ ] **BLOQUEADO: Envio como áudio nativo (bolinha de play) não funciona via API**
+- [ ] **TODO: Testar GHL Workflow nativo (WhatsApp: Media action)**
+- [ ] **TODO: Testar upload via `/medias/upload-file` + URL interna**
+- [ ] **TODO: Se nada funcionar, avaliar Meta WhatsApp Business API direto**
+- Ver seção 17 para detalhes completos
+
+### GHL Workflows ⏳ PENDENTE
+- [x] Workflow 2 configurado (simplificado — sem step "Update Contact")
 - [ ] **TODO: Configurar Workflow 1 (Boas-Vindas + "ok")**
 - [ ] **TODO: Aprovar Template WhatsApp no Meta**
 - [ ] **TODO: Teste end-to-end realizado**
@@ -1459,5 +1705,5 @@ Para ativar suas análises personalizadas, responda: ok
 
 **Desenvolvido por:** Claude Code + Andre Buric
 **Data:** 2026-02-01
-**Última Atualização:** 2026-02-03
-**Status:** 🟡 70% Implementado | Edge Function ✅ | GHL Workflows ⏳ | Testes E2E ⏳
+**Última Atualização:** 2026-02-04
+**Status:** 🟡 75% Implementado | Geração ✅ | Storage ✅ | GHL Custom Fields ✅ | Envio WhatsApp ❌ | Workflows ⏳

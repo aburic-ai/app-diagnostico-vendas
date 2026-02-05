@@ -25,7 +25,7 @@
 
 ### 🎯 Preparação Final para o Evento
 
-Grande rodada de melhorias de UX, correções e novas funcionalidades focadas na experiência do participante e do administrador antes do evento (28/02).
+Grande rodada de melhorias de UX, correções e novas funcionalidades focadas na experiência do participante e do administrador antes do evento (07/03).
 
 ---
 
@@ -1178,7 +1178,7 @@ supabase functions deploy generate-action-plan
 
 **Última revisão:** 2026-02-04
 **Versão atual:** 2.4.0
-**Próxima milestone:** Evento 28/02 - Validação final + Google Sheets
+**Próxima milestone:** Evento 07/03 - Validação final + Google Sheets
 
 ---
 

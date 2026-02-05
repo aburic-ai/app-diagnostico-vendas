@@ -185,10 +185,10 @@ export function Admin() {
 
   // Event Data (editável)
   const [eventData, setEventData] = useState<EventData>({
-    edition: 'Fevereiro 2026',
-    day1Date: '2026-02-28',
+    edition: 'Março 2026',
+    day1Date: '2026-03-07',
     day1Time: '09:30',
-    day2Date: '2026-03-01',
+    day2Date: '2026-03-08',
     day2Time: '09:30',
   })
   const [showEventSettings, setShowEventSettings] = useState(false)
@@ -197,24 +197,24 @@ export function Admin() {
   const [tabRelease, setTabRelease] = useState<TabRelease>({
     preparacao: {
       enabled: true,
-      unlockDate: '2026-02-01',
+      unlockDate: '2026-02-03',
       unlockTime: '00:00',
-      lockDate: '2026-02-28',
-      lockTime: '09:30'
+      lockDate: '2026-03-07',
+      lockTime: '09:40'
     },
     aoVivo: {
       enabled: false,
-      unlockDate: '2026-02-28',
+      unlockDate: '2026-03-07',
       unlockTime: '09:30',
-      lockDate: '2026-03-01',
-      lockTime: '18:00'
+      lockDate: '2026-03-08',
+      lockTime: '19:00'
     },
     posEvento: {
       enabled: false,
-      unlockDate: '2026-03-01',
-      unlockTime: '18:00',
-      lockDate: '',
-      lockTime: ''
+      unlockDate: '2026-03-09',
+      unlockTime: '07:00',
+      lockDate: '2026-03-30',
+      lockTime: '00:00'
     },
   })
 
@@ -481,10 +481,10 @@ export function Admin() {
     if (!dbEventState) return
 
     setEventData({
-      edition: dbEventState.edition || 'Fevereiro 2026',
-      day1Date: dbEventState.day1_date || '2026-02-28',
+      edition: dbEventState.edition || 'Março 2026',
+      day1Date: dbEventState.day1_date || '2026-03-07',
       day1Time: dbEventState.day1_time || '09:30',
-      day2Date: dbEventState.day2_date || '2026-03-01',
+      day2Date: dbEventState.day2_date || '2026-03-08',
       day2Time: dbEventState.day2_time || '09:30',
     })
   }, [dbEventState])

@@ -409,17 +409,24 @@ export function ThankYou() {
       generateWhatsAppMessage(surveyData).then(async (result) => {
         console.log('[ThankYou] Mensagem WhatsApp gerada:', result)
 
-        // Salvar no Supabase
+        // Salvar no Supabase (update se já existe, insert se não)
         try {
-          await supabase.from('whatsapp_messages').insert({
-            transaction_id: identifier,
-            email: email || null,
-            survey_data: surveyData,
-            prompt: result.prompt,
-            generated_message: result.message,
-            used_fallback: result.usedFallback,
+          const msgEmail = email || null
+
+          const { error: msgRpcError } = await supabase.rpc('upsert_whatsapp_message', {
+            p_email: msgEmail,
+            p_transaction_id: identifier,
+            p_survey_data: surveyData,
+            p_prompt: result.prompt,
+            p_generated_message: result.message,
+            p_used_fallback: result.usedFallback,
           })
-          console.log('[ThankYou] Mensagem WhatsApp salva no Supabase')
+
+          if (msgRpcError) {
+            console.error('[ThankYou] Erro ao salvar mensagem WhatsApp:', msgRpcError)
+          } else {
+            console.log('[ThankYou] ✅ Mensagem WhatsApp salva no Supabase')
+          }
         } catch (error) {
           console.error('[ThankYou] Erro ao salvar mensagem WhatsApp:', error)
         }
@@ -490,20 +497,22 @@ export function ThankYou() {
 
       console.log('[ThankYou] ✅ Compra validada, prosseguindo...')
 
-      // 1. Salvar survey
+      // 1. Salvar survey via RPC (SECURITY DEFINER bypassa RLS)
       console.log('[ThankYou] Salvando survey...')
-      const { error: surveyError } = await supabase.from('survey_responses').insert({
-        transaction_id: identifier,
-        email: email || validation.buyerEmail || null,
-        user_id: validation.userId || null,
-        survey_data: surveyData,
+      const surveyEmail = email || validation.buyerEmail
+
+      const { error: surveyRpcError } = await supabase.rpc('upsert_survey_response', {
+        p_email: surveyEmail,
+        p_transaction_id: identifier,
+        p_user_id: validation.userId || null,
+        p_survey_data: surveyData,
       })
 
-      if (surveyError) {
-        console.error('[ThankYou] ERRO ao salvar survey:', surveyError)
-        throw surveyError
+      if (surveyRpcError) {
+        console.error('[ThankYou] ERRO ao salvar survey:', surveyRpcError)
+        throw surveyRpcError
       }
-      console.log('[ThankYou] ✅ Survey salvo!')
+      console.log('[ThankYou] ✅ Survey salvo/atualizado!')
 
       // 1.5. Notificar GHL sobre survey completado (trigger workflow de áudio)
       try {

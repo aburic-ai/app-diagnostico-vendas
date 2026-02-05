@@ -29,17 +29,17 @@ No Admin, vá até "LIBERAÇÃO DE ABAS":
 **Preparação:**
 - Toggle: ✅ Ligado
 - Liberar: `2026-02-01` `00:00`
-- Bloquear: `2026-02-28` `09:30`
+- Bloquear: `2026-03-07` `09:40`
 
 **Ao Vivo:**
 - Toggle: ❌ Desligado (vamos ligar durante o teste)
-- Liberar: `2026-02-28` `09:30`
-- Bloquear: `2026-03-01` `18:00`
+- Liberar: `2026-03-07` `09:30`
+- Bloquear: `2026-03-08` `19:00`
 
 **Pós-Evento:**
 - Toggle: ❌ Desligado
-- Liberar: `2026-03-01` `18:00`
-- Bloquear: (vazio)
+- Liberar: `2026-03-09` `07:00`
+- Bloquear: `2026-03-30` `00:00`
 
 **Salvar Configurações**
 
@@ -217,7 +217,7 @@ Clique nos cards, faça check-ins, veja seu XP aumentar."
 - [ ] Aba está acessível (não mostra "Aba Bloqueada")
 - [ ] Status do evento: "offline"
 - [ ] Mostra **countdown** para início do evento
-- [ ] Data do evento: 28/02/2026 às 09:30
+- [ ] Data do evento: 07/03/2026 às 09:30
 
 **11. Admin inicia transmissão**
 

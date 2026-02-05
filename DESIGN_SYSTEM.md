@@ -317,7 +317,7 @@ import {
 ### Countdown
 ```tsx
 <Countdown
-  targetDate={new Date('2026-02-28T09:30:00')}
+  targetDate={new Date('2026-03-07T09:30:00')}
   label="INICIO DA OPERACAO"
 />
 ```

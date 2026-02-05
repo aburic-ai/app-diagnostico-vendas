@@ -16,6 +16,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { generateScript, sanitizeScriptForTTS } from './_shared/openai-service.ts'
 import { convertTextToSpeech, validateTextLength } from './_shared/elevenlabs-service.ts'
 import { uploadAudio, checkBucketHealth } from './_shared/storage-service.ts'
+import { updateContactCustomFields, findContactByEmail } from './_shared/ghl-service.ts'
 import { generateAudioPrompt, getFallbackScript } from './prompts/audio-script.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -38,13 +39,23 @@ serve(async (req) => {
 
   try {
     // 1. Parsear payload do GHL
-    const { email, transaction_id, ghl_contact_id } = await req.json()
+    const { email, transaction_id, ghl_contact_id: rawContactId, force } = await req.json()
+
+    // Fallback: se ghl_contact_id não veio, buscar pelo email
+    let ghl_contact_id = rawContactId
+    if (!ghl_contact_id && email) {
+      console.log('[generate-audio] ghl_contact_id não fornecido, buscando por email...')
+      const lookup = await findContactByEmail(email)
+      if (lookup.contactId) {
+        ghl_contact_id = lookup.contactId
+      }
+    }
 
     console.log('='.repeat(60))
     console.log('[generate-audio] Nova requisição')
     console.log('[generate-audio] Email:', email)
     console.log('[generate-audio] Transaction:', transaction_id)
-    console.log('[generate-audio] GHL Contact ID:', ghl_contact_id)
+    console.log('[generate-audio] GHL Contact ID:', ghl_contact_id, rawContactId ? '(do payload)' : '(lookup por email)')
     console.log('='.repeat(60))
 
     if (!email && !transaction_id) {
@@ -133,8 +144,18 @@ serve(async (req) => {
       .eq('survey_response_id', surveyResponse.id)
       .single()
 
-    if (existingAudio && existingAudio.status === 'completed' && existingAudio.audio_url) {
+    if (existingAudio && existingAudio.status === 'completed' && existingAudio.audio_url && !force) {
       console.log('[generate-audio] ⚠️ Áudio já existe, retornando URL')
+
+      // Atualizar GHL mesmo com cache (pode ter falhado antes)
+      if (ghl_contact_id) {
+        await updateContactCustomFields(
+          ghl_contact_id,
+          existingAudio.audio_url,
+          existingAudio.script_generated || ''
+        )
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
@@ -190,14 +211,14 @@ serve(async (req) => {
     }
 
     const surveyData = surveyResponse.survey_data as {
-      q1: number
-      q2: number
-      q3: number
-      q4: number
-      q5: number
-      q6: number
-      q7: number
-      q8: number
+      modeloNegocio: string
+      faturamento: string
+      ondeTrava: string
+      tentativasAnteriores: string
+      investimentoAnterior: string
+      cursosAnteriores: string
+      problemaPrincipal: string
+      interessePos: string
     }
 
     const prompt = generateAudioPrompt(surveyData, userProfile)
@@ -322,6 +343,35 @@ serve(async (req) => {
       })
       .eq('id', audioFile.id)
 
+    // 12. Atualizar custom fields do contato no GHL
+    if (ghl_contact_id) {
+      console.log('[generate-audio] Atualizando contato no GHL...')
+      const ghlResult = await updateContactCustomFields(
+        ghl_contact_id,
+        uploadResult.publicUrl,
+        finalScript
+      )
+
+      if (ghlResult.success) {
+        console.log('[generate-audio] ✅ GHL atualizado!')
+        // Salvar referência no banco
+        await supabase
+          .from('survey_audio_files')
+          .update({
+            ghl_custom_field_audio_url: uploadResult.publicUrl,
+            ghl_custom_field_script: finalScript,
+          })
+          .eq('id', audioFile.id)
+      } else {
+        console.warn('[generate-audio] ⚠️ Falha ao atualizar GHL:', ghlResult.error)
+      }
+    } else {
+      console.warn('[generate-audio] ⚠️ Sem ghl_contact_id, pulando atualização GHL')
+    }
+
+    // 13. Envio do áudio via WhatsApp é feito pelo Workflow do GHL
+    // (precisa da janela 24h aberta — pessoa responde "ok" primeiro)
+
     const totalTime = Date.now() - startTime
 
     console.log('='.repeat(60))
@@ -330,7 +380,7 @@ serve(async (req) => {
     console.log('[generate-audio] Total time:', totalTime, 'ms')
     console.log('='.repeat(60))
 
-    // 12. Retornar resultado para GHL
+    // 13. Retornar resultado
     return new Response(
       JSON.stringify({
         success: true,

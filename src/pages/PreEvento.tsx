@@ -192,6 +192,14 @@ export function PreEvento() {
   const profileProgress = Math.round((completedFields / profileFields.length) * 100)
   const isProfileComplete = profileProgress === 100
 
+  // Auto-creditar XP quando perfil já está completo mas step não foi registrado
+  useEffect(() => {
+    if (isProfileComplete && !isStepCompleted(STEP_IDS.COMPLETE_PROFILE)) {
+      console.log('🔄 Perfil completo detectado sem XP creditado, creditando automaticamente...')
+      completeStep(STEP_IDS.COMPLETE_PROFILE, XP_CONFIG.PRE_EVENT.COMPLETE_PROFILE)
+    }
+  }, [isProfileComplete])
+
   // Notificações em tempo real
   const { notifications, unreadCount, markAllAsRead } = useNotifications()
 
@@ -199,7 +207,7 @@ export function PreEvento() {
   // Se Pré-Evento não está acessível → countdown para liberação do Pré-Evento
   // Se Pré-Evento já liberou → countdown para Ao Vivo
   const eventDate = useMemo(() => {
-    if (!eventState) return new Date('2026-02-28T09:30:00') // Fallback
+    if (!eventState) return new Date('2026-03-07T09:30:00') // Fallback
 
     const now = new Date()
 
@@ -216,7 +224,7 @@ export function PreEvento() {
       return new Date(eventState.ao_vivo_unlock_date)
     }
 
-    return new Date('2026-02-28T09:30:00') // Fallback
+    return new Date('2026-03-07T09:30:00') // Fallback
   }, [eventState])
 
   // Dynamic nav items baseado no estado do evento
@@ -1015,7 +1023,7 @@ export function PreEvento() {
                       marginBottom: '12px',
                     }}
                   >
-                    28/02 e 01/03
+                    07/03 e 08/03
                   </div>
                   <div
                     style={{

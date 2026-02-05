@@ -19,6 +19,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const HOTMART_SECRET = Deno.env.get('HOTMART_WEBHOOK_SECRET')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const GOOGLE_SHEETS_WEBHOOK_URL = Deno.env.get('GOOGLE_SHEETS_WEBHOOK_URL')
 
 // CORS headers
 const corsHeaders = {
@@ -199,10 +200,20 @@ async function handlePurchaseComplete(supabase: any, data: any) {
 
   console.log(`✓ Purchase recorded: ${transactionId}`)
 
-  // 6. Dar XP ao usuário (marcar step como completo)
+  // 6. Sincronizar com Google Sheets (não bloqueia)
+  syncToGoogleSheets({
+    action: 'purchase',
+    name: buyerName,
+    document: cpfCnpj,
+    email,
+    phone: buyerPhone,
+    product_slug: productInfo.slug,
+    price: purchase.price?.value || 0,
+  }).catch(() => {}) // fire-and-forget
+
+  // 7. Dar XP ao usuário (marcar step como completo)
   const currentSteps = profile.completed_steps || []
 
-  // Evitar duplicação de XP
   if (currentSteps.includes(productInfo.stepId)) {
     console.log(`⚠️ Step already completed: ${productInfo.stepId}`)
     return { success: true, duplicate_xp: true }
@@ -276,7 +287,14 @@ async function handlePurchaseRefund(supabase: any, data: any) {
 
   console.log(`✓ Purchase marked as refunded`)
 
-  // 3. Detectar produto para reverter XP
+  // 3. Sincronizar reembolso com Google Sheets
+  syncToGoogleSheets({
+    action: 'refund',
+    email: purchase.buyer_email,
+    product_slug: purchase.product_slug,
+  }).catch(() => {}) // fire-and-forget
+
+  // 4. Detectar produto para reverter XP (PRODUCT_MAP)
   const productConfig = Object.values(PRODUCT_MAP).find(
     p => p.slug === purchase.product_slug
   )
@@ -314,6 +332,31 @@ async function handlePurchaseRefund(supabase: any, data: any) {
     product: purchase.product_slug,
     xp_reverted: productConfig.xp,
     total_xp: newXP,
+  }
+}
+
+/**
+ * Sincronizar dados com Google Sheets (fire-and-forget)
+ * Envia dados para o Google Apps Script que atualiza a aba "compradores"
+ */
+async function syncToGoogleSheets(payload: Record<string, unknown>): Promise<void> {
+  if (!GOOGLE_SHEETS_WEBHOOK_URL) return
+
+  try {
+    const response = await fetch(GOOGLE_SHEETS_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    if (response.ok) {
+      console.log('📊 Google Sheets sync OK')
+    } else {
+      const text = await response.text()
+      console.warn('📊 Google Sheets sync failed:', response.status, text)
+    }
+  } catch (err) {
+    console.warn('📊 Google Sheets sync error:', err instanceof Error ? err.message : err)
   }
 }
 

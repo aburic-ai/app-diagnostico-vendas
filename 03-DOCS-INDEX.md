@@ -79,20 +79,21 @@ A documentação usa numeração prefixada para organização:
 #### [12-AUDIO-SYSTEM.md](./12-AUDIO-SYSTEM.md)
 - **Descrição:** Sistema completo de áudio personalizado via IA
 - **Conteúdo:**
-  - Fluxo completo: Survey → OpenAI o1-mini → ElevenLabs TTS → WhatsApp
+  - Fluxo completo: Survey → OpenAI gpt-4o-mini → ElevenLabs eleven_v3 → GHL API → WhatsApp
   - 2 Workflows GHL (Boas-Vindas + Áudio Personalizado)
+  - Integração GHL via API direta (ghl-service.ts) — atualiza custom fields sem depender do workflow
   - Templates WhatsApp aprovados
   - Padrão "ok" para session window
-  - Edge Function: generate-audio
-  - Configuração detalhada GHL
+  - Edge Function: generate-audio (13 steps)
   - Troubleshooting extenso
   - FAQ
 - **Arquivos relacionados:**
-  - `supabase/functions/generate-audio/`
+  - `supabase/functions/generate-audio/` (6 arquivos incl. ghl-service.ts)
   - `supabase-migrations-survey-audio-files.sql`
-- **Custo:** ~$0.19 por usuário ($0.01 OpenAI + $0.18 ElevenLabs)
-- **Última atualização:** 2026-02-03
-- **Tamanho:** 1463 linhas, 16 seções
+- **Secrets:** OPENAI_API_KEY, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID, GHL_API_KEY
+- **Custo:** ~$0.19 por usuário (~$0.005 OpenAI + $0.18 ElevenLabs)
+- **Última atualização:** 2026-02-04
+- **Tamanho:** ~1500 linhas, 16 seções
 
 #### [13-CHAT-AI-SYSTEM.md](./13-CHAT-AI-SYSTEM.md)
 - **Descrição:** Assistente de IA integrado ao chat

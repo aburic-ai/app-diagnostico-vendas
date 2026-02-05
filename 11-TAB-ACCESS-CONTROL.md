@@ -58,17 +58,17 @@ Adiciona 9 colunas à tabela `event_state`:
 **Preparação (Pre-evento):**
 - `pre_evento_enabled` (boolean, default: true)
 - `pre_evento_unlock_date` (timestamptz, default: '2026-02-01 00:00:00-03')
-- `pre_evento_lock_date` (timestamptz, default: '2026-02-28 09:30:00-03')
+- `pre_evento_lock_date` (timestamptz, default: '2026-03-07 09:40:00-03')
 
 **Ao Vivo:**
 - `ao_vivo_enabled` (boolean, default: false)
-- `ao_vivo_unlock_date` (timestamptz, default: '2026-02-28 09:30:00-03')
-- `ao_vivo_lock_date` (timestamptz, default: '2026-03-01 18:00:00-03')
+- `ao_vivo_unlock_date` (timestamptz, default: '2026-03-07 09:30:00-03')
+- `ao_vivo_lock_date` (timestamptz, default: '2026-03-08 19:00:00-03')
 
 **Pós-Evento:**
 - `pos_evento_enabled` (boolean, default: false)
-- `pos_evento_unlock_date` (timestamptz, default: '2026-03-01 18:00:00-03')
-- `pos_evento_lock_date` (timestamptz, NULL - nunca bloqueia)
+- `pos_evento_unlock_date` (timestamptz, default: '2026-03-09 07:00:00-03')
+- `pos_evento_lock_date` (timestamptz, default: '2026-03-30 00:00:00-03')
 
 **Executar:**
 ```bash
@@ -195,17 +195,17 @@ URL: /admin
 **Exemplo - Preparação:**
 - Toggle: ✅ Ligado
 - Liberar: `2026-02-01` `00:00`
-- Bloquear: `2026-02-28` `09:30`
+- Bloquear: `2026-03-07` `09:40`
 
 **Exemplo - Ao Vivo:**
 - Toggle: ❌ Desligado (participantes não acessam ainda)
-- Liberar: `2026-02-28` `09:30`
-- Bloquear: `2026-03-01` `18:00`
+- Liberar: `2026-03-07` `09:30`
+- Bloquear: `2026-03-08` `19:00`
 
 **Exemplo - Pós-Evento:**
 - Toggle: ❌ Desligado
-- Liberar: `2026-03-01` `18:00`
-- Bloquear: (vazio - nunca bloqueia)
+- Liberar: `2026-03-09` `07:00`
+- Bloquear: `2026-03-30` `00:00`
 
 ### **4. Clique em "SALVAR CONFIGURAÇÕES DE ABAS"**
 
@@ -308,15 +308,15 @@ LIMIT 1;
 ```
 pre_evento_enabled: true
 pre_evento_unlock_date: 2026-02-01 00:00:00-03
-pre_evento_lock_date: 2026-02-28 09:30:00-03
+pre_evento_lock_date: 2026-03-07 09:40:00-03
 
 ao_vivo_enabled: false
-ao_vivo_unlock_date: 2026-02-28 09:30:00-03
-ao_vivo_lock_date: 2026-03-01 18:00:00-03
+ao_vivo_unlock_date: 2026-03-07 09:30:00-03
+ao_vivo_lock_date: 2026-03-08 19:00:00-03
 
 pos_evento_enabled: false
-pos_evento_unlock_date: 2026-03-01 18:00:00-03
-pos_evento_lock_date: NULL
+pos_evento_unlock_date: 2026-03-09 07:00:00-03
+pos_evento_lock_date: 2026-03-30 00:00:00-03
 ```
 
 ---

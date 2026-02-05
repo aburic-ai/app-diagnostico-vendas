@@ -262,7 +262,7 @@ CREATE TABLE public.event_state (
   -- Timestamps
   event_started_at TIMESTAMPTZ,
   event_finished_at TIMESTAMPTZ,
-  event_scheduled_start TIMESTAMPTZ DEFAULT '2026-02-28 09:30:00-03',
+  event_scheduled_start TIMESTAMPTZ DEFAULT '2026-03-07 09:30:00-03',
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   updated_by UUID REFERENCES public.profiles(id)
 );

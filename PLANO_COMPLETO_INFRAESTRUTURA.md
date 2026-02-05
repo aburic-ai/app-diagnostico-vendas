@@ -46,7 +46,7 @@ Mas na prática, a maioria dos participantes:
 - **Participantes esperados:** ~1000 pessoas (~700 presentes ativamente)
 - **Duração:** 2 dias de evento
 - **Preferência de visualização:** Airtable ou Baserow (interface familiar)
-- **Data do evento:** 28/02/2026
+- **Data do evento:** 07/03/2026
 
 ---
 
@@ -694,7 +694,7 @@ Ajude a entender e melhorar o processo de vendas.
 
 ### Recomendação: Estratégia Híbrida
 
-**Fase 1 - Para o evento (28/02):**
+**Fase 1 - Para o evento (07/03):**
 - Lançar como **PWA**
 - Instruir participantes a "instalar" no celular
 - Criar tutorial visual de como adicionar à tela inicial

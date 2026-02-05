@@ -1,0 +1,1 @@
+O prompt para gerar o audio está em audio-scripts.ts
