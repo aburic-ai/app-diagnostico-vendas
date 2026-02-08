@@ -43,9 +43,11 @@ export type SurveyQuestion = SurveyQuestionSelect | SurveyQuestionTextarea
 // ============================================
 
 export const SURVEY_INTRO = {
-  title: 'Suas respostas vao calibrar seu diagnostico',
+  title: 'Suas respostas vão calibrar seu diagnóstico',
   subtitle:
-    'Preencha com atencao. Essas informacoes alimentam nosso sistema de diagnostico e permitem personalizar sua experiencia na imersao.',
+    'Preencha com atenção. Essas informações alimentam nosso sistema de diagnóstico e permitem personalizar sua experiência na imersão.',
+  reassurance:
+    'Não se preocupe se não souber tudo com 100% de certeza. Coloque suas impressões — a Imersão é que vai te dar as respostas.',
 }
 
 // ============================================
